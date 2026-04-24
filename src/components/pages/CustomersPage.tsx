@@ -185,14 +185,32 @@ function CustomerDetail({ customer, onClose, onEdit }: { customer: CustomerWithR
     getBillsByCustomer(customer.id).then(setBills);
   }, [customer.id]);
 
-  const statusColor = (s: string) =>
-    s === 'active' ? 'green' : s === 'suspended' ? 'amber' : 'red';
+  const statusColor = (s: string) => {
+    if (s === 'active') return 'green';
+    if (s === 'free') return 'blue';
+    if (s === 'suspended' || s === 'tdc') return 'amber';
+    return 'red';
+  };
 
   const addressDisplay = () => {
     if (!customer.address_value) return '—';
-    if (customer.address_type === 'id_number') return `ID NO ${customer.address_value}`;
+    if (customer.address_type === 'id_number') {
+      const v = customer.address_value.trim().toUpperCase();
+      if (v.startsWith('ID NO') || v.startsWith('ID NUMBER')) return customer.address_value;
+      return `ID NO ${customer.address_value}`;
+    }
     return customer.address_value;
   };
+
+  const InfoRow = ({ label, value, mono }: { label: string; value: React.ReactNode; mono?: boolean }) => (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 0',
+                  borderBottom: '1px solid var(--border)' }}>
+      <span style={{ fontSize: 12, color: 'var(--text-muted)', width: 110, flexShrink: 0 }}>{label}</span>
+      <span style={{ fontSize: 13, fontFamily: mono ? 'JetBrains Mono, monospace' : undefined, flex: 1 }}>
+        {value || '—'}
+      </span>
+    </div>
+  );
 
   return (
     <>
@@ -202,72 +220,68 @@ function CustomerDetail({ customer, onClose, onEdit }: { customer: CustomerWithR
           <div>
             <div style={{ fontSize: 15, fontWeight: 600, letterSpacing: '-0.01em' }}>{customer.full_name}</div>
             <div className="muted mono" style={{ fontSize: 11 }}>
-              {customer.customer_code} · {customer.connection_date ? `Since ${customer.connection_date}` : 'Date unknown'}
+              {customer.customer_code} · {customer.area?.name ?? '—'}
             </div>
           </div>
         </div>
         <button className="icon-btn" onClick={onClose}><Icon name="close" size={16} /></button>
       </div>
+
       <div className="drawer-body">
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 20 }}>
-          <div className="card card-pad" style={{ padding: 14, gap: 4, display: 'flex', flexDirection: 'column' }}>
-            <div className="muted" style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>CNIC</div>
-            <div className="mono" style={{ fontSize: 13 }}>{customer.cnic ?? '—'}</div>
-          </div>
-          <div className="card card-pad" style={{ padding: 14, gap: 4, display: 'flex', flexDirection: 'column' }}>
-            <div className="muted" style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>Phone</div>
-            <div className="mono" style={{ fontSize: 13 }}>{customer.phone ?? '—'}</div>
+        {/* Status bar */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px',
+                      background: 'var(--bg-muted)', borderRadius: 10, marginBottom: 16,
+                      border: '1px solid var(--border)' }}>
+          <Badge color={statusColor(customer.status)} dot>{customer.status.toUpperCase()}</Badge>
+          {customer.iptv && <Badge color="purple" dot>IPTV</Badge>}
+          {customer.due_amount
+            ? <span style={{ marginLeft: 'auto', fontSize: 13, fontWeight: 600, fontFamily: 'JetBrains Mono, monospace' }}>
+                Rs. {customer.due_amount.toLocaleString()}/mo
+              </span>
+            : <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--text-muted)' }}>Free / No charge</span>
+          }
+        </div>
+
+        {/* Personal Info */}
+        <div className="card" style={{ marginBottom: 14 }}>
+          <div className="card-head"><h3>Personal Info</h3></div>
+          <div className="card-pad" style={{ paddingTop: 8, paddingBottom: 8 }}>
+            <InfoRow label="CNIC" value={customer.cnic} mono />
+            <InfoRow label="Phone" value={customer.phone} mono />
+            <InfoRow label="Address" value={addressDisplay()} />
           </div>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px',
-                      background: 'var(--bg-muted)', borderRadius: 10, marginBottom: 20, border: '1px solid var(--border)' }}>
-          <div>
-            <div className="muted" style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>Status</div>
-            <div style={{ fontSize: 14, fontWeight: 500, marginTop: 2 }}>
-              <Badge color={statusColor(customer.status)} dot>{customer.status}</Badge>
-            </div>
-          </div>
-          <div style={{ textAlign: 'right' }}>
-            <div className="muted" style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>Address</div>
-            <div style={{ fontSize: 13, marginTop: 2 }}>{addressDisplay()}</div>
-          </div>
-        </div>
-
-        <div className="card" style={{ marginBottom: 20 }}>
-          <div className="card-head"><h3>Current Package</h3></div>
-          <div className="card-pad" style={{ paddingTop: 14 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-              <IconBadge name="wifi" color="blue" size={44} />
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 15, fontWeight: 600 }}>{customer.package?.name ?? '—'}</div>
-                <div className="muted" style={{ fontSize: 12 }}>
-                  {customer.due_amount ? `Rs. ${customer.due_amount.toLocaleString()}/mo` : 'Free / No charge'} · {customer.area?.name ?? '—'}
-                </div>
-              </div>
-              <button className="btn btn-secondary btn-sm">Change</button>
-            </div>
+        {/* Connection Details */}
+        <div className="card" style={{ marginBottom: 14 }}>
+          <div className="card-head"><h3>Connection Details</h3></div>
+          <div className="card-pad" style={{ paddingTop: 8, paddingBottom: 8 }}>
+            <InfoRow label="Package" value={customer.package?.name} />
+            <InfoRow label="Area" value={customer.area?.name} />
+            {customer.username && <InfoRow label="Username" value={customer.username} mono />}
+            {customer.onu_number && <InfoRow label="ONU Number" value={customer.onu_number} mono />}
+            <InfoRow label="IPTV"
+              value={customer.iptv
+                ? <Badge color="purple" dot>Active</Badge>
+                : <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>Not subscribed</span>}
+            />
+            {customer.connection_date && <InfoRow label="Connected Since" value={customer.connection_date} />}
+            {customer.disconnected_date && <InfoRow label="Disconnected On" value={customer.disconnected_date} />}
+            {customer.reconnected_date && <InfoRow label="Reconnected On" value={customer.reconnected_date} />}
           </div>
         </div>
 
-        {customer.username && (
-          <div className="card" style={{ marginBottom: 20 }}>
-            <div className="card-head"><h3>Connection Details</h3></div>
-            <div className="card-pad" style={{ paddingTop: 14, display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <div className="row gap-sm"><span className="muted" style={{ fontSize: 12, width: 80 }}>Username</span><span className="mono" style={{ fontSize: 13 }}>{customer.username}</span></div>
-              {customer.onu_number && <div className="row gap-sm"><span className="muted" style={{ fontSize: 12, width: 80 }}>ONU</span><span className="mono" style={{ fontSize: 13 }}>{customer.onu_number}</span></div>}
-              {customer.iptv && <div className="row gap-sm"><span className="muted" style={{ fontSize: 12, width: 80 }}>IPTV</span><Badge color="blue" dot>Active</Badge></div>}
-            </div>
-          </div>
-        )}
-
-        <div className="card" style={{ marginBottom: 20 }}>
-          <div className="card-head"><h3>Bill history</h3></div>
+        {/* Bill History */}
+        <div className="card" style={{ marginBottom: 14 }}>
+          <div className="card-head"><h3>Bill History</h3></div>
           {bills.length === 0 ? (
-            <div style={{ padding: '16px 20px', color: 'var(--text-muted)', fontSize: 13 }}>No bills recorded</div>
+            <div style={{ padding: '14px 20px', color: 'var(--text-muted)', fontSize: 13 }}>No bills recorded</div>
           ) : bills.map((b, i) => (
             <div key={i} className="minirow">
-              <div className="row gap-sm"><Icon name="calendar" size={14} style={{ color: 'var(--text-muted)' }} />{b.month}</div>
+              <div className="row gap-sm">
+                <Icon name="calendar" size={14} style={{ color: 'var(--text-muted)' }} />
+                {b.month}
+              </div>
               <div className="row gap-md">
                 <span className="mono">Rs. {b.amount.toLocaleString()}</span>
                 <Badge color={b.status === 'paid' ? 'green' : 'amber'} dot>{b.status}</Badge>
@@ -276,13 +290,17 @@ function CustomerDetail({ customer, onClose, onEdit }: { customer: CustomerWithR
           ))}
         </div>
 
+        {/* Remarks */}
         {customer.remarks && (
           <div className="card">
             <div className="card-head"><h3>Remarks</h3></div>
-            <div style={{ padding: '12px 20px', fontSize: 13, color: 'var(--text-muted)' }}>{customer.remarks}</div>
+            <div style={{ padding: '12px 20px', fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.6 }}>
+              {customer.remarks}
+            </div>
           </div>
         )}
       </div>
+
       <div className="drawer-foot">
         <button className="btn btn-secondary" onClick={onEdit}><Icon name="edit" size={14} />Edit</button>
         <button className="btn btn-danger"><Icon name="ban" size={14} />Suspend</button>
@@ -427,7 +445,6 @@ export default function CustomersPage() {
                   <div className="row gap-sm" style={{ justifyContent: 'flex-end' }}>
                     <button className="icon-btn" style={{ width: 28, height: 28 }}><Icon name="eye" size={14} /></button>
                     <button className="icon-btn" style={{ width: 28, height: 28 }} onClick={() => setEditCustomer(c)}><Icon name="edit" size={14} /></button>
-                    <button className="icon-btn" style={{ width: 28, height: 28 }}><Icon name="moreV" size={14} /></button>
                   </div>
                 </td>
               </tr>

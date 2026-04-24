@@ -147,9 +147,11 @@ export default function App() {
   return (
     <div className="app">
       <Sidebar active={active} setActive={setActive} />
-      <main style={{ minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+      <main style={{ minWidth: 0, display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
         <Topbar meta={meta} isDark={isDark} onToggleTheme={() => setIsDark(d => !d)} />
-        {pages[active]}
+        <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
+          {pages[active]}
+        </div>
       </main>
     </div>
   );

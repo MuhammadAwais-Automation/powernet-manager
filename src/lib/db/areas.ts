@@ -55,11 +55,29 @@ export async function updateArea(id: string, input: Partial<{
 
 export async function getAreaCustomerCounts(): Promise<Record<string, number>> {
   const { data, error } = await supabase
-    .from('customers')
-    .select('area_id')
-  if (error) return {}
-  return (data ?? []).reduce((acc, c) => {
-    if (c.area_id) acc[c.area_id] = (acc[c.area_id] ?? 0) + 1
+    .rpc('get_area_customer_counts')
+  if (error) {
+    // fallback: batch fetch
+    const BATCH = 1000
+    let all: { area_id: string }[] = []
+    let from = 0
+    while (true) {
+      const { data: batch, error: bErr } = await supabase
+        .from('customers')
+        .select('area_id')
+        .range(from, from + BATCH - 1)
+      if (bErr || !batch || batch.length === 0) break
+      all = all.concat(batch as { area_id: string }[])
+      if (batch.length < BATCH) break
+      from += BATCH
+    }
+    return all.reduce((acc, c) => {
+      if (c.area_id) acc[c.area_id] = (acc[c.area_id] ?? 0) + 1
+      return acc
+    }, {} as Record<string, number>)
+  }
+  return (data ?? []).reduce((acc: Record<string, number>, row: { area_id: string; count: number }) => {
+    acc[row.area_id] = row.count
     return acc
-  }, {} as Record<string, number>)
+  }, {})
 }
