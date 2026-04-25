@@ -2,22 +2,35 @@
 import React, { useState, useEffect } from 'react';
 import Icon from '../Icon';
 import { Badge, Switch, Modal } from '../ui';
+import { supabase } from '@/lib/supabase';
 import { getStaff, createStaff, updateStaff, updateStaffPassword } from '@/lib/db/staff';
 import { getAreas } from '@/lib/db/areas';
 import { initials, avClass } from '@/lib/utils';
 import type { Staff, StaffWithArea, Area, StaffRole } from '@/types/database';
 
 const ROLE_LABELS: Record<string, string> = {
-  technician:     'Technician',
-  recovery_agent: 'Recovery Agent',
-  helper:         'Helper',
+  technician:        'Technician',
+  recovery_agent:    'Recovery Agent',
+  helper:            'Helper',
+  admin:             'Admin',
+  complaint_manager: 'Complaint Manager',
 };
 
 const ROLE_COLORS: Record<string, 'blue' | 'amber' | 'green' | 'purple' | 'gray'> = {
-  technician:     'blue',
-  recovery_agent: 'amber',
-  helper:         'green',
+  technician:        'blue',
+  recovery_agent:    'amber',
+  helper:            'green',
+  admin:             'gray',
+  complaint_manager: 'purple',
 };
+
+const DASHBOARD_ROLES = new Set(['admin', 'complaint_manager']);
+
+async function getAuthHeaders(): Promise<Record<string, string>> {
+  const { data: { session } } = await supabase.auth.getSession();
+  const token = session?.access_token;
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
 
 // ── Add / Edit Staff Modal ────────────────────────────────────────────────────
 
@@ -61,15 +74,36 @@ function StaffFormModal({ open, onClose, areas, onSaved, editTarget }: {
         saved = await updateStaff(editTarget.id, patch);
         if (form.password.trim()) await updateStaffPassword(editTarget.id, form.password.trim());
       } else {
-        saved = await createStaff({
-          full_name: form.full_name.trim(),
-          role:      form.role,
-          phone:     form.phone || null,
-          area_id:   form.area_id || null,
-          username:  form.username.trim().toLowerCase(),
-          is_active: true,
-          password:  form.password.trim(),
-        });
+        if (DASHBOARD_ROLES.has(form.role)) {
+          const res = await fetch('/api/admin/create-dashboard-user', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', ...(await getAuthHeaders()) },
+            body: JSON.stringify({
+              username:  form.username.trim().toLowerCase(),
+              password:  form.password.trim(),
+              full_name: form.full_name.trim(),
+              phone:     form.phone || null,
+              area_id:   form.area_id || null,
+              role:      form.role,
+            }),
+          });
+          if (!res.ok) {
+            const data = await res.json().catch(() => ({}));
+            throw new Error(data.error ?? 'Could not create dashboard user');
+          }
+          const { staff: created } = await res.json();
+          saved = created;
+        } else {
+          saved = await createStaff({
+            full_name: form.full_name.trim(),
+            role:      form.role,
+            phone:     form.phone || null,
+            area_id:   form.area_id || null,
+            username:  form.username.trim().toLowerCase(),
+            is_active: true,
+            password:  form.password.trim(),
+          });
+        }
       }
       onSaved(saved);
       onClose();
@@ -119,6 +153,8 @@ function StaffFormModal({ open, onClose, areas, onSaved, editTarget }: {
               <option value="technician">Technician</option>
               <option value="recovery_agent">Recovery Agent</option>
               <option value="helper">Helper</option>
+              <option value="admin">Admin</option>
+              <option value="complaint_manager">Complaint Manager</option>
             </select>
           </div>
           <div className="field">
@@ -183,7 +219,7 @@ function StaffFormModal({ open, onClose, areas, onSaved, editTarget }: {
 function CredentialsModal({ staff, onClose, onPasswordReset }: {
   staff: StaffWithArea;
   onClose: () => void;
-  onPasswordReset: (staffId: string, newPw: string) => Promise<void>;
+  onPasswordReset: (s: StaffWithArea, newPw: string) => Promise<void>;
 }) {
   const [resetMode, setResetMode] = useState(false);
   const [newPw, setNewPw]         = useState('');
@@ -203,7 +239,7 @@ function CredentialsModal({ staff, onClose, onPasswordReset }: {
     setSaving(true);
     setError(null);
     try {
-      await onPasswordReset(staff.id, newPw.trim());
+      await onPasswordReset(staff, newPw.trim());
       setResetMode(false);
       setNewPw('');
     } catch (e: unknown) {
@@ -391,9 +427,20 @@ export default function StaffPage() {
     }
   };
 
-  const handlePasswordReset = async (staffId: string, newPw: string) => {
-    const { updateStaffPassword } = await import('@/lib/db/staff');
-    await updateStaffPassword(staffId, newPw);
+  const handlePasswordReset = async (s: StaffWithArea, newPw: string) => {
+    if (s.auth_user_id) {
+      const res = await fetch('/api/admin/reset-dashboard-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(await getAuthHeaders()) },
+        body: JSON.stringify({ auth_user_id: s.auth_user_id, password: newPw }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error ?? 'Could not reset password');
+      }
+    } else {
+      await updateStaffPassword(s.id, newPw);
+    }
   };
 
   if (loading) return (
@@ -403,6 +450,7 @@ export default function StaffPage() {
   );
 
   const byRole = (role: StaffRole) => staff.filter(s => s.role === role);
+  const dashUsers   = staff.filter(s => DASHBOARD_ROLES.has(s.role));
   const technicians = byRole('technician');
   const agents      = byRole('recovery_agent');
   const helpers     = byRole('helper');
@@ -423,7 +471,7 @@ export default function StaffPage() {
         <div>
           <h1>Staff Management</h1>
           <p>
-            {staff.length} total · {technicians.length} technicians · {agents.length} recovery agents
+            {staff.length} total · {dashUsers.length} dashboard · {technicians.length} technicians · {agents.length} recovery agents
             {helpers.length > 0 ? ` · ${helpers.length} helpers` : ''}
           </p>
         </div>
@@ -432,6 +480,16 @@ export default function StaffPage() {
             <Icon name="plus" size={14} />Add Staff
           </button>
         </div>
+      </div>
+
+      <SectionHeader label="Dashboard Users" count={dashUsers.length} color="var(--purple)" />
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 14, marginBottom: 4 }}>
+        {dashUsers.map(s => (
+          <StaffCard key={s.id} s={s}
+            onEdit={() => setEditTarget(s)}
+            onViewCreds={() => setCredsTarget(s)}
+            onToggleActive={v => handleToggleActive(s, v)} />
+        ))}
       </div>
 
       <SectionHeader label="Technicians"       count={technicians.length} color="var(--blue)" />

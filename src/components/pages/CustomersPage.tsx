@@ -6,6 +6,7 @@ import { getCustomers, createCustomer, getCustomerById, updateCustomer } from '@
 import { getAreas } from '@/lib/db/areas';
 import { getPackages } from '@/lib/db/packages';
 import { getBillsByCustomer } from '@/lib/db/bills';
+import { useAuth } from '@/lib/auth/auth-context';
 import type { CustomerWithRelations, Area, Package, CustomerStatus, Bill } from '@/types/database';
 
 // ── Add Customer Drawer ──────────────────────────────────────────────────────
@@ -178,7 +179,7 @@ function AddCustomerDrawer({
 
 // ── Customer Detail Drawer ───────────────────────────────────────────────────
 
-function CustomerDetail({ customer, onClose, onEdit }: { customer: CustomerWithRelations; onClose: () => void; onEdit: () => void; }) {
+function CustomerDetail({ customer, onClose, onEdit, readOnly }: { customer: CustomerWithRelations; onClose: () => void; onEdit: () => void; readOnly?: boolean; }) {
   const [bills, setBills] = useState<Bill[]>([]);
 
   useEffect(() => {
@@ -301,10 +302,12 @@ function CustomerDetail({ customer, onClose, onEdit }: { customer: CustomerWithR
         )}
       </div>
 
-      <div className="drawer-foot">
-        <button className="btn btn-secondary" onClick={onEdit}><Icon name="edit" size={14} />Edit</button>
-        <button className="btn btn-danger"><Icon name="ban" size={14} />Suspend</button>
-      </div>
+      {!readOnly && (
+        <div className="drawer-foot">
+          <button className="btn btn-secondary" onClick={onEdit}><Icon name="edit" size={14} />Edit</button>
+          <button className="btn btn-danger"><Icon name="ban" size={14} />Suspend</button>
+        </div>
+      )}
     </>
   );
 }
@@ -312,6 +315,8 @@ function CustomerDetail({ customer, onClose, onEdit }: { customer: CustomerWithR
 // ── Main Page ────────────────────────────────────────────────────────────────
 
 export default function CustomersPage() {
+  const { staff } = useAuth();
+  const readOnly = staff?.role === 'complaint_manager';
   const [customers, setCustomers] = useState<CustomerWithRelations[]>([]);
   const [areas, setAreas] = useState<Area[]>([]);
   const [packages, setPackages] = useState<Package[]>([]);
@@ -371,7 +376,9 @@ export default function CustomersPage() {
         </div>
         <div className="row gap-sm">
           <button className="btn btn-secondary"><Icon name="download" size={14} />Export CSV</button>
-          <button className="btn btn-primary" onClick={() => setShowAdd(true)}><Icon name="plus" size={14} />Add Customer</button>
+          {!readOnly && (
+            <button className="btn btn-primary" onClick={() => setShowAdd(true)}><Icon name="plus" size={14} />Add Customer</button>
+          )}
         </div>
       </div>
 
@@ -444,7 +451,9 @@ export default function CustomersPage() {
                 <td onClick={e => e.stopPropagation()} style={{ textAlign: 'right' }}>
                   <div className="row gap-sm" style={{ justifyContent: 'flex-end' }}>
                     <button className="icon-btn" style={{ width: 28, height: 28 }}><Icon name="eye" size={14} /></button>
-                    <button className="icon-btn" style={{ width: 28, height: 28 }} onClick={() => setEditCustomer(c)}><Icon name="edit" size={14} /></button>
+                    {!readOnly && (
+                      <button className="icon-btn" style={{ width: 28, height: 28 }} onClick={() => setEditCustomer(c)}><Icon name="edit" size={14} /></button>
+                    )}
                   </div>
                 </td>
               </tr>
@@ -474,6 +483,7 @@ export default function CustomersPage() {
             customer={selected}
             onClose={() => setSelected(null)}
             onEdit={() => { setEditCustomer(selected); setSelected(null); }}
+            readOnly={readOnly}
           />
         )}
       </Drawer>
