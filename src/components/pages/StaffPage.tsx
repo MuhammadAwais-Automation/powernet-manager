@@ -8,19 +8,15 @@ import { initials, avClass } from '@/lib/utils';
 import type { Staff, StaffWithArea, Area, StaffRole } from '@/types/database';
 
 const ROLE_LABELS: Record<string, string> = {
-  technician:       'Technician',
-  recovery_agent:   'Recovery Agent',
-  helper_technician:'Helper Technician',
-  cable_operator:   'Cable Operator',
-  admin:            'Admin',
+  technician:     'Technician',
+  recovery_agent: 'Recovery Agent',
+  helper:         'Helper',
 };
 
 const ROLE_COLORS: Record<string, 'blue' | 'amber' | 'green' | 'purple' | 'gray'> = {
-  technician:        'blue',
-  recovery_agent:    'amber',
-  helper_technician: 'green',
-  cable_operator:    'purple',
-  admin:             'gray',
+  technician:     'blue',
+  recovery_agent: 'amber',
+  helper:         'green',
 };
 
 // ── Add / Edit Staff Modal ────────────────────────────────────────────────────
@@ -122,9 +118,7 @@ function StaffFormModal({ open, onClose, areas, onSaved, editTarget }: {
             <select className="select" value={form.role} onChange={e => set('role', e.target.value)}>
               <option value="technician">Technician</option>
               <option value="recovery_agent">Recovery Agent</option>
-              <option value="helper_technician">Helper Technician</option>
-              <option value="cable_operator">Cable Operator</option>
-              <option value="admin">Admin</option>
+              <option value="helper">Helper</option>
             </select>
           </div>
           <div className="field">
@@ -409,10 +403,9 @@ export default function StaffPage() {
   );
 
   const byRole = (role: StaffRole) => staff.filter(s => s.role === role);
-  const technicians      = byRole('technician');
-  const agents           = byRole('recovery_agent');
-  const helpers          = byRole('helper_technician');
-  const cableOps         = byRole('cable_operator');
+  const technicians = byRole('technician');
+  const agents      = byRole('recovery_agent');
+  const helpers     = byRole('helper');
 
   const SectionHeader = ({ label, count, color }: { label: string; count: number; color: string }) =>
     count > 0 ? (
@@ -432,7 +425,6 @@ export default function StaffPage() {
           <p>
             {staff.length} total · {technicians.length} technicians · {agents.length} recovery agents
             {helpers.length > 0 ? ` · ${helpers.length} helpers` : ''}
-            {cableOps.length > 0 ? ` · ${cableOps.length} cable operators` : ''}
           </p>
         </div>
         <div className="row gap-sm">
@@ -462,19 +454,9 @@ export default function StaffPage() {
         ))}
       </div>
 
-      <SectionHeader label="Helper Technicians" count={helpers.length}   color="var(--green)" />
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 14, marginBottom: 4 }}>
-        {helpers.map(s => (
-          <StaffCard key={s.id} s={s}
-            onEdit={() => setEditTarget(s)}
-            onViewCreds={() => setCredsTarget(s)}
-            onToggleActive={v => handleToggleActive(s, v)} />
-        ))}
-      </div>
-
-      <SectionHeader label="Cable Operators"   count={cableOps.length}  color="var(--purple)" />
+      <SectionHeader label="Helpers" count={helpers.length} color="var(--green)" />
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 14 }}>
-        {cableOps.map(s => (
+        {helpers.map(s => (
           <StaffCard key={s.id} s={s}
             onEdit={() => setEditTarget(s)}
             onViewCreds={() => setCredsTarget(s)}

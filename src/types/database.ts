@@ -46,7 +46,7 @@ export type CustomerWithRelations = Customer & {
 
 export type NewCustomer = Omit<Customer, 'id' | 'customer_code' | 'created_at'>
 
-export type StaffRole = 'technician' | 'recovery_agent' | 'helper_technician' | 'cable_operator' | 'admin'
+export type StaffRole = 'technician' | 'recovery_agent' | 'helper'
 
 export type Staff = {
   id: string
