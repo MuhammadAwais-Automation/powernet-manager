@@ -34,15 +34,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let active = true
     async function bootstrap() {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!active) return
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        if (!active) return
+        if (!session) {
+          setStaff(null)
+          return
+        }
+        const s = await fetchStaffByAuthId(session.user.id)
+        if (!active) return
+        if (!s || !isDashboardRole(s.role) || !s.is_active) {
+          await supabase.auth.signOut()
+          setStaff(null)
+        } else {
+          setStaff(s)
+        }
+      } catch {
+        if (active) setStaff(null)
+      } finally {
+        if (active) setLoading(false)
+      }
+    }
+    bootstrap()
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (!session) {
         setStaff(null)
         setLoading(false)
         return
       }
       const s = await fetchStaffByAuthId(session.user.id)
-      if (!active) return
       if (!s || !isDashboardRole(s.role) || !s.is_active) {
         await supabase.auth.signOut()
         setStaff(null)
@@ -50,20 +70,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setStaff(s)
       }
       setLoading(false)
-    }
-    bootstrap()
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      if (!session) {
-        setStaff(null)
-        return
-      }
-      const s = await fetchStaffByAuthId(session.user.id)
-      if (!s || !isDashboardRole(s.role) || !s.is_active) {
-        await supabase.auth.signOut()
-        setStaff(null)
-      } else {
-        setStaff(s)
-      }
     })
     return () => {
       active = false
