@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabase';
 import { getStaff, createStaff, updateStaff, updateStaffPassword } from '@/lib/db/staff';
 import { getAreas } from '@/lib/db/areas';
 import { initials, avClass } from '@/lib/utils';
+import { useAuth } from '@/lib/auth/auth-context';
 import type { Staff, StaffWithArea, Area, StaffRole } from '@/types/database';
 
 const ROLE_LABELS: Record<string, string> = {
@@ -394,6 +395,7 @@ function StaffCard({ s, onEdit, onViewCreds, onToggleActive }: {
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function StaffPage() {
+  const { staff: currentStaff } = useAuth();
   const [staff, setStaff]             = useState<StaffWithArea[]>([]);
   const [areas, setAreas]             = useState<Area[]>([]);
   const [loading, setLoading]         = useState(true);
@@ -406,6 +408,8 @@ export default function StaffPage() {
       .then(([s, a]) => { setStaff(s); setAreas(a); })
       .finally(() => setLoading(false));
   }, []);
+
+  const visibleStaff = staff.filter(s => s.id !== currentStaff?.id);
 
   const handleSaved = (saved: Staff) => {
     const area = areas.find(a => a.id === saved.area_id) ?? null;
@@ -449,8 +453,8 @@ export default function StaffPage() {
     </div>
   );
 
-  const byRole = (role: StaffRole) => staff.filter(s => s.role === role);
-  const dashUsers   = staff.filter(s => DASHBOARD_ROLES.has(s.role));
+  const byRole = (role: StaffRole) => visibleStaff.filter(s => s.role === role);
+  const dashUsers   = visibleStaff.filter(s => DASHBOARD_ROLES.has(s.role));
   const technicians = byRole('technician');
   const agents      = byRole('recovery_agent');
   const helpers     = byRole('helper');
@@ -471,7 +475,7 @@ export default function StaffPage() {
         <div>
           <h1>Staff Management</h1>
           <p>
-            {staff.length} total · {dashUsers.length} dashboard · {technicians.length} technicians · {agents.length} recovery agents
+            {visibleStaff.length} total · {dashUsers.length} dashboard · {technicians.length} technicians · {agents.length} recovery agents
             {helpers.length > 0 ? ` · ${helpers.length} helpers` : ''}
           </p>
         </div>
@@ -522,7 +526,7 @@ export default function StaffPage() {
         ))}
       </div>
 
-      {staff.length === 0 && (
+      {visibleStaff.length === 0 && (
         <div className="card" style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)' }}>
           <Icon name="briefcase" size={28} style={{ color: 'var(--text-faint)', marginBottom: 12 }} />
           <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text)', marginBottom: 4 }}>No staff yet</div>
