@@ -1,6 +1,6 @@
 'use client';
 import React, { useState, useEffect } from 'react';
-import Icon from '../Icon';
+import Icon, { type IconName } from '../Icon';
 import { IconBadge } from '../ui';
 import { RevenueLineChart, Donut, Sparkline } from '../charts';
 import { getDashboardStats, getRecentActivity } from '@/lib/db/dashboard';
@@ -10,10 +10,12 @@ export default function DashboardPage() {
   const [stats, setStats]       = useState<DashboardStats | null>(null);
   const [activity, setActivity] = useState<ActivityItem[]>([]);
   const [loading, setLoading]   = useState(true);
+  const [error, setError]       = useState<string | null>(null);
 
   useEffect(() => {
     Promise.all([getDashboardStats(), getRecentActivity()])
       .then(([s, a]) => { setStats(s); setActivity(a); })
+      .catch((e: unknown) => setError(e instanceof Error ? e.message : 'Could not load dashboard'))
       .finally(() => setLoading(false));
   }, []);
 
@@ -26,9 +28,30 @@ export default function DashboardPage() {
     </div>
   );
 
-  const s = stats!;
+  if (error) return (
+    <div className="page">
+      <div className="card" style={{ padding: 24 }}>
+        <div style={{ fontWeight: 600, marginBottom: 6 }}>Data load failed</div>
+        <div className="muted" style={{ fontSize: 13, marginBottom: 14 }}>{error}</div>
+        <button className="btn btn-primary" onClick={() => window.location.reload()}>
+          <Icon name="refresh" size={14} />Retry
+        </button>
+      </div>
+    </div>
+  );
 
-  const statCards = [
+  const s = stats!;
+  type StatCard = {
+    key: string;
+    label: string;
+    value: string;
+    sub: string;
+    icon: IconName;
+    accent: string;
+    spark: number[];
+  };
+
+  const statCards: StatCard[] = [
     {
       key: 'customers', label: 'Total Customers',
       value: s.totalCustomers.toLocaleString(),
@@ -70,7 +93,7 @@ export default function DashboardPage() {
     },
   ];
 
-  const wideCards = [
+  const wideCards: StatCard[] = [
     {
       key: 'complaints', label: 'Open Complaints',
       value: s.openComplaints.toLocaleString(),
@@ -116,7 +139,7 @@ export default function DashboardPage() {
           <div key={i} className="stat-v2" style={{ '--stat-accent': c.accent } as React.CSSProperties}>
             <div className="stat-v2-glow" />
             <div className="stat-v2-head">
-              <span className="stat-v2-icon"><Icon name={c.icon as any} size={18} /></span>
+              <span className="stat-v2-icon"><Icon name={c.icon} size={18} /></span>
               <span className="stat-v2-label">{c.label}</span>
             </div>
             <div className="stat-v2-body">
@@ -135,7 +158,7 @@ export default function DashboardPage() {
           <div key={i} className="stat-v2 stat-v2-wide" style={{ '--stat-accent': c.accent } as React.CSSProperties}>
             <div className="stat-v2-glow" />
             <div className="stat-v2-head">
-              <span className="stat-v2-icon"><Icon name={c.icon as any} size={18} /></span>
+              <span className="stat-v2-icon"><Icon name={c.icon} size={18} /></span>
               <span className="stat-v2-label">{c.label}</span>
             </div>
             <div className="stat-v2-body">
@@ -204,7 +227,7 @@ export default function DashboardPage() {
           <div>
             {activity.map((a, i) => (
               <div key={i} className="activity-item">
-                <IconBadge name={a.icon as any} color={a.color} size={32} />
+                <IconBadge name={a.icon} color={a.color} size={32} />
                 <div className="main">
                   <div className="lead">{a.lead}</div>
                   <div className="when">

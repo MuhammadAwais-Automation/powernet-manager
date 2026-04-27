@@ -1,6 +1,8 @@
 'use client';
 import React from 'react';
 
+type BarDatum = Record<string, string | number | boolean | undefined>;
+
 export function RevenueLineChart({ data, height = 260 }: { data: { m: string; v: number }[]; height?: number }) {
   const w = 560, h = height;
   const pad = { l: 44, r: 20, t: 24, b: 32 };
@@ -85,14 +87,14 @@ export function Donut({ segments, size = 200, thickness = 28, center }: {
 }
 
 export function BarChart({ data, height = 220, accent, labelKey = 'd', valueKey = 'v', unit = 'k' }: {
-  data: Record<string, any>[];
+  data: BarDatum[];
   height?: number; accent?: string; labelKey?: string; valueKey?: string; unit?: string;
 }) {
   const fill = accent || 'var(--brand)';
   const w = 640, h = height;
   const pad = { l: 40, r: 16, t: 20, b: 30 };
   const innerW = w - pad.l - pad.r, innerH = h - pad.t - pad.b;
-  const max = Math.ceil(Math.max(...data.map(d => d[valueKey])) / 20) * 20 + 20;
+  const max = Math.ceil(Math.max(...data.map(d => Number(d[valueKey] ?? 0))) / 20) * 20 + 20;
   const barW = innerW / data.length * 0.58;
   const gap = innerW / data.length;
   const ticks = [0, Math.round(max / 2), max];
@@ -117,14 +119,15 @@ export function BarChart({ data, height = 220, accent, labelKey = 'd', valueKey 
       })}
       {data.map((d, i) => {
         const bx = pad.l + i * gap + gap / 2 - barW / 2;
-        const bh = (d[valueKey] / max) * innerH;
+        const value = Number(d[valueKey] ?? 0);
+        const bh = (value / max) * innerH;
         const yy = pad.t + innerH - bh;
         const rx = barW / 2;
         return (
           <g key={i}>
             <rect x={bx} y={yy} width={barW} height={bh} fill={fill} rx={rx} opacity={d.highlight ? 1 : 0.85} />
-            <text x={bx + barW / 2} y={h - pad.b + 16} fontSize="11" textAnchor="middle" fill="var(--text-muted)">{d[labelKey]}</text>
-            <text x={bx + barW / 2} y={yy - 6} fontSize="10" textAnchor="middle" fill="var(--text)" fontWeight="600" fontFamily="JetBrains Mono, monospace">{d[valueKey]}{unit}</text>
+            <text x={bx + barW / 2} y={h - pad.b + 16} fontSize="11" textAnchor="middle" fill="var(--text-muted)">{String(d[labelKey] ?? '')}</text>
+            <text x={bx + barW / 2} y={yy - 6} fontSize="10" textAnchor="middle" fill="var(--text)" fontWeight="600" fontFamily="JetBrains Mono, monospace">{value}{unit}</text>
           </g>
         );
       })}

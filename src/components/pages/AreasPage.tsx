@@ -166,18 +166,32 @@ export default function AreasPage() {
   const [staff, setStaff]           = useState<StaffWithArea[]>([]);
   const [counts, setCounts]         = useState<Record<string, number>>({});
   const [loading, setLoading]       = useState(true);
+  const [error, setError]           = useState<string | null>(null);
   const [addOpen, setAddOpen]       = useState(false);
   const [editTarget, setEditTarget] = useState<Area | null>(null);
 
   useEffect(() => {
     Promise.all([getAreas(), getStaff(), getAreaCustomerCounts()])
       .then(([a, s, c]) => { setAreas(a); setStaff(s); setCounts(c); })
+      .catch((e: unknown) => setError(e instanceof Error ? e.message : 'Could not load areas'))
       .finally(() => setLoading(false));
   }, []);
 
   if (loading) return (
     <div className="page" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 300 }}>
       <div className="muted">Loading areas…</div>
+    </div>
+  );
+
+  if (error) return (
+    <div className="page">
+      <div className="card" style={{ padding: 24 }}>
+        <div style={{ fontWeight: 600, marginBottom: 6 }}>Data load failed</div>
+        <div className="muted" style={{ fontSize: 13, marginBottom: 14 }}>{error}</div>
+        <button className="btn btn-primary" onClick={() => window.location.reload()}>
+          <Icon name="refresh" size={14} />Retry
+        </button>
+      </div>
     </div>
   );
 

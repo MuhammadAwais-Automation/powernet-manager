@@ -258,6 +258,7 @@ export default function ComplaintsPage() {
   const [areas, setAreas] = useState<Area[]>([]);
   const [staff, setStaff] = useState<StaffWithArea[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [view, setView] = useState('kanban');
   const [open, setOpen] = useState<ComplaintWithRelations | null>(null);
   const [logOpen, setLogOpen] = useState(false);
@@ -265,6 +266,7 @@ export default function ComplaintsPage() {
   useEffect(() => {
     Promise.all([getComplaints(), getAreas(), getStaff()])
       .then(([c, a, s]) => { setComplaints(c); setAreas(a); setStaff(s); })
+      .catch((e: unknown) => setError(e instanceof Error ? e.message : 'Could not load complaints'))
       .finally(() => setLoading(false));
   }, []);
 
@@ -275,6 +277,18 @@ export default function ComplaintsPage() {
   if (loading) return (
     <div className="page" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 300 }}>
       <div className="muted">Loading complaints…</div>
+    </div>
+  );
+
+  if (error) return (
+    <div className="page">
+      <div className="card" style={{ padding: 24 }}>
+        <div style={{ fontWeight: 600, marginBottom: 6 }}>Data load failed</div>
+        <div className="muted" style={{ fontSize: 13, marginBottom: 14 }}>{error}</div>
+        <button className="btn btn-primary" onClick={() => window.location.reload()}>
+          <Icon name="refresh" size={14} />Retry
+        </button>
+      </div>
     </div>
   );
 

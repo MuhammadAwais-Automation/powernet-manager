@@ -5,6 +5,8 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "test:billing-core": "node scripts/billing-core.test.js",
+    "perf:smoke": "node scripts/perf-smoke.js",
     "start": "next start",
     "lint": "next lint"
   },

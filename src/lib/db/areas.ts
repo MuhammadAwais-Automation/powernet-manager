@@ -1,7 +1,18 @@
 import { supabase } from '@/lib/supabase'
 import type { Area } from '@/types/database'
 
+let areasCache: { data: Area[]; expiresAt: number } | null = null
+let areaCountsCache: { data: Record<string, number>; expiresAt: number } | null = null
+const CACHE_MS = 60_000
+
+function clearAreaCaches() {
+  areasCache = null
+  areaCountsCache = null
+}
+
 export async function getAreas(): Promise<Area[]> {
+  if (areasCache && areasCache.expiresAt > Date.now()) return areasCache.data
+
   const { data, error } = await supabase
     .from('areas')
     .select('*')
@@ -9,7 +20,9 @@ export async function getAreas(): Promise<Area[]> {
     .order('type')
     .order('name')
   if (error) throw error
-  return data as Area[]
+  const areas = data as Area[]
+  areasCache = { data: areas, expiresAt: Date.now() + CACHE_MS }
+  return areas
 }
 
 export async function getAreaById(id: string): Promise<Area | null> {
@@ -34,6 +47,7 @@ export async function createArea(input: {
     .select()
     .single()
   if (error) throw error
+  clearAreaCaches()
   return data as Area
 }
 
@@ -50,10 +64,13 @@ export async function updateArea(id: string, input: Partial<{
     .select()
     .single()
   if (error) throw error
+  clearAreaCaches()
   return data as Area
 }
 
 export async function getAreaCustomerCounts(): Promise<Record<string, number>> {
+  if (areaCountsCache && areaCountsCache.expiresAt > Date.now()) return areaCountsCache.data
+
   const { data, error } = await supabase
     .rpc('get_area_customer_counts')
   if (error) {
@@ -71,13 +88,17 @@ export async function getAreaCustomerCounts(): Promise<Record<string, number>> {
       if (batch.length < BATCH) break
       from += BATCH
     }
-    return all.reduce((acc, c) => {
+    const counts = all.reduce((acc, c) => {
       if (c.area_id) acc[c.area_id] = (acc[c.area_id] ?? 0) + 1
       return acc
     }, {} as Record<string, number>)
+    areaCountsCache = { data: counts, expiresAt: Date.now() + CACHE_MS }
+    return counts
   }
-  return (data ?? []).reduce((acc: Record<string, number>, row: { area_id: string; count: number }) => {
+  const counts = (data ?? []).reduce((acc: Record<string, number>, row: { area_id: string; count: number }) => {
     acc[row.area_id] = row.count
     return acc
   }, {})
+  areaCountsCache = { data: counts, expiresAt: Date.now() + CACHE_MS }
+  return counts
 }

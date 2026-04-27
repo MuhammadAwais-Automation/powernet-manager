@@ -1,13 +1,15 @@
 'use client';
 import React, { useState, useEffect } from 'react';
 import Icon from '../Icon';
-import { Badge, Avatar, IconBadge, Switch, Drawer } from '../ui';
-import { getCustomers, createCustomer, getCustomerById, updateCustomer } from '@/lib/db/customers';
+import { Badge, Avatar, Switch, Drawer } from '../ui';
+import { createCustomer, getCustomerById, updateCustomer } from '@/lib/db/customers';
+import { getCustomerList } from '@/lib/db/customer-list';
+import { getCachedAreas, getCachedPackages, setCachedAreas, setCachedPackages } from '@/lib/db/customer-cache';
 import { getAreas } from '@/lib/db/areas';
 import { getPackages } from '@/lib/db/packages';
 import { getBillsByCustomer } from '@/lib/db/bills';
 import { useAuth } from '@/lib/auth/auth-context';
-import type { CustomerWithRelations, Area, Package, CustomerStatus, Bill } from '@/types/database';
+import type { CustomerWithRelations, Area, Package, CustomerStatus, Bill, CustomerListRow } from '@/types/database';
 
 // ── Add Customer Drawer ──────────────────────────────────────────────────────
 
@@ -181,9 +183,13 @@ function AddCustomerDrawer({
 
 function CustomerDetail({ customer, onClose, onEdit, readOnly }: { customer: CustomerWithRelations; onClose: () => void; onEdit: () => void; readOnly?: boolean; }) {
   const [bills, setBills] = useState<Bill[]>([]);
+  const [billsError, setBillsError] = useState<string | null>(null);
 
   useEffect(() => {
-    getBillsByCustomer(customer.id).then(setBills);
+    setBillsError(null);
+    getBillsByCustomer(customer.id)
+      .then(setBills)
+      .catch((e: unknown) => setBillsError(e instanceof Error ? e.message : 'Could not load bills'));
   }, [customer.id]);
 
   const statusColor = (s: string) => {
@@ -275,20 +281,32 @@ function CustomerDetail({ customer, onClose, onEdit, readOnly }: { customer: Cus
         {/* Bill History */}
         <div className="card" style={{ marginBottom: 14 }}>
           <div className="card-head"><h3>Bill History</h3></div>
-          {bills.length === 0 ? (
+          {billsError ? (
+            <div style={{ padding: '14px 20px', color: '#dc2626', fontSize: 13 }}>{billsError}</div>
+          ) : bills.length === 0 ? (
             <div style={{ padding: '14px 20px', color: 'var(--text-muted)', fontSize: 13 }}>No bills recorded</div>
-          ) : bills.map((b, i) => (
-            <div key={i} className="minirow">
-              <div className="row gap-sm">
-                <Icon name="calendar" size={14} style={{ color: 'var(--text-muted)' }} />
-                {b.month}
+          ) : bills.map(b => {
+            const paid = b.paid_amount ?? 0;
+            const remaining = Math.max(b.amount - paid, 0);
+            return (
+              <div key={b.id} className="minirow">
+                <div>
+                  <div className="row gap-sm">
+                    <Icon name="calendar" size={14} style={{ color: 'var(--text-muted)' }} />
+                    <span>{b.month}</span>
+                    {b.receipt_no && <span className="mono muted" style={{ fontSize: 11 }}>{b.receipt_no}</span>}
+                  </div>
+                  <div className="muted" style={{ fontSize: 11, marginTop: 3 }}>
+                    Paid Rs. {paid.toLocaleString()} · Remaining Rs. {remaining.toLocaleString()}
+                  </div>
+                </div>
+                <div className="row gap-md">
+                  <span className="mono">Rs. {b.amount.toLocaleString()}</span>
+                  <Badge color={b.status === 'paid' ? 'green' : b.status === 'overdue' ? 'red' : 'amber'} dot>{b.status}</Badge>
+                </div>
               </div>
-              <div className="row gap-md">
-                <span className="mono">Rs. {b.amount.toLocaleString()}</span>
-                <Badge color={b.status === 'paid' ? 'green' : 'amber'} dot>{b.status}</Badge>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
         {/* Remarks */}
@@ -317,31 +335,85 @@ function CustomerDetail({ customer, onClose, onEdit, readOnly }: { customer: Cus
 export default function CustomersPage() {
   const { staff } = useAuth();
   const readOnly = staff?.role === 'complaint_manager';
-  const [customers, setCustomers] = useState<CustomerWithRelations[]>([]);
-  const [areas, setAreas] = useState<Area[]>([]);
-  const [packages, setPackages] = useState<Package[]>([]);
+  const [customers, setCustomers] = useState<CustomerListRow[]>([]);
+  const [totalCustomers, setTotalCustomers] = useState(0);
+  const [areas, setAreas] = useState<Area[]>(() => getCachedAreas() ?? []);
+  const [packages, setPackages] = useState<Package[]>(() => getCachedPackages() ?? []);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<CustomerWithRelations | null>(null);
   const [showAdd, setShowAdd] = useState(false);
+  const [rawSearch, setRawSearch] = useState('');
   const [search, setSearch] = useState('');
-  const [areaFilter, setAreaFilter] = useState('All areas');
-  const [statusFilter, setStatusFilter] = useState('All status');
-  const [pkgFilter, setPkgFilter] = useState('All packages');
+  const [areaFilter, setAreaFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [pkgFilter, setPkgFilter] = useState('');
   const PAGE_SIZE = 50;
   const [page, setPage] = useState(0);
 
   useEffect(() => { setPage(0); }, [search, areaFilter, statusFilter, pkgFilter]);
 
   useEffect(() => {
-    Promise.all([getCustomers(), getAreas(), getPackages()])
-      .then(([c, a, p]) => { setCustomers(c); setAreas(a); setPackages(p); })
-      .finally(() => setLoading(false));
+    const timer = window.setTimeout(() => setSearch(rawSearch), 250);
+    return () => window.clearTimeout(timer);
+  }, [rawSearch]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadLookups() {
+      try {
+        const [loadedAreas, loadedPackages] = await Promise.all([
+          getCachedAreas() ? Promise.resolve(getCachedAreas()!) : getAreas(),
+          getCachedPackages() ? Promise.resolve(getCachedPackages()!) : getPackages(),
+        ]);
+        if (cancelled) return;
+        setCachedAreas(loadedAreas);
+        setCachedPackages(loadedPackages);
+        setAreas(loadedAreas);
+        setPackages(loadedPackages);
+      } catch (e: unknown) {
+        if (!cancelled) setError(e instanceof Error ? e.message : 'Could not load lookup data');
+      }
+    }
+
+    loadLookups();
+    return () => { cancelled = true; };
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+
+    getCustomerList({
+      page,
+      pageSize: PAGE_SIZE,
+      search,
+      areaId: areaFilter || undefined,
+      packageId: pkgFilter || undefined,
+      status: statusFilter ? (statusFilter as CustomerStatus) : undefined,
+    })
+      .then(result => {
+        if (cancelled) return;
+        setCustomers(result.rows);
+        setTotalCustomers(result.total);
+      })
+      .catch((e: unknown) => {
+        if (!cancelled) setError(e instanceof Error ? e.message : 'Could not load customers');
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => { cancelled = true; };
+  }, [page, search, areaFilter, statusFilter, pkgFilter]);
 
   const [editCustomer, setEditCustomer] = useState<CustomerWithRelations | null>(null);
 
   const handleCustomerSaved = (c: CustomerWithRelations) => {
     setCustomers(prev => [c, ...prev]);
+    setTotalCustomers(prev => prev + 1);
   };
 
   const handleCustomerUpdated = (updated: CustomerWithRelations) => {
@@ -349,21 +421,34 @@ export default function CustomersPage() {
     setSelected(null);
   };
 
-  const filtered = customers.filter(c => {
-    if (search && !c.full_name.toLowerCase().includes(search.toLowerCase()) &&
-        !c.customer_code.includes(search) && !(c.username ?? '').includes(search)) return false;
-    if (areaFilter !== 'All areas' && c.area?.name !== areaFilter) return false;
-    if (statusFilter !== 'All status' && c.status !== statusFilter) return false;
-    if (pkgFilter !== 'All packages' && c.package?.name !== pkgFilter) return false;
-    return true;
-  });
+  const handleSelectCustomer = async (id: string) => {
+    const full = await getCustomerById(id);
+    if (full) setSelected(full);
+  };
 
-  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
-  const paginated  = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+  const handleEditCustomer = async (id: string) => {
+    const full = await getCustomerById(id);
+    if (full) setEditCustomer(full);
+  };
+
+  const totalPages = Math.ceil(totalCustomers / PAGE_SIZE);
+  const paginated  = customers;
 
   if (loading) return (
     <div className="page" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 300 }}>
       <div className="muted">Loading customers…</div>
+    </div>
+  );
+
+  if (error) return (
+    <div className="page">
+      <div className="card" style={{ padding: 24 }}>
+        <div style={{ fontWeight: 600, marginBottom: 6 }}>Data load failed</div>
+        <div className="muted" style={{ fontSize: 13, marginBottom: 14 }}>{error}</div>
+        <button className="btn btn-primary" onClick={() => window.location.reload()}>
+          <Icon name="refresh" size={14} />Retry
+        </button>
+      </div>
     </div>
   );
 
@@ -372,7 +457,7 @@ export default function CustomersPage() {
       <div className="page-header">
         <div>
           <h1>Customers</h1>
-          <p>{customers.length} total · managing active, suspended and onboarding subscribers</p>
+          <p>{totalCustomers.toLocaleString()} total · managing active, suspended and onboarding subscribers</p>
         </div>
         <div className="row gap-sm">
           <button className="btn btn-secondary"><Icon name="download" size={14} />Export CSV</button>
@@ -385,14 +470,14 @@ export default function CustomersPage() {
       <div className="filter-bar">
         <div className="search">
           <Icon name="search" size={14} />
-          <input placeholder="Search by name, username or customer ID…" value={search} onChange={e => setSearch(e.target.value)} />
+          <input placeholder="Search by name, username or customer ID…" value={rawSearch} onChange={e => setRawSearch(e.target.value)} />
         </div>
         <select className="select" style={{ width: 'auto' }} value={areaFilter} onChange={e => setAreaFilter(e.target.value)}>
-          <option>All areas</option>
-          {areas.map(a => <option key={a.id}>{a.name}</option>)}
+          <option value="">All areas</option>
+          {areas.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
         </select>
         <select className="select" style={{ width: 'auto' }} value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
-          <option>All status</option>
+          <option value="">All status</option>
           <option value="active">Active</option>
           <option value="free">Free</option>
           <option value="suspended">Suspended</option>
@@ -401,8 +486,8 @@ export default function CustomersPage() {
           <option value="shifted">Shifted</option>
         </select>
         <select className="select" style={{ width: 'auto' }} value={pkgFilter} onChange={e => setPkgFilter(e.target.value)}>
-          <option>All packages</option>
-          {packages.map(p => <option key={p.id}>{p.name}</option>)}
+          <option value="">All packages</option>
+          {packages.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
         </select>
         <div className="spacer" />
         <button className="btn btn-ghost btn-sm"><Icon name="filter" size={14} />More filters</button>
@@ -425,7 +510,7 @@ export default function CustomersPage() {
           </thead>
           <tbody>
             {paginated.map(c => (
-              <tr key={c.id} className={`clickable ${selected?.id === c.id ? 'selected' : ''}`} onClick={() => setSelected(c)}>
+              <tr key={c.id} className={`clickable ${selected?.id === c.id ? 'selected' : ''}`} onClick={() => handleSelectCustomer(c.id)}>
                 <td onClick={e => e.stopPropagation()}><input type="checkbox" /></td>
                 <td>
                   <div className="cell-user">
@@ -452,7 +537,7 @@ export default function CustomersPage() {
                   <div className="row gap-sm" style={{ justifyContent: 'flex-end' }}>
                     <button className="icon-btn" style={{ width: 28, height: 28 }}><Icon name="eye" size={14} /></button>
                     {!readOnly && (
-                      <button className="icon-btn" style={{ width: 28, height: 28 }} onClick={() => setEditCustomer(c)}><Icon name="edit" size={14} /></button>
+                      <button className="icon-btn" style={{ width: 28, height: 28 }} onClick={() => handleEditCustomer(c.id)}><Icon name="edit" size={14} /></button>
                     )}
                   </div>
                 </td>
@@ -464,7 +549,7 @@ export default function CustomersPage() {
 
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 14, fontSize: 13, color: 'var(--text-muted)' }}>
         <div>
-          Showing <strong style={{ color: 'var(--text)' }}>{page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, filtered.length)}</strong> of {filtered.length}
+          Showing <strong style={{ color: 'var(--text)' }}>{totalCustomers === 0 ? 0 : page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, totalCustomers)}</strong> of {totalCustomers}
         </div>
         <div className="row gap-sm">
           <button className="btn btn-secondary btn-sm" disabled={page === 0} onClick={() => setPage(p => p - 1)}>
