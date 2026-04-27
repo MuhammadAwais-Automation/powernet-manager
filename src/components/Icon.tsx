@@ -1,7 +1,7 @@
 'use client';
 import React from 'react';
 
-type IconName =
+export type IconName =
   | 'grid' | 'users' | 'user' | 'card' | 'alert' | 'alertTri' | 'briefcase' | 'pin'
   | 'chart' | 'settings' | 'search' | 'bell' | 'sun' | 'moon' | 'more' | 'moreV'
   | 'wifi' | 'dollar' | 'cash' | 'plus' | 'filter' | 'calendar' | 'close' | 'check'

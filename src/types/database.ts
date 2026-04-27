@@ -44,6 +44,14 @@ export type CustomerWithRelations = Customer & {
   package: Package | null
 }
 
+export type CustomerListRow = Pick<
+  Customer,
+  'id' | 'customer_code' | 'username' | 'full_name' | 'cnic' | 'phone' | 'status' | 'due_amount'
+> & {
+  area: Pick<Area, 'id' | 'name'> | null
+  package: Pick<Package, 'id' | 'name'> | null
+}
+
 export type NewCustomer = Omit<Customer, 'id' | 'customer_code' | 'created_at'>
 
 export type StaffRole =
@@ -73,16 +81,35 @@ export type Bill = {
   id: string
   customer_id: string
   amount: number
+  paid_amount: number
   month: string
   status: BillStatus
   collected_by: string | null
   paid_at: string | null
+  receipt_no: string | null
+  payment_method: 'cash' | 'bank' | 'easypaisa' | 'jazzcash' | 'other' | null
+  payment_note: string | null
   created_at: string
 }
 
 export type BillWithRelations = Bill & {
   customer: Pick<Customer, 'id' | 'customer_code' | 'full_name' | 'package_id'> | null
   collector: Pick<Staff, 'id' | 'full_name'> | null
+}
+
+export type PaymentMethod = 'cash' | 'bank' | 'easypaisa' | 'jazzcash' | 'other'
+
+export type Payment = {
+  id: string
+  bill_id: string
+  customer_id: string
+  amount: number
+  collected_by: string | null
+  method: PaymentMethod
+  note: string | null
+  receipt_no: string
+  paid_at: string
+  created_at: string
 }
 
 export type ComplaintType = 'connectivity' | 'speed' | 'hardware' | 'billing' | 'upgrade' | 'other'

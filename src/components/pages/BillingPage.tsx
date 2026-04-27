@@ -1,48 +1,201 @@
 'use client';
-import React, { useState, useEffect } from 'react';
-import Icon from '../Icon';
+import React, { useEffect, useState } from 'react';
+import Icon, { type IconName } from '../Icon';
 import { Badge, Avatar, IconBadge, Tabs } from '../ui';
 import { BarChart } from '../charts';
-import { getBills } from '@/lib/db/bills';
-import type { BillWithRelations } from '@/types/database';
+import {
+  getBills,
+  generateMonthlyBills,
+  markBillPaid,
+  recordBillPayment,
+  type GenerateBillsResult,
+} from '@/lib/db/bills';
+import { getStaff } from '@/lib/db/staff';
+import { getCurrentBillingMonth, normalizeBillingMonth } from '@/lib/billing/core';
+import { useAuth } from '@/lib/auth/auth-context';
+import type { BillWithRelations, PaymentMethod, StaffWithArea } from '@/types/database';
 
-const DAILY_COLLECTION = [
-  { d: 'Mon', v: 62 }, { d: 'Tue', v: 81 }, { d: 'Wed', v: 74 }, { d: 'Thu', v: 93 },
-  { d: 'Fri', v: 108 }, { d: 'Sat', v: 71 }, { d: 'Sun', v: 44 },
+const PAYMENT_METHODS: { value: PaymentMethod; label: string }[] = [
+  { value: 'cash', label: 'Cash' },
+  { value: 'bank', label: 'Bank' },
+  { value: 'easypaisa', label: 'Easypaisa' },
+  { value: 'jazzcash', label: 'JazzCash' },
+  { value: 'other', label: 'Other' },
 ];
 
-export default function BillingPage() {
-  const [bills, setBills] = useState<BillWithRelations[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState('All');
+function remainingAmount(bill: Pick<BillWithRelations, 'amount' | 'paid_amount'>): number {
+  return Math.max(bill.amount - (bill.paid_amount ?? 0), 0);
+}
 
-  useEffect(() => {
-    getBills().then(setBills).finally(() => setLoading(false));
-  }, []);
+function statusColor(status: string): 'green' | 'red' | 'amber' {
+  if (status === 'paid') return 'green';
+  if (status === 'overdue') return 'red';
+  return 'amber';
+}
 
-  const filtered = bills.filter(b => {
-    if (tab === 'All') return true;
-    if (tab === 'Unpaid') return b.status !== 'paid';
-    return b.status === tab.toLowerCase();
+function buildDailyCollection(bills: BillWithRelations[]) {
+  const labels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const totals = labels.map(label => ({ d: label, v: 0 }));
+
+  bills.forEach(bill => {
+    if (!bill.paid_at || (bill.paid_amount ?? 0) <= 0) return;
+    const day = new Date(bill.paid_at).getDay();
+    totals[day].v += Math.round((bill.paid_amount ?? 0) / 1000);
   });
 
-  const totalBilled  = bills.reduce((s, b) => s + b.amount, 0);
-  const totalPaid    = bills.filter(b => b.status === 'paid').reduce((s, b) => s + b.amount, 0);
-  const totalPending = bills.filter(b => b.status === 'pending').reduce((s, b) => s + b.amount, 0);
-  const totalOverdue = bills.filter(b => b.status === 'overdue').reduce((s, b) => s + b.amount, 0);
+  return [1, 2, 3, 4, 5, 6, 0].map(index => totals[index]);
+}
+
+export default function BillingPage() {
+  const { staff: currentStaff } = useAuth();
+  const [bills, setBills] = useState<BillWithRelations[]>([]);
+  const [staff, setStaff] = useState<StaffWithArea[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+  const [tab, setTab] = useState('All');
+  const [billingMonth, setBillingMonth] = useState(getCurrentBillingMonth());
+  const [search, setSearch] = useState('');
+  const [generating, setGenerating] = useState(false);
+  const [payingBillId, setPayingBillId] = useState<string | null>(null);
+  const [recordForm, setRecordForm] = useState({
+    billId: '',
+    amount: '',
+    collectedBy: '',
+    method: 'cash' as PaymentMethod,
+    note: '',
+  });
+
+  const loadBilling = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const month = normalizeBillingMonth(billingMonth);
+      const [billRows, staffRows] = await Promise.all([getBills(month), getStaff()]);
+      setBills(billRows);
+      setStaff(staffRows);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Could not load bills');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadBilling();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [billingMonth]);
+
+  const unpaidBills = bills.filter(b => b.status !== 'paid' && remainingAmount(b) > 0);
+  const selectedBill = bills.find(b => b.id === recordForm.billId) ?? null;
+
+  const filtered = bills.filter(bill => {
+    if (tab === 'Unpaid' && bill.status === 'paid') return false;
+    if (tab === 'Paid' && bill.status !== 'paid') return false;
+    if (tab === 'Overdue' && bill.status !== 'overdue') return false;
+
+    const q = search.trim().toLowerCase();
+    if (!q) return true;
+    return [
+      bill.id,
+      bill.customer?.customer_code,
+      bill.customer?.full_name,
+      bill.month,
+      bill.receipt_no,
+    ].some(value => value?.toLowerCase().includes(q));
+  });
+
+  const totalBilled = bills.reduce((sum, bill) => sum + bill.amount, 0);
+  const totalPaid = bills.reduce((sum, bill) => sum + (bill.paid_amount ?? 0), 0);
+  const totalRemaining = bills.reduce((sum, bill) => sum + remainingAmount(bill), 0);
+  const overdueTotal = bills.filter(b => b.status === 'overdue').reduce((sum, bill) => sum + remainingAmount(bill), 0);
 
   const fmt = (n: number) => `Rs. ${n.toLocaleString()}`;
 
-  const stats = [
-    { label: 'Total Billed',  value: fmt(totalBilled),  color: 'blue',  icon: 'fileText'   },
-    { label: 'Collected',     value: fmt(totalPaid),    color: 'green', icon: 'checkCircle' },
-    { label: 'Pending',       value: fmt(totalPending), color: 'amber', icon: 'clock'       },
-    { label: 'Overdue',       value: fmt(totalOverdue), color: 'red',   icon: 'alertTri'    },
+  const stats: { label: string; value: string; color: string; icon: IconName }[] = [
+    { label: 'Total Billed', value: fmt(totalBilled), color: 'blue', icon: 'fileText' },
+    { label: 'Collected', value: fmt(totalPaid), color: 'green', icon: 'checkCircle' },
+    { label: 'Remaining', value: fmt(totalRemaining), color: 'amber', icon: 'clock' },
+    { label: 'Overdue', value: fmt(overdueTotal), color: 'red', icon: 'alertTri' },
   ];
+
+  const reloadAfterMutation = async (notice: string) => {
+    setMessage(notice);
+    const rows = await getBills(normalizeBillingMonth(billingMonth));
+    setBills(rows);
+  };
+
+  const handleGenerateBills = async () => {
+    setGenerating(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const result: GenerateBillsResult = await generateMonthlyBills(normalizeBillingMonth(billingMonth));
+      await reloadAfterMutation(
+        `${result.created} bills generated for ${result.month}. ${result.existing} already existed, ${result.zeroAmount} skipped with zero amount.`
+      );
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Could not generate bills');
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  const handleMarkPaid = async (bill: BillWithRelations) => {
+    setPayingBillId(bill.id);
+    setError(null);
+    setMessage(null);
+    try {
+      const result = await markBillPaid(bill, currentStaff?.id ?? null);
+      await reloadAfterMutation(`Payment recorded. Receipt ${result.receiptNo}`);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Could not mark bill paid');
+    } finally {
+      setPayingBillId(null);
+    }
+  };
+
+  const handleRecordPayment = async () => {
+    if (!selectedBill) { setError('Select an unpaid bill first'); return; }
+    const amount = Number(recordForm.amount);
+    if (!Number.isFinite(amount) || amount <= 0) { setError('Enter a valid payment amount'); return; }
+    if (amount > remainingAmount(selectedBill)) { setError('Payment amount exceeds remaining balance'); return; }
+
+    setPayingBillId(selectedBill.id);
+    setError(null);
+    setMessage(null);
+    try {
+      const result = await recordBillPayment({
+        billId: selectedBill.id,
+        amount,
+        collectedBy: recordForm.collectedBy || currentStaff?.id || null,
+        method: recordForm.method,
+        note: recordForm.note || null,
+      });
+      setRecordForm({ billId: '', amount: '', collectedBy: '', method: 'cash', note: '' });
+      await reloadAfterMutation(`Payment recorded. Receipt ${result.receiptNo}`);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Could not record payment');
+    } finally {
+      setPayingBillId(null);
+    }
+  };
 
   if (loading) return (
     <div className="page" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 300 }}>
-      <div className="muted">Loading bills…</div>
+      <div className="muted">Loading bills...</div>
+    </div>
+  );
+
+  if (error && bills.length === 0) return (
+    <div className="page">
+      <div className="card" style={{ padding: 24 }}>
+        <div style={{ fontWeight: 600, marginBottom: 6 }}>Data load failed</div>
+        <div className="muted" style={{ fontSize: 13, marginBottom: 14 }}>{error}</div>
+        <button className="btn btn-primary" onClick={loadBilling}>
+          <Icon name="refresh" size={14} />Retry
+        </button>
+      </div>
     </div>
   );
 
@@ -51,18 +204,42 @@ export default function BillingPage() {
       <div className="page-header">
         <div>
           <h1>Billing & Payments</h1>
-          <p>Current cycle · {bills.length} bills · {fmt(totalBilled)} total invoiced</p>
+          <p>{billingMonth} cycle · {bills.length} bills · {fmt(totalBilled)} total invoiced</p>
         </div>
         <div className="row gap-sm">
+          <input
+            className="select"
+            type="month"
+            value={billingMonth}
+            onChange={e => setBillingMonth(e.target.value)}
+            style={{ width: 150 }}
+          />
           <button className="btn btn-secondary"><Icon name="download" size={14} />Export</button>
-          <button className="btn btn-primary"><Icon name="fileText" size={14} />Generate Bills</button>
+          <button className="btn btn-primary" onClick={handleGenerateBills} disabled={generating}>
+            <Icon name="fileText" size={14} />{generating ? 'Generating...' : 'Generate Bills'}
+          </button>
         </div>
       </div>
+
+      {(error || message) && (
+        <div
+          className="card"
+          style={{
+            padding: '10px 14px',
+            marginBottom: 14,
+            color: error ? '#dc2626' : 'var(--green)',
+            fontSize: 13,
+            fontWeight: 600,
+          }}
+        >
+          {error ?? message}
+        </div>
+      )}
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 20 }}>
         {stats.map((s, i) => (
           <div key={i} className="card card-pad" style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-            <IconBadge name={s.icon as any} color={s.color} size={40} />
+            <IconBadge name={s.icon} color={s.color} size={40} />
             <div style={{ flex: 1 }}>
               <div className="muted" style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>{s.label}</div>
               <div style={{ fontSize: 20, fontWeight: 600, letterSpacing: '-0.02em', marginTop: 2 }} className="num">{s.value}</div>
@@ -71,25 +248,30 @@ export default function BillingPage() {
         ))}
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: 16 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: 16 }}>
         <div>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, gap: 12 }}>
             <Tabs value={tab} onChange={setTab} items={[
-              { value: 'All',     label: 'All Bills', count: bills.length },
-              { value: 'Unpaid',  label: 'Unpaid',    count: bills.filter(b => b.status !== 'paid').length },
-              { value: 'Paid',    label: 'Paid',      count: bills.filter(b => b.status === 'paid').length },
-              { value: 'Overdue', label: 'Overdue',   count: bills.filter(b => b.status === 'overdue').length },
+              { value: 'All', label: 'All Bills', count: bills.length },
+              { value: 'Unpaid', label: 'Unpaid', count: unpaidBills.length },
+              { value: 'Paid', label: 'Paid', count: bills.filter(b => b.status === 'paid').length },
+              { value: 'Overdue', label: 'Overdue', count: bills.filter(b => b.status === 'overdue').length },
             ]} />
-            <div className="search" style={{ minWidth: 240, height: 36, border: '1px solid var(--border)', borderRadius: 8, padding: '0 12px', display: 'flex', alignItems: 'center', gap: 8, background: 'var(--bg-elev)' }}>
+            <div className="search" style={{ minWidth: 260, height: 36, border: '1px solid var(--border)', borderRadius: 8, padding: '0 12px', display: 'flex', alignItems: 'center', gap: 8, background: 'var(--bg-elev)' }}>
               <Icon name="search" size={14} />
-              <input placeholder="Search bills…" style={{ border: 'none', outline: 'none', background: 'none', fontSize: 13, flex: 1 }} />
+              <input
+                placeholder="Search bills..."
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                style={{ border: 'none', outline: 'none', background: 'none', fontSize: 13, flex: 1 }}
+              />
             </div>
           </div>
 
           {bills.length === 0 ? (
             <div className="card" style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)' }}>
-              <div style={{ fontSize: 14, marginBottom: 8 }}>No bills yet</div>
-              <div style={{ fontSize: 12 }}>Generate bills for this cycle using the panel on the right.</div>
+              <div style={{ fontSize: 14, marginBottom: 8 }}>No bills for {billingMonth}</div>
+              <div style={{ fontSize: 12 }}>Click Generate Bills to create this month&apos;s invoices from active customers.</div>
             </div>
           ) : (
             <div className="table-wrap">
@@ -99,33 +281,41 @@ export default function BillingPage() {
                     <th>Bill ID</th>
                     <th>Customer</th>
                     <th>Amount</th>
-                    <th>Month</th>
+                    <th>Paid</th>
+                    <th>Remaining</th>
                     <th>Status</th>
-                    <th>Collected By</th>
+                    <th>Receipt</th>
                     <th style={{ textAlign: 'right' }}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filtered.map(b => (
                     <tr key={b.id} className="clickable">
-                      <td className="mono" style={{ fontSize: 12 }}>{b.id.slice(0, 8)}…</td>
+                      <td className="mono" style={{ fontSize: 12 }}>{b.id.slice(0, 8)}...</td>
                       <td>
                         <div className="cell-user">
                           <Avatar name={b.customer?.full_name ?? '?'} size={28} />
                           <div>
-                            <div className="nm" style={{ fontSize: 13 }}>{b.customer?.full_name ?? '—'}</div>
+                            <div className="nm" style={{ fontSize: 13 }}>{b.customer?.full_name ?? 'Unknown customer'}</div>
                             <div className="sub mono">{b.customer?.customer_code ?? ''}</div>
                           </div>
                         </div>
                       </td>
-                      <td className="num" style={{ fontWeight: 600 }}>Rs. {b.amount.toLocaleString()}</td>
-                      <td className="mono" style={{ fontSize: 12 }}>{b.month}</td>
-                      <td><Badge color={b.status === 'paid' ? 'green' : b.status === 'overdue' ? 'red' : 'amber'} dot>{b.status}</Badge></td>
-                      <td className="muted">{b.collector?.full_name ?? '—'}</td>
+                      <td className="num" style={{ fontWeight: 600 }}>{fmt(b.amount)}</td>
+                      <td className="num" style={{ color: 'var(--green)' }}>{fmt(b.paid_amount ?? 0)}</td>
+                      <td className="num" style={{ color: remainingAmount(b) > 0 ? 'var(--amber)' : 'var(--green)' }}>{fmt(remainingAmount(b))}</td>
+                      <td><Badge color={statusColor(b.status)} dot>{b.status}</Badge></td>
+                      <td className="mono" style={{ fontSize: 11 }}>{b.receipt_no ?? '-'}</td>
                       <td style={{ textAlign: 'right' }}>
                         <div className="row gap-sm" style={{ justifyContent: 'flex-end' }}>
-                          {b.status !== 'paid' && <button className="btn btn-secondary btn-sm"><Icon name="check" size={12} />Mark paid</button>}
-                          <button className="icon-btn" style={{ width: 28, height: 28 }}><Icon name="fileText" size={14} /></button>
+                          {b.status !== 'paid' && remainingAmount(b) > 0 && (
+                            <button className="btn btn-secondary btn-sm" onClick={() => handleMarkPaid(b)} disabled={payingBillId === b.id}>
+                              <Icon name="check" size={12} />{payingBillId === b.id ? 'Saving' : 'Mark paid'}
+                            </button>
+                          )}
+                          <button className="icon-btn" style={{ width: 28, height: 28 }} title={b.payment_note ?? 'Bill details'}>
+                            <Icon name="fileText" size={14} />
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -139,14 +329,14 @@ export default function BillingPage() {
             <div className="card-head">
               <div>
                 <h3>Daily Collection Summary</h3>
-                <div className="sub">This week · Rs. in thousands</div>
+                <div className="sub">Selected cycle · Rs. in thousands</div>
               </div>
               <div className="legend">
                 <div className="item"><span className="sw" style={{ background: '#3B82F6' }} />Collected</div>
               </div>
             </div>
             <div className="card-pad" style={{ paddingTop: 8 }}>
-              <BarChart data={DAILY_COLLECTION.map((d, i) => ({ ...d, highlight: i === 4 }))} accent="#3B82F6" labelKey="d" />
+              <BarChart data={buildDailyCollection(bills)} accent="#3B82F6" labelKey="d" />
             </div>
           </div>
         </div>
@@ -154,39 +344,82 @@ export default function BillingPage() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div className="card">
             <div className="card-head">
-              <div><h3>Generate Bills</h3><div className="sub">Bulk invoice for a billing period</div></div>
+              <div><h3>Generate Bills</h3><div className="sub">Bulk invoice active customers</div></div>
             </div>
             <div className="card-pad" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               <div className="field">
                 <label>Billing Month</label>
-                <select className="select" defaultValue="Apr 2026">
-                  <option>Apr 2026</option><option>May 2026</option><option>Jun 2026</option>
-                </select>
+                <input className="input" type="month" value={billingMonth} onChange={e => setBillingMonth(e.target.value)} />
               </div>
-              <div className="field">
-                <label>Include</label>
-                <select className="select">
-                  <option>All active customers</option>
-                  <option>By area…</option>
-                  <option>Custom list…</option>
-                </select>
+              <div style={{ padding: 12, borderRadius: 10, background: 'var(--bg-muted)', fontSize: 12, color: 'var(--text-muted)' }}>
+                Active customers with a monthly due/package price will receive one bill for this month. Existing bills are skipped safely.
               </div>
-              <button className="btn btn-primary" style={{ width: '100%' }}><Icon name="fileText" size={14} />Generate Bills</button>
+              <button className="btn btn-primary" style={{ width: '100%' }} onClick={handleGenerateBills} disabled={generating}>
+                <Icon name="fileText" size={14} />{generating ? 'Generating...' : 'Generate Bills'}
+              </button>
             </div>
           </div>
 
           <div className="card">
             <div className="card-head">
-              <div><h3>Record Cash Payment</h3><div className="sub">Manual entry from field agent</div></div>
+              <div><h3>Record Cash Payment</h3><div className="sub">Manual collection receipt</div></div>
             </div>
             <div className="card-pad" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <div className="field"><label>Customer</label><input className="input" placeholder="Search by name or ID…" /></div>
-              <div className="field"><label>Amount (Rs.)</label><input className="input" placeholder="0" /></div>
-              <div className="field"><label>Collected By</label>
-                <select className="select"><option>— Select staff —</option></select>
+              <div className="field">
+                <label>Unpaid Bill</label>
+                <select
+                  className="select"
+                  value={recordForm.billId}
+                  onChange={e => {
+                    const bill = bills.find(b => b.id === e.target.value);
+                    setRecordForm(f => ({
+                      ...f,
+                      billId: e.target.value,
+                      amount: bill ? String(remainingAmount(bill)) : '',
+                    }));
+                  }}
+                >
+                  <option value="">Select bill...</option>
+                  {unpaidBills.map(b => (
+                    <option key={b.id} value={b.id}>
+                      {b.customer?.customer_code ?? b.id.slice(0, 8)} · {b.customer?.full_name ?? 'Unknown'} · {fmt(remainingAmount(b))}
+                    </option>
+                  ))}
+                </select>
               </div>
-              <div className="field"><label>Notes (optional)</label><input className="input" placeholder="e.g. partial payment, receipt #4428" /></div>
-              <button className="btn btn-primary" style={{ width: '100%' }}><Icon name="cash" size={14} />Record Payment</button>
+              <div className="field">
+                <label>Amount (Rs.)</label>
+                <input className="input" type="number" min={1} placeholder="0" value={recordForm.amount}
+                  onChange={e => setRecordForm(f => ({ ...f, amount: e.target.value }))} />
+              </div>
+              <div className="field">
+                <label>Collected By</label>
+                <select className="select" value={recordForm.collectedBy}
+                  onChange={e => setRecordForm(f => ({ ...f, collectedBy: e.target.value }))}>
+                  <option value="">Current user / unassigned</option>
+                  {staff.filter(s => s.is_active).map(s => <option key={s.id} value={s.id}>{s.full_name}</option>)}
+                </select>
+              </div>
+              <div className="field">
+                <label>Method</label>
+                <select className="select" value={recordForm.method}
+                  onChange={e => setRecordForm(f => ({ ...f, method: e.target.value as PaymentMethod }))}>
+                  {PAYMENT_METHODS.map(method => <option key={method.value} value={method.value}>{method.label}</option>)}
+                </select>
+              </div>
+              <div className="field">
+                <label>Notes (optional)</label>
+                <input className="input" placeholder="e.g. partial payment, receipt #4428" value={recordForm.note}
+                  onChange={e => setRecordForm(f => ({ ...f, note: e.target.value }))} />
+              </div>
+              {selectedBill && (
+                <div className="muted" style={{ fontSize: 12 }}>
+                  Remaining balance: <span className="num" style={{ color: 'var(--text)', fontWeight: 600 }}>{fmt(remainingAmount(selectedBill))}</span>
+                </div>
+              )}
+              <button className="btn btn-primary" style={{ width: '100%' }} onClick={handleRecordPayment} disabled={!recordForm.billId || payingBillId === recordForm.billId}>
+                <Icon name="cash" size={14} />{payingBillId === recordForm.billId ? 'Recording...' : 'Record Payment'}
+              </button>
             </div>
           </div>
         </div>

@@ -1,7 +1,16 @@
 import { supabase } from '@/lib/supabase'
 import type { Complaint, ComplaintWithRelations } from '@/types/database'
 
+let complaintsCache: { data: ComplaintWithRelations[]; expiresAt: number } | null = null
+const CACHE_MS = 60_000
+
+function clearComplaintsCache() {
+  complaintsCache = null
+}
+
 export async function getComplaints(): Promise<ComplaintWithRelations[]> {
+  if (complaintsCache && complaintsCache.expiresAt > Date.now()) return complaintsCache.data
+
   const { data, error } = await supabase
     .from('complaints')
     .select(`
@@ -11,7 +20,9 @@ export async function getComplaints(): Promise<ComplaintWithRelations[]> {
     `)
     .order('opened_at', { ascending: false })
   if (error) throw error
-  return data as ComplaintWithRelations[]
+  const complaints = data as ComplaintWithRelations[]
+  complaintsCache = { data: complaints, expiresAt: Date.now() + CACHE_MS }
+  return complaints
 }
 
 export async function createComplaint(
@@ -23,5 +34,6 @@ export async function createComplaint(
     .select()
     .single()
   if (error) throw error
+  clearComplaintsCache()
   return data as Complaint
 }

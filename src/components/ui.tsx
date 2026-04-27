@@ -1,7 +1,7 @@
 'use client';
 import React from 'react';
 import { initials, avClass } from '@/lib/utils';
-import Icon from './Icon';
+import Icon, { type IconName } from './Icon';
 
 export function Badge({ color = 'gray', dot = false, children }: { color?: string; dot?: boolean; children: React.ReactNode }) {
   return (
@@ -21,10 +21,10 @@ export function Avatar({ name, size = 32 }: { name: string; size?: number }) {
   );
 }
 
-export function IconBadge({ name, color = 'blue', size = 36 }: { name: string; color?: string; size?: number }) {
+export function IconBadge({ name, color = 'blue', size = 36 }: { name: IconName; color?: string; size?: number }) {
   return (
     <span className={`icon-badge ${color}`} style={{ width: size, height: size }}>
-      <Icon name={name as any} size={Math.round(size * 0.5)} />
+      <Icon name={name} size={Math.round(size * 0.5)} />
     </span>
   );
 }

@@ -399,6 +399,7 @@ export default function StaffPage() {
   const [staff, setStaff]             = useState<StaffWithArea[]>([]);
   const [areas, setAreas]             = useState<Area[]>([]);
   const [loading, setLoading]         = useState(true);
+  const [error, setError]             = useState<string | null>(null);
   const [addOpen, setAddOpen]         = useState(false);
   const [editTarget, setEditTarget]   = useState<StaffWithArea | null>(null);
   const [credsTarget, setCredsTarget] = useState<StaffWithArea | null>(null);
@@ -406,6 +407,7 @@ export default function StaffPage() {
   useEffect(() => {
     Promise.all([getStaff(), getAreas()])
       .then(([s, a]) => { setStaff(s); setAreas(a); })
+      .catch((e: unknown) => setError(e instanceof Error ? e.message : 'Could not load staff'))
       .finally(() => setLoading(false));
   }, []);
 
@@ -450,6 +452,18 @@ export default function StaffPage() {
   if (loading) return (
     <div className="page" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 300 }}>
       <div className="muted">Loading staff…</div>
+    </div>
+  );
+
+  if (error) return (
+    <div className="page">
+      <div className="card" style={{ padding: 24 }}>
+        <div style={{ fontWeight: 600, marginBottom: 6 }}>Data load failed</div>
+        <div className="muted" style={{ fontSize: 13, marginBottom: 14 }}>{error}</div>
+        <button className="btn btn-primary" onClick={() => window.location.reload()}>
+          <Icon name="refresh" size={14} />Retry
+        </button>
+      </div>
     </div>
   );
 
@@ -530,7 +544,7 @@ export default function StaffPage() {
         <div className="card" style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)' }}>
           <Icon name="briefcase" size={28} style={{ color: 'var(--text-faint)', marginBottom: 12 }} />
           <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text)', marginBottom: 4 }}>No staff yet</div>
-          <div style={{ fontSize: 13 }}>Click "Add Staff" to create your first staff member.</div>
+          <div style={{ fontSize: 13 }}>Click Add Staff to create your first staff member.</div>
         </div>
       )}
 

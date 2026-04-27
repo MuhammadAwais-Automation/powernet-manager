@@ -2,14 +2,24 @@ import { supabase } from '@/lib/supabase'
 import type { Staff, StaffWithArea } from '@/types/database'
 
 const COLS = 'id, full_name, role, phone, area_id, username, auth_user_id, is_active, created_at'
+let staffCache: { data: StaffWithArea[]; expiresAt: number } | null = null
+const CACHE_MS = 60_000
+
+function clearStaffCache() {
+  staffCache = null
+}
 
 export async function getStaff(): Promise<StaffWithArea[]> {
+  if (staffCache && staffCache.expiresAt > Date.now()) return staffCache.data
+
   const { data, error } = await supabase
     .from('staff')
     .select(`${COLS}, area:areas(*)`)
     .order('full_name')
   if (error) throw error
-  return data as unknown as StaffWithArea[]
+  const staff = data as unknown as StaffWithArea[]
+  staffCache = { data: staff, expiresAt: Date.now() + CACHE_MS }
+  return staff
 }
 
 export async function createStaff(input: {
@@ -28,6 +38,7 @@ export async function createStaff(input: {
     .select(COLS)
     .single()
   if (error) throw error
+  clearStaffCache()
   const staff = data as Staff
 
   if (password && staff.id) {
@@ -55,6 +66,7 @@ export async function updateStaff(id: string, input: Partial<{
     .select(COLS)
     .single()
   if (error) throw error
+  clearStaffCache()
   return data as Staff
 }
 
@@ -64,4 +76,5 @@ export async function updateStaffPassword(staffId: string, newPassword: string):
     p_plain_password: newPassword,
   })
   if (error) throw error
+  clearStaffCache()
 }
