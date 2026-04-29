@@ -1,4 +1,10 @@
 import { supabase } from '@/lib/supabase'
+import {
+  buildBillsPageCacheKey,
+  getBillRange,
+  normalizeBillingSearch,
+  type BillStatusFilter,
+} from '@/lib/billing/query'
 import type { Bill, BillWithRelations, PaymentMethod } from '@/types/database'
 
 export type GenerateBillsResult = {
@@ -27,11 +33,58 @@ export type RecordPaymentResult = {
   receiptNo: string
 }
 
+export type BillingSummary = {
+  month: string
+  totalBills: number
+  paidBills: number
+  unpaidBills: number
+  overdueBills: number
+  totalBilled: number
+  totalPaid: number
+  totalRemaining: number
+  overdueTotal: number
+  dailyCollections: { d: string; v: number }[]
+}
+
+export type BillsPageParams = {
+  month: string
+  page: number
+  pageSize: number
+  status?: BillStatusFilter
+  search?: string
+}
+
+export type BillsPageResult = {
+  rows: BillWithRelations[]
+  total: number
+}
+
 let billsCache: Record<string, { data: BillWithRelations[]; expiresAt: number }> = {}
+let billsPageCache: Record<string, { data: BillsPageResult; expiresAt: number }> = {}
+let billingSummaryCache: Record<string, { data: BillingSummary; expiresAt: number }> = {}
 const CACHE_MS = 60_000
+const CUSTOMER_SEARCH_LIMIT = 250
+const BILL_PAGE_SELECT = `
+  id,
+  customer_id,
+  amount,
+  paid_amount,
+  month,
+  status,
+  collected_by,
+  paid_at,
+  receipt_no,
+  payment_method,
+  payment_note,
+  created_at,
+  customer:customers(id, customer_code, full_name, package_id),
+  collector:staff(id, full_name)
+`
 
 function clearBillsCache() {
   billsCache = {}
+  billsPageCache = {}
+  billingSummaryCache = {}
 }
 
 function cacheKey(month?: string) {
@@ -58,6 +111,113 @@ export async function getBills(month?: string): Promise<BillWithRelations[]> {
   const bills = data as BillWithRelations[]
   billsCache[key] = { data: bills, expiresAt: Date.now() + CACHE_MS }
   return bills
+}
+
+export async function getBillsPage(params: BillsPageParams): Promise<BillsPageResult> {
+  const { from, to } = getBillRange(params.page, params.pageSize)
+  const key = buildBillsPageCacheKey(params)
+  if (billsPageCache[key] && billsPageCache[key].expiresAt > Date.now()) return billsPageCache[key].data
+
+  const search = normalizeBillingSearch(params.search)
+  const customerIds = search ? await findBillingCustomerIds(search, CUSTOMER_SEARCH_LIMIT) : undefined
+  if (search && customerIds?.length === 0) {
+    const emptyResult = { rows: [], total: 0 }
+    billsPageCache[key] = { data: emptyResult, expiresAt: Date.now() + CACHE_MS }
+    return emptyResult
+  }
+
+  let query = supabase
+    .from('bills')
+    .select(BILL_PAGE_SELECT, { count: 'exact' })
+    .eq('month', params.month)
+    .order('created_at', { ascending: false })
+    .range(from, to)
+
+  if (params.status === 'unpaid') query = query.neq('status', 'paid')
+  else if (params.status) query = query.eq('status', params.status)
+  if (customerIds) query = query.in('customer_id', customerIds)
+
+  const { data, error, count } = await query
+  if (error) throw error
+
+  const result = {
+    rows: (data ?? []) as unknown as BillWithRelations[],
+    total: count ?? 0,
+  }
+  billsPageCache[key] = { data: result, expiresAt: Date.now() + CACHE_MS }
+  return result
+}
+
+export async function searchUnpaidBills(month: string, search?: string, limit = 12): Promise<BillWithRelations[]> {
+  const normalized = normalizeBillingSearch(search)
+  if (!normalized) return []
+
+  const customerIds = await findBillingCustomerIds(normalized, Math.max(limit * 4, 24))
+  if (customerIds.length === 0) return []
+
+  const { data, error } = await supabase
+    .from('bills')
+    .select(BILL_PAGE_SELECT)
+    .eq('month', month)
+    .neq('status', 'paid')
+    .in('customer_id', customerIds)
+    .order('created_at', { ascending: false })
+    .limit(limit)
+
+  if (error) throw error
+  return (data ?? []) as unknown as BillWithRelations[]
+}
+
+export async function getBillingSummary(month: string): Promise<BillingSummary> {
+  const cached = billingSummaryCache[month]
+  if (cached && cached.expiresAt > Date.now()) return cached.data
+
+  const [reportsRes, totalRes, paidRes, unpaidRes, overdueRes, overdueRowsRes] = await Promise.all([
+    supabase.rpc('get_reports_summary', { p_month: month }),
+    supabase.from('bills').select('id', { count: 'exact', head: true }).eq('month', month),
+    supabase.from('bills').select('id', { count: 'exact', head: true }).eq('month', month).eq('status', 'paid'),
+    supabase.from('bills').select('id', { count: 'exact', head: true }).eq('month', month).neq('status', 'paid'),
+    supabase.from('bills').select('id', { count: 'exact', head: true }).eq('month', month).eq('status', 'overdue'),
+    supabase.from('bills').select('amount, paid_amount').eq('month', month).eq('status', 'overdue'),
+  ])
+
+  if (reportsRes.error) throw reportsRes.error
+  if (totalRes.error) throw totalRes.error
+  if (paidRes.error) throw paidRes.error
+  if (unpaidRes.error) throw unpaidRes.error
+  if (overdueRes.error) throw overdueRes.error
+  if (overdueRowsRes.error) throw overdueRowsRes.error
+
+  const raw = (reportsRes.data ?? {}) as {
+    month?: unknown
+    cards?: {
+      revenue?: unknown
+      collections?: unknown
+      pending?: unknown
+    }
+    dailyCollections?: unknown
+  }
+  const summary: BillingSummary = {
+    month: typeof raw.month === 'string' ? raw.month : month,
+    totalBills: totalRes.count ?? 0,
+    paidBills: paidRes.count ?? 0,
+    unpaidBills: unpaidRes.count ?? 0,
+    overdueBills: overdueRes.count ?? 0,
+    totalBilled: toNumber(raw.cards?.revenue),
+    totalPaid: toNumber(raw.cards?.collections),
+    totalRemaining: toNumber(raw.cards?.pending),
+    overdueTotal: (overdueRowsRes.data ?? []).reduce((sum, bill) => (
+      sum + Math.max(toNumber(bill.amount) - toNumber(bill.paid_amount), 0)
+    ), 0),
+    dailyCollections: Array.isArray(raw.dailyCollections)
+      ? raw.dailyCollections.map(row => {
+          const point = row as { d?: unknown; v?: unknown }
+          return { d: typeof point.d === 'string' ? point.d : '', v: toNumber(point.v) }
+        })
+      : [],
+  }
+  billingSummaryCache[month] = { data: summary, expiresAt: Date.now() + CACHE_MS }
+  return summary
 }
 
 export async function getBillsByCustomer(customerId: string): Promise<Bill[]> {
@@ -103,4 +263,21 @@ export async function markBillPaid(
     method: 'cash',
     note: 'Marked paid from billing page',
   })
+}
+
+function toNumber(value: unknown): number {
+  return typeof value === 'number' && Number.isFinite(value) ? value : 0
+}
+
+async function findBillingCustomerIds(search: string, limit: number): Promise<string[]> {
+  const safeSearch = search.replaceAll(',', ' ')
+  const { data, error } = await supabase
+    .from('customers')
+    .select('id')
+    .or(`full_name.ilike.%${safeSearch}%,customer_code.ilike.%${safeSearch}%,username.ilike.%${safeSearch}%`)
+    .order('customer_code')
+    .limit(limit)
+
+  if (error) throw error
+  return Array.from(new Set((data ?? []).map(row => row.id).filter(Boolean)))
 }
