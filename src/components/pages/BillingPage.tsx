@@ -4,14 +4,17 @@ import Icon, { type IconName } from '../Icon';
 import { Badge, Avatar, IconBadge, Tabs } from '../ui';
 import { BarChart } from '../charts';
 import {
-  getBills,
+  getBillsPage,
+  getBillingSummary,
   generateMonthlyBills,
   markBillPaid,
   recordBillPayment,
+  type BillingSummary,
   type GenerateBillsResult,
 } from '@/lib/db/bills';
 import { getStaff } from '@/lib/db/staff';
 import { getCurrentBillingMonth, normalizeBillingMonth } from '@/lib/billing/core';
+import { normalizeBillStatusFilter, type BillingTab } from '@/lib/billing/query';
 import { useAuth } from '@/lib/auth/auth-context';
 import type { BillWithRelations, PaymentMethod, StaffWithArea } from '@/types/database';
 
@@ -33,29 +36,20 @@ function statusColor(status: string): 'green' | 'red' | 'amber' {
   return 'amber';
 }
 
-function buildDailyCollection(bills: BillWithRelations[]) {
-  const labels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-  const totals = labels.map(label => ({ d: label, v: 0 }));
-
-  bills.forEach(bill => {
-    if (!bill.paid_at || (bill.paid_amount ?? 0) <= 0) return;
-    const day = new Date(bill.paid_at).getDay();
-    totals[day].v += Math.round((bill.paid_amount ?? 0) / 1000);
-  });
-
-  return [1, 2, 3, 4, 5, 6, 0].map(index => totals[index]);
-}
-
 export default function BillingPage() {
   const { staff: currentStaff } = useAuth();
   const [bills, setBills] = useState<BillWithRelations[]>([]);
+  const [summary, setSummary] = useState<BillingSummary | null>(null);
+  const [totalBills, setTotalBills] = useState(0);
   const [staff, setStaff] = useState<StaffWithArea[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
-  const [tab, setTab] = useState('All');
+  const [tab, setTab] = useState<BillingTab>('All');
   const [billingMonth, setBillingMonth] = useState(getCurrentBillingMonth());
   const [search, setSearch] = useState('');
+  const [page, setPage] = useState(0);
+  const [reloadToken, setReloadToken] = useState(0);
   const [generating, setGenerating] = useState(false);
   const [payingBillId, setPayingBillId] = useState<string | null>(null);
   const [recordForm, setRecordForm] = useState({
@@ -66,13 +60,28 @@ export default function BillingPage() {
     note: '',
   });
 
+  const PAGE_SIZE = 50;
+
+  useEffect(() => { setPage(0); }, [billingMonth, tab]);
+
   const loadBilling = async () => {
     setLoading(true);
     setError(null);
     try {
       const month = normalizeBillingMonth(billingMonth);
-      const [billRows, staffRows] = await Promise.all([getBills(month), getStaff()]);
-      setBills(billRows);
+      const [billPage, billingSummary, staffRows] = await Promise.all([
+        getBillsPage({
+          month,
+          page,
+          pageSize: PAGE_SIZE,
+          status: normalizeBillStatusFilter(tab),
+        }),
+        getBillingSummary(month),
+        getStaff(),
+      ]);
+      setBills(billPage.rows);
+      setTotalBills(billPage.total);
+      setSummary(billingSummary);
       setStaff(staffRows);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Could not load bills');
@@ -84,16 +93,11 @@ export default function BillingPage() {
   useEffect(() => {
     loadBilling();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [billingMonth]);
+  }, [billingMonth, page, tab, reloadToken]);
 
-  const unpaidBills = bills.filter(b => b.status !== 'paid' && remainingAmount(b) > 0);
   const selectedBill = bills.find(b => b.id === recordForm.billId) ?? null;
 
   const filtered = bills.filter(bill => {
-    if (tab === 'Unpaid' && bill.status === 'paid') return false;
-    if (tab === 'Paid' && bill.status !== 'paid') return false;
-    if (tab === 'Overdue' && bill.status !== 'overdue') return false;
-
     const q = search.trim().toLowerCase();
     if (!q) return true;
     return [
@@ -105,10 +109,10 @@ export default function BillingPage() {
     ].some(value => value?.toLowerCase().includes(q));
   });
 
-  const totalBilled = bills.reduce((sum, bill) => sum + bill.amount, 0);
-  const totalPaid = bills.reduce((sum, bill) => sum + (bill.paid_amount ?? 0), 0);
-  const totalRemaining = bills.reduce((sum, bill) => sum + remainingAmount(bill), 0);
-  const overdueTotal = bills.filter(b => b.status === 'overdue').reduce((sum, bill) => sum + remainingAmount(bill), 0);
+  const totalBilled = summary?.totalBilled ?? 0;
+  const totalPaid = summary?.totalPaid ?? 0;
+  const totalRemaining = summary?.totalRemaining ?? 0;
+  const overdueTotal = summary?.overdueTotal ?? 0;
 
   const fmt = (n: number) => `Rs. ${n.toLocaleString()}`;
 
@@ -121,8 +125,7 @@ export default function BillingPage() {
 
   const reloadAfterMutation = async (notice: string) => {
     setMessage(notice);
-    const rows = await getBills(normalizeBillingMonth(billingMonth));
-    setBills(rows);
+    setReloadToken(t => t + 1);
   };
 
   const handleGenerateBills = async () => {
@@ -204,7 +207,7 @@ export default function BillingPage() {
       <div className="page-header">
         <div>
           <h1>Billing & Payments</h1>
-          <p>{billingMonth} cycle · {bills.length} bills · {fmt(totalBilled)} total invoiced</p>
+          <p>{billingMonth} cycle · {summary?.totalBills ?? totalBills} bills · {fmt(totalBilled)} total invoiced</p>
         </div>
         <div className="row gap-sm">
           <input
@@ -251,11 +254,11 @@ export default function BillingPage() {
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: 16 }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, gap: 12 }}>
-            <Tabs value={tab} onChange={setTab} items={[
-              { value: 'All', label: 'All Bills', count: bills.length },
-              { value: 'Unpaid', label: 'Unpaid', count: unpaidBills.length },
-              { value: 'Paid', label: 'Paid', count: bills.filter(b => b.status === 'paid').length },
-              { value: 'Overdue', label: 'Overdue', count: bills.filter(b => b.status === 'overdue').length },
+            <Tabs value={tab} onChange={value => setTab(value as BillingTab)} items={[
+              { value: 'All', label: 'All Bills', count: summary?.totalBills ?? 0 },
+              { value: 'Unpaid', label: 'Unpaid', count: summary?.unpaidBills ?? 0 },
+              { value: 'Paid', label: 'Paid', count: summary?.paidBills ?? 0 },
+              { value: 'Overdue', label: 'Overdue', count: summary?.overdueBills ?? 0 },
             ]} />
             <div className="search" style={{ minWidth: 260, height: 36, border: '1px solid var(--border)', borderRadius: 8, padding: '0 12px', display: 'flex', alignItems: 'center', gap: 8, background: 'var(--bg-elev)' }}>
               <Icon name="search" size={14} />
@@ -268,7 +271,7 @@ export default function BillingPage() {
             </div>
           </div>
 
-          {bills.length === 0 ? (
+          {totalBills === 0 ? (
             <div className="card" style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)' }}>
               <div style={{ fontSize: 14, marginBottom: 8 }}>No bills for {billingMonth}</div>
               <div style={{ fontSize: 12 }}>Click Generate Bills to create this month&apos;s invoices from active customers.</div>
@@ -325,6 +328,21 @@ export default function BillingPage() {
             </div>
           )}
 
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 14, fontSize: 13, color: 'var(--text-muted)' }}>
+            <div>
+              Showing <strong style={{ color: 'var(--text)' }}>{totalBills === 0 ? 0 : page * PAGE_SIZE + 1}-{Math.min((page + 1) * PAGE_SIZE, totalBills)}</strong> of {totalBills}
+            </div>
+            <div className="row gap-sm">
+              <button className="btn btn-secondary btn-sm" disabled={page === 0 || loading} onClick={() => setPage(p => p - 1)}>
+                <Icon name="chevronLeft" size={12} />Prev
+              </button>
+              <span style={{ fontSize: 12, padding: '0 4px' }}>Page {page + 1} of {Math.ceil(totalBills / PAGE_SIZE) || 1}</span>
+              <button className="btn btn-secondary btn-sm" disabled={page >= Math.ceil(totalBills / PAGE_SIZE) - 1 || loading} onClick={() => setPage(p => p + 1)}>
+                Next<Icon name="chevronRight" size={12} />
+              </button>
+            </div>
+          </div>
+
           <div className="card" style={{ marginTop: 20 }}>
             <div className="card-head">
               <div>
@@ -336,7 +354,7 @@ export default function BillingPage() {
               </div>
             </div>
             <div className="card-pad" style={{ paddingTop: 8 }}>
-              <BarChart data={buildDailyCollection(bills)} accent="#3B82F6" labelKey="d" />
+              <BarChart data={summary?.dailyCollections ?? []} accent="#3B82F6" labelKey="d" />
             </div>
           </div>
         </div>
@@ -380,7 +398,7 @@ export default function BillingPage() {
                   }}
                 >
                   <option value="">Select bill...</option>
-                  {unpaidBills.map(b => (
+                  {bills.filter(b => b.status !== 'paid' && remainingAmount(b) > 0).map(b => (
                     <option key={b.id} value={b.id}>
                       {b.customer?.customer_code ?? b.id.slice(0, 8)} · {b.customer?.full_name ?? 'Unknown'} · {fmt(remainingAmount(b))}
                     </option>

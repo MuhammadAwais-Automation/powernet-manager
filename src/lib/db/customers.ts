@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase'
-import type { Customer, CustomerWithRelations, NewCustomer } from '@/types/database'
+import type { Area, Customer, CustomerWithRelations, NewCustomer } from '@/types/database'
 
 export async function getCustomers(): Promise<CustomerWithRelations[]> {
   const BATCH = 1000
@@ -56,12 +56,23 @@ export async function updateCustomer(
   return data as Customer
 }
 
-export async function searchCustomers(query: string): Promise<CustomerWithRelations[]> {
+export type CustomerSearchResult = Pick<
+  Customer,
+  'id' | 'customer_code' | 'full_name' | 'area_id'
+> & {
+  area: Pick<Area, 'id' | 'name'> | null
+}
+
+export async function searchCustomers(query: string, limit = 8): Promise<CustomerSearchResult[]> {
+  const safeQuery = query.trim().replaceAll(',', ' ')
+  if (safeQuery.length < 2) return []
+
   const { data, error } = await supabase
     .from('customers')
-    .select('*, area:areas(*), package:packages(*)')
-    .or(`full_name.ilike.%${query}%,customer_code.ilike.%${query}%,username.ilike.%${query}%`)
+    .select('id, customer_code, full_name, area_id, area:areas(id, name)')
+    .or(`full_name.ilike.%${safeQuery}%,customer_code.ilike.%${safeQuery}%,username.ilike.%${safeQuery}%`)
     .order('customer_code')
+    .limit(limit)
   if (error) throw error
-  return data as CustomerWithRelations[]
+  return (data ?? []) as unknown as CustomerSearchResult[]
 }

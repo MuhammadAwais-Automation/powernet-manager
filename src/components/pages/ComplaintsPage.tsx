@@ -5,8 +5,8 @@ import { Badge, Avatar, Modal, Tabs } from '../ui';
 import { getComplaints, createComplaint } from '@/lib/db/complaints';
 import { getAreas } from '@/lib/db/areas';
 import { getStaff } from '@/lib/db/staff';
-import { searchCustomers } from '@/lib/db/customers';
-import type { ComplaintWithRelations, Area, StaffWithArea, CustomerWithRelations, ComplaintType, ComplaintPriority, ComplaintStatus } from '@/types/database';
+import { searchCustomers, type CustomerSearchResult } from '@/lib/db/customers';
+import type { ComplaintWithRelations, Area, StaffWithArea, ComplaintType, ComplaintPriority, ComplaintStatus } from '@/types/database';
 
 function LogComplaintModal({ onClose, staff, onSaved }: {
   onClose: () => void;
@@ -14,8 +14,8 @@ function LogComplaintModal({ onClose, staff, onSaved }: {
   onSaved: (c: ComplaintWithRelations) => void;
 }) {
   const [customerSearch, setCustomerSearch]     = useState('');
-  const [customerResults, setCustomerResults]   = useState<CustomerWithRelations[]>([]);
-  const [selectedCustomer, setSelectedCustomer] = useState<CustomerWithRelations | null>(null);
+  const [customerResults, setCustomerResults]   = useState<CustomerSearchResult[]>([]);
+  const [selectedCustomer, setSelectedCustomer] = useState<CustomerSearchResult | null>(null);
   const [form, setForm] = useState({
     issue:       '',
     type:        'connectivity' as ComplaintType,
@@ -29,7 +29,7 @@ function LogComplaintModal({ onClose, staff, onSaved }: {
   useEffect(() => {
     if (customerSearch.length < 2) { setCustomerResults([]); return; }
     const t = setTimeout(() => {
-      searchCustomers(customerSearch).then(r => setCustomerResults(r.slice(0, 8)));
+      searchCustomers(customerSearch, 8).then(setCustomerResults);
     }, 300);
     return () => clearTimeout(t);
   }, [customerSearch]);

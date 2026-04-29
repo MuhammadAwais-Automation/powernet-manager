@@ -5,7 +5,9 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "test:async-core": "node scripts/async-core.test.js",
     "test:billing-core": "node scripts/billing-core.test.js",
+    "test:billing-query": "node scripts/billing-query.test.js",
     "test:reports-core": "node scripts/reports-core.test.js",
     "perf:smoke": "node scripts/perf-smoke.js",
     "start": "next start",
