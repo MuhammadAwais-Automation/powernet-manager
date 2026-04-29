@@ -9,12 +9,13 @@ import {
   generateMonthlyBills,
   markBillPaid,
   recordBillPayment,
+  searchUnpaidBills,
   type BillingSummary,
   type GenerateBillsResult,
 } from '@/lib/db/bills';
 import { getStaff } from '@/lib/db/staff';
 import { getCurrentBillingMonth, normalizeBillingMonth } from '@/lib/billing/core';
-import { normalizeBillStatusFilter, type BillingTab } from '@/lib/billing/query';
+import { normalizeBillingSearch, normalizeBillStatusFilter, type BillingTab } from '@/lib/billing/query';
 import { useAuth } from '@/lib/auth/auth-context';
 import type { BillWithRelations, PaymentMethod, StaffWithArea } from '@/types/database';
 
@@ -48,10 +49,14 @@ export default function BillingPage() {
   const [tab, setTab] = useState<BillingTab>('All');
   const [billingMonth, setBillingMonth] = useState(getCurrentBillingMonth());
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [page, setPage] = useState(0);
   const [reloadToken, setReloadToken] = useState(0);
   const [generating, setGenerating] = useState(false);
   const [payingBillId, setPayingBillId] = useState<string | null>(null);
+  const [billSearch, setBillSearch] = useState('');
+  const [unpaidBillOptions, setUnpaidBillOptions] = useState<BillWithRelations[]>([]);
+  const [searchingUnpaid, setSearchingUnpaid] = useState(false);
   const [recordForm, setRecordForm] = useState({
     billId: '',
     amount: '',
@@ -62,7 +67,12 @@ export default function BillingPage() {
 
   const PAGE_SIZE = 50;
 
-  useEffect(() => { setPage(0); }, [billingMonth, tab]);
+  useEffect(() => {
+    const timeout = window.setTimeout(() => setDebouncedSearch(normalizeBillingSearch(search) ?? ''), 250);
+    return () => window.clearTimeout(timeout);
+  }, [search]);
+
+  useEffect(() => { setPage(0); }, [billingMonth, tab, debouncedSearch]);
 
   const loadBilling = async () => {
     setLoading(true);
@@ -75,6 +85,7 @@ export default function BillingPage() {
           page,
           pageSize: PAGE_SIZE,
           status: normalizeBillStatusFilter(tab),
+          search: debouncedSearch,
         }),
         getBillingSummary(month),
         getStaff(),
@@ -93,21 +104,40 @@ export default function BillingPage() {
   useEffect(() => {
     loadBilling();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [billingMonth, page, tab, reloadToken]);
+  }, [billingMonth, page, tab, debouncedSearch, reloadToken]);
 
-  const selectedBill = bills.find(b => b.id === recordForm.billId) ?? null;
+  useEffect(() => {
+    let cancelled = false;
+    const timeout = window.setTimeout(async () => {
+      const normalized = normalizeBillingSearch(billSearch);
+      if (!normalized) {
+        setUnpaidBillOptions([]);
+        setSearchingUnpaid(false);
+        return;
+      }
 
-  const filtered = bills.filter(bill => {
-    const q = search.trim().toLowerCase();
-    if (!q) return true;
-    return [
-      bill.id,
-      bill.customer?.customer_code,
-      bill.customer?.full_name,
-      bill.month,
-      bill.receipt_no,
-    ].some(value => value?.toLowerCase().includes(q));
-  });
+      setSearchingUnpaid(true);
+      try {
+        const options = await searchUnpaidBills(normalizeBillingMonth(billingMonth), normalized, 12);
+        if (!cancelled) setUnpaidBillOptions(options);
+      } catch (e: unknown) {
+        if (!cancelled) setError(e instanceof Error ? e.message : 'Could not search unpaid bills');
+      } finally {
+        if (!cancelled) setSearchingUnpaid(false);
+      }
+    }, 250);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timeout);
+    };
+  }, [billSearch, billingMonth, reloadToken]);
+
+  const currentPageUnpaidBills = bills.filter(b => b.status !== 'paid' && remainingAmount(b) > 0);
+  const billOptions = Array.from(
+    new Map([...unpaidBillOptions, ...currentPageUnpaidBills].map(bill => [bill.id, bill])).values()
+  );
+  const selectedBill = billOptions.find(b => b.id === recordForm.billId) ?? null;
 
   const totalBilled = summary?.totalBilled ?? 0;
   const totalPaid = summary?.totalPaid ?? 0;
@@ -292,7 +322,7 @@ export default function BillingPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filtered.map(b => (
+                  {bills.map(b => (
                     <tr key={b.id} className="clickable">
                       <td className="mono" style={{ fontSize: 12 }}>{b.id.slice(0, 8)}...</td>
                       <td>
@@ -385,11 +415,18 @@ export default function BillingPage() {
             <div className="card-pad" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               <div className="field">
                 <label>Unpaid Bill</label>
+                <input
+                  className="input"
+                  placeholder="Search customer code/name..."
+                  value={billSearch}
+                  onChange={e => setBillSearch(e.target.value)}
+                  style={{ marginBottom: 8 }}
+                />
                 <select
                   className="select"
                   value={recordForm.billId}
                   onChange={e => {
-                    const bill = bills.find(b => b.id === e.target.value);
+                    const bill = billOptions.find(b => b.id === e.target.value);
                     setRecordForm(f => ({
                       ...f,
                       billId: e.target.value,
@@ -397,13 +434,18 @@ export default function BillingPage() {
                     }));
                   }}
                 >
-                  <option value="">Select bill...</option>
-                  {bills.filter(b => b.status !== 'paid' && remainingAmount(b) > 0).map(b => (
+                  <option value="">{searchingUnpaid ? 'Searching...' : 'Select bill...'}</option>
+                  {billOptions.map(b => (
                     <option key={b.id} value={b.id}>
                       {b.customer?.customer_code ?? b.id.slice(0, 8)} · {b.customer?.full_name ?? 'Unknown'} · {fmt(remainingAmount(b))}
                     </option>
                   ))}
                 </select>
+                {normalizeBillingSearch(billSearch) && !searchingUnpaid && unpaidBillOptions.length === 0 && (
+                  <div className="muted" style={{ fontSize: 12, marginTop: 6 }}>
+                    No unpaid bill found for this search in {billingMonth}.
+                  </div>
+                )}
               </div>
               <div className="field">
                 <label>Amount (Rs.)</label>

@@ -1,5 +1,10 @@
 import { supabase } from '@/lib/supabase'
-import { getBillRange, type BillStatusFilter } from '@/lib/billing/query'
+import {
+  buildBillsPageCacheKey,
+  getBillRange,
+  normalizeBillingSearch,
+  type BillStatusFilter,
+} from '@/lib/billing/query'
 import type { Bill, BillWithRelations, PaymentMethod } from '@/types/database'
 
 export type GenerateBillsResult = {
@@ -46,6 +51,7 @@ export type BillsPageParams = {
   page: number
   pageSize: number
   status?: BillStatusFilter
+  search?: string
 }
 
 export type BillsPageResult = {
@@ -57,6 +63,23 @@ let billsCache: Record<string, { data: BillWithRelations[]; expiresAt: number }>
 let billsPageCache: Record<string, { data: BillsPageResult; expiresAt: number }> = {}
 let billingSummaryCache: Record<string, { data: BillingSummary; expiresAt: number }> = {}
 const CACHE_MS = 60_000
+const CUSTOMER_SEARCH_LIMIT = 250
+const BILL_PAGE_SELECT = `
+  id,
+  customer_id,
+  amount,
+  paid_amount,
+  month,
+  status,
+  collected_by,
+  paid_at,
+  receipt_no,
+  payment_method,
+  payment_note,
+  created_at,
+  customer:customers(id, customer_code, full_name, package_id),
+  collector:staff(id, full_name)
+`
 
 function clearBillsCache() {
   billsCache = {}
@@ -92,32 +115,57 @@ export async function getBills(month?: string): Promise<BillWithRelations[]> {
 
 export async function getBillsPage(params: BillsPageParams): Promise<BillsPageResult> {
   const { from, to } = getBillRange(params.page, params.pageSize)
-  const key = JSON.stringify({ ...params, from, to })
+  const key = buildBillsPageCacheKey(params)
   if (billsPageCache[key] && billsPageCache[key].expiresAt > Date.now()) return billsPageCache[key].data
+
+  const search = normalizeBillingSearch(params.search)
+  const customerIds = search ? await findBillingCustomerIds(search, CUSTOMER_SEARCH_LIMIT) : undefined
+  if (search && customerIds?.length === 0) {
+    const emptyResult = { rows: [], total: 0 }
+    billsPageCache[key] = { data: emptyResult, expiresAt: Date.now() + CACHE_MS }
+    return emptyResult
+  }
 
   let query = supabase
     .from('bills')
-    .select(`
-      *,
-      customer:customers(id, customer_code, full_name, package_id),
-      collector:staff(id, full_name)
-    `, { count: 'exact' })
+    .select(BILL_PAGE_SELECT, { count: 'exact' })
     .eq('month', params.month)
     .order('created_at', { ascending: false })
     .range(from, to)
 
   if (params.status === 'unpaid') query = query.neq('status', 'paid')
   else if (params.status) query = query.eq('status', params.status)
+  if (customerIds) query = query.in('customer_id', customerIds)
 
   const { data, error, count } = await query
   if (error) throw error
 
   const result = {
-    rows: (data ?? []) as BillWithRelations[],
+    rows: (data ?? []) as unknown as BillWithRelations[],
     total: count ?? 0,
   }
   billsPageCache[key] = { data: result, expiresAt: Date.now() + CACHE_MS }
   return result
+}
+
+export async function searchUnpaidBills(month: string, search?: string, limit = 12): Promise<BillWithRelations[]> {
+  const normalized = normalizeBillingSearch(search)
+  if (!normalized) return []
+
+  const customerIds = await findBillingCustomerIds(normalized, Math.max(limit * 4, 24))
+  if (customerIds.length === 0) return []
+
+  const { data, error } = await supabase
+    .from('bills')
+    .select(BILL_PAGE_SELECT)
+    .eq('month', month)
+    .neq('status', 'paid')
+    .in('customer_id', customerIds)
+    .order('created_at', { ascending: false })
+    .limit(limit)
+
+  if (error) throw error
+  return (data ?? []) as unknown as BillWithRelations[]
 }
 
 export async function getBillingSummary(month: string): Promise<BillingSummary> {
@@ -219,4 +267,17 @@ export async function markBillPaid(
 
 function toNumber(value: unknown): number {
   return typeof value === 'number' && Number.isFinite(value) ? value : 0
+}
+
+async function findBillingCustomerIds(search: string, limit: number): Promise<string[]> {
+  const safeSearch = search.replaceAll(',', ' ')
+  const { data, error } = await supabase
+    .from('customers')
+    .select('id')
+    .or(`full_name.ilike.%${safeSearch}%,customer_code.ilike.%${safeSearch}%,username.ilike.%${safeSearch}%`)
+    .order('customer_code')
+    .limit(limit)
+
+  if (error) throw error
+  return Array.from(new Set((data ?? []).map(row => row.id).filter(Boolean)))
 }

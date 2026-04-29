@@ -39,4 +39,14 @@ assert.strictEqual(query.normalizeBillStatusFilter('Paid'), 'paid')
 assert.strictEqual(query.normalizeBillStatusFilter('Overdue'), 'overdue')
 assert.strictEqual(query.normalizeBillStatusFilter('Unpaid'), 'unpaid')
 
+assert.strictEqual(query.normalizeBillingSearch('  CUST-001  '), 'CUST-001')
+assert.strictEqual(query.normalizeBillingSearch(' Awais   Khan '), 'Awais Khan')
+assert.strictEqual(query.normalizeBillingSearch('a'), undefined)
+assert.strictEqual(query.normalizeBillingSearch('   '), undefined)
+
+assert.strictEqual(
+  query.buildBillsPageCacheKey({ month: '2026-04', page: 0, pageSize: 50, status: 'unpaid', search: ' Awais  Khan ' }),
+  '{"month":"2026-04","page":0,"pageSize":50,"status":"unpaid","search":"Awais Khan","from":0,"to":49}'
+)
+
 console.log('billing-query tests passed')
