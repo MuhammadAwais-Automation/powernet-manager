@@ -170,31 +170,27 @@ function Shell() {
 
   const meta = PAGE_META[active];
 
-  const renderPage = () => {
-    if (!canAccessPage(staff.role, active)) return <AccessDenied />;
-    switch (active) {
-      case 'dashboard':  return <DashboardPage />;
-      case 'customers':  return <CustomersPage />;
-      case 'billing':    return <BillingPage />;
-      case 'complaints': return <ComplaintsPage />;
-      case 'staff':      return <StaffPage />;
-      case 'areas':      return <AreasPage />;
-      case 'reports':    return <ReportsPage />;
-      case 'settings':
-        return (
-          <div className="page">
-            <div className="page-header">
-              <div><h1>Settings</h1><p>Organization profile, billing integrations and API keys</p></div>
-            </div>
-            <div className="card card-pad" style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)' }}>
-              <Icon name="settings" size={32} style={{ color: 'var(--text-faint)', marginBottom: 12 }} />
-              <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text)', marginBottom: 4 }}>Settings coming soon</div>
-              <div style={{ fontSize: 13 }}>Configure organization details, tax rates, payment gateways and SMS templates here.</div>
-            </div>
-          </div>
-        );
-    }
-  };
+  const PAGES: { id: PageId; component: React.ReactNode }[] = [
+    { id: 'dashboard',  component: <DashboardPage /> },
+    { id: 'customers',  component: <CustomersPage /> },
+    { id: 'billing',    component: <BillingPage /> },
+    { id: 'complaints', component: <ComplaintsPage /> },
+    { id: 'staff',      component: <StaffPage /> },
+    { id: 'areas',      component: <AreasPage /> },
+    { id: 'reports',    component: <ReportsPage /> },
+    { id: 'settings',   component: (
+      <div className="page">
+        <div className="page-header">
+          <div><h1>Settings</h1><p>Organization profile, billing integrations and API keys</p></div>
+        </div>
+        <div className="card card-pad" style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)' }}>
+          <Icon name="settings" size={32} style={{ color: 'var(--text-faint)', marginBottom: 12 }} />
+          <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text)', marginBottom: 4 }}>Settings coming soon</div>
+          <div style={{ fontSize: 13 }}>Configure organization details, tax rates, payment gateways and SMS templates here.</div>
+        </div>
+      </div>
+    )},
+  ];
 
   return (
     <div className="app">
@@ -204,7 +200,13 @@ function Shell() {
         <Topbar meta={meta} isDark={isDark} onToggleTheme={() => setIsDark(d => !d)}
           staffName={staff.full_name} staffRole={staff.role} onLogout={logout} />
         <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
-          {renderPage()}
+          {!canAccessPage(staff.role, active) ? <AccessDenied /> : (
+            PAGES.map(({ id, component }) => (
+              <div key={id} style={{ display: active === id ? 'contents' : 'none' }}>
+                {component}
+              </div>
+            ))
+          )}
         </div>
       </main>
     </div>
