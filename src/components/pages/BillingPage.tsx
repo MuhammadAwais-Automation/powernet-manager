@@ -1,7 +1,7 @@
 'use client';
 import React, { useEffect, useState } from 'react';
 import Icon, { type IconName } from '../Icon';
-import { Badge, Avatar, IconBadge, Tabs } from '../ui';
+import { Badge, Avatar, IconBadge, Tabs, Modal } from '../ui';
 import { BarChart } from '../charts';
 import {
   getBillsPage,
@@ -158,6 +158,63 @@ export default function BillingPage() {
     { label: 'Bills Remaining', value: String(summary?.unpaidBills ?? 0), color: 'amber', icon: 'clock' },
   ];
 
+  const [exporting, setExporting] = useState(false);
+  const [detailBill, setDetailBill] = useState<BillWithRelations | null>(null);
+
+  const handleExport = async () => {
+    setExporting(true);
+    setError(null);
+    try {
+      const month = normalizeBillingMonth(billingMonth);
+      const status = normalizeBillStatusFilter(tab);
+      const search = debouncedSearch;
+      const PAGE_SIZE_EXPORT = 500;
+      const MAX_ROWS = 2000;
+
+      let allRows: BillWithRelations[] = [];
+      let exportPage = 0;
+      while (allRows.length < MAX_ROWS) {
+        const result = await getBillsPage({ month, page: exportPage, pageSize: PAGE_SIZE_EXPORT, status, search });
+        allRows = allRows.concat(result.rows);
+        if (allRows.length >= result.total || result.rows.length < PAGE_SIZE_EXPORT) break;
+        exportPage++;
+      }
+
+      const escape = (v: string | number | null | undefined) => {
+        const s = String(v ?? '');
+        return `"${s.replace(/"/g, '""')}"`;
+      };
+
+      const headers = ['Bill ID', 'Customer Code', 'Customer Name', 'Month', 'Amount', 'Paid', 'Remaining', 'Status', 'Receipt No', 'Payment Method', 'Created At'];
+      const rows = allRows.map(b => [
+        escape(b.id),
+        escape(b.customer?.customer_code),
+        escape(b.customer?.full_name),
+        escape(b.month),
+        escape(b.amount),
+        escape(b.paid_amount ?? 0),
+        escape(Math.max(b.amount - (b.paid_amount ?? 0), 0)),
+        escape(b.status),
+        escape(b.receipt_no),
+        escape(b.payment_method),
+        escape(b.created_at),
+      ].join(','));
+
+      const csv = [headers.join(','), ...rows].join('\n');
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `bills-${billingMonth}-${tab.toLowerCase()}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Export failed');
+    } finally {
+      setExporting(false);
+    }
+  };
+
   const reloadAfterMutation = async (notice: string) => {
     setMessage(notice);
     setReloadToken(t => t + 1);
@@ -252,7 +309,9 @@ export default function BillingPage() {
             onChange={e => setBillingMonth(e.target.value)}
             style={{ width: 150 }}
           />
-          <button className="btn btn-secondary"><Icon name="download" size={14} />Export</button>
+          <button className="btn btn-secondary" onClick={handleExport} disabled={exporting}>
+            <Icon name="download" size={14} />{exporting ? 'Exporting...' : 'Export'}
+          </button>
           <button className="btn btn-primary" onClick={handleGenerateBills} disabled={generating}>
             <Icon name="fileText" size={14} />{generating ? 'Generating...' : 'Generate Bills'}
           </button>
@@ -362,7 +421,7 @@ export default function BillingPage() {
                               <Icon name="check" size={12} />{payingBillId === b.id ? 'Saving' : 'Mark paid'}
                             </button>
                           )}
-                          <button className="icon-btn" style={{ width: 28, height: 28 }} title={b.payment_note ?? 'Bill details'}>
+                          <button className="icon-btn" style={{ width: 28, height: 28 }} title="Bill details" onClick={() => setDetailBill(b)}>
                             <Icon name="fileText" size={14} />
                           </button>
                         </div>
@@ -500,6 +559,82 @@ export default function BillingPage() {
           </div>
         </div>
       </div>
+      {detailBill && (
+        <Modal open={!!detailBill} onClose={() => setDetailBill(null)} width={480}>
+          <div style={{ padding: '24px 28px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+              <div>
+                <div style={{ fontWeight: 700, fontSize: 16 }}>Bill Details</div>
+                <div className="muted" style={{ fontSize: 12 }}>#{detailBill.id.slice(0, 8).toUpperCase()}</div>
+              </div>
+              <Badge color={statusColor(detailBill.status)} dot>{detailBill.status}</Badge>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 20 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div className="card card-pad" style={{ padding: '10px 14px' }}>
+                  <div className="muted" style={{ fontSize: 11, textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.05em' }}>Customer</div>
+                  <div style={{ fontWeight: 600, fontSize: 13, marginTop: 4 }}>{detailBill.customer?.full_name ?? '—'}</div>
+                  <div className="muted mono" style={{ fontSize: 11 }}>{detailBill.customer?.customer_code ?? ''}</div>
+                </div>
+                <div className="card card-pad" style={{ padding: '10px 14px' }}>
+                  <div className="muted" style={{ fontSize: 11, textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.05em' }}>Billing Month</div>
+                  <div style={{ fontWeight: 600, fontSize: 13, marginTop: 4 }}>{detailBill.month}</div>
+                </div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
+                <div className="card card-pad" style={{ padding: '10px 14px' }}>
+                  <div className="muted" style={{ fontSize: 11, textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.05em' }}>Amount</div>
+                  <div className="num" style={{ fontWeight: 700, fontSize: 15, marginTop: 4 }}>{fmt(detailBill.amount)}</div>
+                </div>
+                <div className="card card-pad" style={{ padding: '10px 14px' }}>
+                  <div className="muted" style={{ fontSize: 11, textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.05em' }}>Paid</div>
+                  <div className="num" style={{ fontWeight: 700, fontSize: 15, marginTop: 4, color: 'var(--green)' }}>{fmt(detailBill.paid_amount ?? 0)}</div>
+                </div>
+                <div className="card card-pad" style={{ padding: '10px 14px' }}>
+                  <div className="muted" style={{ fontSize: 11, textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.05em' }}>Remaining</div>
+                  <div className="num" style={{ fontWeight: 700, fontSize: 15, marginTop: 4, color: remainingAmount(detailBill) > 0 ? 'var(--amber)' : 'var(--green)' }}>{fmt(remainingAmount(detailBill))}</div>
+                </div>
+              </div>
+              {detailBill.receipt_no && (
+                <div className="card card-pad" style={{ padding: '10px 14px' }}>
+                  <div className="muted" style={{ fontSize: 11, textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.05em' }}>Receipt No</div>
+                  <div className="mono" style={{ fontWeight: 600, fontSize: 13, marginTop: 4 }}>{detailBill.receipt_no}</div>
+                </div>
+              )}
+              {(detailBill.payment_method || detailBill.collector) && (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                  {detailBill.payment_method && (
+                    <div className="card card-pad" style={{ padding: '10px 14px' }}>
+                      <div className="muted" style={{ fontSize: 11, textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.05em' }}>Method</div>
+                      <div style={{ fontWeight: 600, fontSize: 13, marginTop: 4, textTransform: 'capitalize' }}>{detailBill.payment_method}</div>
+                    </div>
+                  )}
+                  {detailBill.collector && (
+                    <div className="card card-pad" style={{ padding: '10px 14px' }}>
+                      <div className="muted" style={{ fontSize: 11, textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.05em' }}>Collected By</div>
+                      <div style={{ fontWeight: 600, fontSize: 13, marginTop: 4 }}>{detailBill.collector.full_name}</div>
+                    </div>
+                  )}
+                </div>
+              )}
+              {detailBill.payment_note && (
+                <div className="card card-pad" style={{ padding: '10px 14px' }}>
+                  <div className="muted" style={{ fontSize: 11, textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.05em' }}>Notes</div>
+                  <div style={{ fontSize: 13, marginTop: 4 }}>{detailBill.payment_note}</div>
+                </div>
+              )}
+            </div>
+
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button className="btn btn-secondary" onClick={() => setDetailBill(null)}>Close</button>
+              <button className="btn btn-primary" onClick={() => window.print()}>
+                <Icon name="download" size={14} />Print Receipt
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }
