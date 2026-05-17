@@ -146,17 +146,11 @@ export default function BillingPage() {
 
   const fmt = (n: number) => `Rs. ${n.toLocaleString()}`;
 
-  const stats: { label: string; value: string; color: string; icon: IconName }[] = [
-    { label: 'Total Billed', value: fmt(totalBilled), color: 'blue', icon: 'fileText' },
-    { label: 'Collected', value: fmt(totalPaid), color: 'green', icon: 'checkCircle' },
-    { label: 'Remaining', value: fmt(totalRemaining), color: 'amber', icon: 'clock' },
-    { label: 'Overdue', value: fmt(overdueTotal), color: 'red', icon: 'alertTri' },
-  ];
-
-  const countStats: { label: string; value: string; color: string; icon: IconName }[] = [
-    { label: 'Bills Collected', value: String(summary?.paidBills ?? 0), color: 'green', icon: 'checkCircle' },
-    { label: 'Bills Remaining', value: String(summary?.unpaidBills ?? 0), color: 'amber', icon: 'clock' },
-    { label: 'Overdue Bills', value: String(summary?.overdueBills ?? 0), color: 'red', icon: 'alertTri' },
+  const kpiCards: { label: string; amount: string; count: string; color: string; icon: IconName }[] = [
+    { label: 'Total Billed',  amount: fmt(totalBilled),    count: String(summary?.totalBills ?? 0),   color: 'blue',  icon: 'fileText' },
+    { label: 'Collected',     amount: fmt(totalPaid),       count: String(summary?.paidBills ?? 0),    color: 'green', icon: 'checkCircle' },
+    { label: 'Remaining',     amount: fmt(totalRemaining),  count: String(summary?.unpaidBills ?? 0),  color: 'amber', icon: 'clock' },
+    { label: 'Overdue',       amount: fmt(overdueTotal),    count: String(summary?.overdueBills ?? 0), color: 'red',   icon: 'alertTri' },
   ];
 
   const [exporting, setExporting] = useState(false);
@@ -277,23 +271,6 @@ export default function BillingPage() {
     }
   };
 
-  if (loading) return (
-    <div className="page" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 300 }}>
-      <div className="muted">Loading bills...</div>
-    </div>
-  );
-
-  if (error && bills.length === 0) return (
-    <div className="page">
-      <div className="card" style={{ padding: 24 }}>
-        <div style={{ fontWeight: 600, marginBottom: 6 }}>Data load failed</div>
-        <div className="muted" style={{ fontSize: 13, marginBottom: 14 }}>{error}</div>
-        <button className="btn btn-primary" onClick={loadBilling}>
-          <Icon name="refresh" size={14} />Retry
-        </button>
-      </div>
-    </div>
-  );
 
   return (
     <div className="page">
@@ -319,39 +296,26 @@ export default function BillingPage() {
         </div>
       </div>
 
-      {(error || message) && (
-        <div
-          className="card"
-          style={{
-            padding: '10px 14px',
-            marginBottom: 14,
-            color: error ? '#dc2626' : 'var(--green)',
-            fontSize: 13,
-            fontWeight: 600,
-          }}
-        >
-          {error ?? message}
+      {error && (
+        <div style={{ padding: '10px 16px', background: 'var(--red-bg, #fef2f2)', color: 'var(--red, #dc2626)', borderRadius: 8, marginBottom: 12, fontSize: 13, display: 'flex', alignItems: 'center', gap: 10 }}>
+          {error}
+          <button className="btn btn-sm btn-secondary" style={{ marginLeft: 'auto' }} onClick={loadBilling}>Retry</button>
+        </div>
+      )}
+      {message && (
+        <div style={{ padding: '10px 16px', background: 'var(--green-bg, #f0fdf4)', color: 'var(--green)', borderRadius: 8, marginBottom: 12, fontSize: 13, fontWeight: 600 }}>
+          {message}
         </div>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 12 }}>
-        {stats.map((s, i) => (
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 20, opacity: loading ? 0.6 : 1, transition: 'opacity 0.15s' }}>
+        {kpiCards.map((s, i) => (
           <div key={i} className="card card-pad" style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
             <IconBadge name={s.icon} color={s.color} size={40} />
-            <div style={{ flex: 1 }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
               <div className="muted" style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>{s.label}</div>
-              <div style={{ fontSize: 20, fontWeight: 600, letterSpacing: '-0.02em', marginTop: 2 }} className="num">{s.value}</div>
-            </div>
-          </div>
-        ))}
-      </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 20 }}>
-        {countStats.map((s, i) => (
-          <div key={i} className="card card-pad" style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-            <IconBadge name={s.icon} color={s.color} size={40} />
-            <div style={{ flex: 1 }}>
-              <div className="muted" style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>{s.label}</div>
-              <div style={{ fontSize: 20, fontWeight: 600, letterSpacing: '-0.02em', marginTop: 2 }} className="num">{s.value}</div>
+              <div style={{ fontSize: 19, fontWeight: 700, letterSpacing: '-0.02em', marginTop: 2 }} className="num">{s.amount}</div>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>{s.count} bills</div>
             </div>
           </div>
         ))}
@@ -377,13 +341,39 @@ export default function BillingPage() {
             </div>
           </div>
 
-          {totalBills === 0 ? (
+          {loading && bills.length === 0 ? (
+            <div className="table-wrap">
+              <table className="data">
+                <thead>
+                  <tr>
+                    <th>Bill ID</th>
+                    <th>Customer</th>
+                    <th>Amount</th>
+                    <th>Paid</th>
+                    <th>Remaining</th>
+                    <th>Status</th>
+                    <th>Receipt</th>
+                    <th style={{ textAlign: 'right' }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {Array.from({ length: 8 }).map((_, i) => (
+                    <tr key={i}>
+                      {Array.from({ length: 8 }).map((__, j) => (
+                        <td key={j}><div style={{ height: 16, background: 'var(--bg-muted)', borderRadius: 4, width: j === 1 ? 140 : j === 7 ? 80 : 70, opacity: 0.6 }} /></td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : totalBills === 0 ? (
             <div className="card" style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)' }}>
               <div style={{ fontSize: 14, marginBottom: 8 }}>No bills for {billingMonth}</div>
               <div style={{ fontSize: 12 }}>Click Generate Bills to create this month&apos;s invoices from active customers.</div>
             </div>
           ) : (
-            <div className="table-wrap">
+            <div className="table-wrap" style={{ opacity: loading ? 0.5 : 1, transition: 'opacity 0.15s' }}>
               <table className="data">
                 <thead>
                   <tr>
