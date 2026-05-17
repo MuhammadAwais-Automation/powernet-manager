@@ -350,6 +350,8 @@ export default function CustomersPage() {
   const [areaFilter, setAreaFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [pkgFilter, setPkgFilter] = useState('');
+  const [iptvFilter, setIptvFilter] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [reloadToken, setReloadToken] = useState(0);
   const [exporting, setExporting] = useState(false);
   const PAGE_SIZE = 50;

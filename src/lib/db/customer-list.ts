@@ -8,6 +8,7 @@ export type CustomerListParams = {
   areaId?: string
   packageId?: string
   status?: CustomerStatus
+  iptv?: boolean
 }
 
 const CUSTOMER_LIST_SELECT = `
@@ -47,6 +48,7 @@ export async function getCustomerList(params: CustomerListParams): Promise<{
   if (params.areaId) query = query.eq('area_id', params.areaId)
   if (params.packageId) query = query.eq('package_id', params.packageId)
   if (params.status) query = query.eq('status', params.status)
+  if (params.iptv === true) query = query.eq('iptv', true)
 
   const { data, error, count } = await query
   if (error) throw error
