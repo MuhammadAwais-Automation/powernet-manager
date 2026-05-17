@@ -156,6 +156,7 @@ export default function BillingPage() {
   const countStats: { label: string; value: string; color: string; icon: IconName }[] = [
     { label: 'Bills Collected', value: String(summary?.paidBills ?? 0), color: 'green', icon: 'checkCircle' },
     { label: 'Bills Remaining', value: String(summary?.unpaidBills ?? 0), color: 'amber', icon: 'clock' },
+    { label: 'Overdue Bills', value: String(summary?.overdueBills ?? 0), color: 'red', icon: 'alertTri' },
   ];
 
   const [exporting, setExporting] = useState(false);
@@ -344,7 +345,7 @@ export default function BillingPage() {
           </div>
         ))}
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12, marginBottom: 20 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 20 }}>
         {countStats.map((s, i) => (
           <div key={i} className="card card-pad" style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
             <IconBadge name={s.icon} color={s.color} size={40} />
