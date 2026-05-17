@@ -1,5 +1,5 @@
 'use client';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Icon from '../Icon';
 import { Badge, Avatar, Switch, Drawer } from '../ui';
 import { createCustomer, getCustomerById, updateCustomer } from '@/lib/db/customers';
@@ -416,7 +416,7 @@ export default function CustomersPage() {
       });
 
     return () => { cancelled = true; };
-  }, [page, search, areaFilter, statusFilter, pkgFilter, reloadToken]);
+  }, [page, search, areaFilter, statusFilter, pkgFilter, iptvFilter, reloadToken]);
 
   const [editCustomer, setEditCustomer] = useState<CustomerWithRelations | null>(null);
 
@@ -492,23 +492,17 @@ export default function CustomersPage() {
   const totalPages = Math.ceil(totalCustomers / PAGE_SIZE);
   const paginated  = customers;
 
-  if (loading) return (
-    <div className="page" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 300 }}>
-      <div className="muted">Loading customers…</div>
-    </div>
-  );
-
-  if (error) return (
-    <div className="page">
-      <div className="card" style={{ padding: 24 }}>
-        <div style={{ fontWeight: 600, marginBottom: 6 }}>Data load failed</div>
-        <div className="muted" style={{ fontSize: 13, marginBottom: 14 }}>{error}</div>
-        <button className="btn btn-primary" onClick={() => window.location.reload()}>
-          <Icon name="refresh" size={14} />Retry
-        </button>
-      </div>
-    </div>
-  );
+  const moreFiltersRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!showMoreFilters) return;
+    const handler = (e: MouseEvent) => {
+      if (moreFiltersRef.current && !moreFiltersRef.current.contains(e.target as Node)) {
+        setShowMoreFilters(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showMoreFilters]);
 
   return (
     <div className="page">
@@ -548,28 +542,47 @@ export default function CustomersPage() {
           {packages.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
         </select>
         <div className="spacer" />
-        <button
-          className={`btn btn-ghost btn-sm${showMoreFilters ? ' active' : ''}`}
-          onClick={() => setShowMoreFilters(v => !v)}
-        >
-          <Icon name="filter" size={14} />More filters
-        </button>
+        <div ref={moreFiltersRef} style={{ position: 'relative' }}>
+          <button
+            className={`btn btn-ghost btn-sm${showMoreFilters || iptvFilter ? ' active' : ''}`}
+            onClick={() => setShowMoreFilters(v => !v)}
+          >
+            <Icon name="filter" size={14} />
+            More filters
+            {iptvFilter && <span style={{ marginLeft: 4, background: 'var(--color-primary)', color: '#fff', borderRadius: 10, fontSize: 10, padding: '1px 6px' }}>1</span>}
+          </button>
+          {showMoreFilters && (
+            <div style={{
+              position: 'absolute', top: 'calc(100% + 6px)', right: 0, zIndex: 100,
+              background: 'var(--bg)', border: '1px solid var(--border)',
+              borderRadius: 10, boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
+              padding: '12px 16px', minWidth: 200,
+            }}>
+              <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)', marginBottom: 10 }}>
+                More Filters
+              </div>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13, cursor: 'pointer', padding: '6px 0' }}>
+                <input
+                  type="checkbox"
+                  checked={iptvFilter}
+                  onChange={e => { setIptvFilter(e.target.checked); setPage(0); }}
+                  style={{ width: 15, height: 15, accentColor: 'var(--color-primary)' }}
+                />
+                <span>IPTV subscribers only</span>
+              </label>
+            </div>
+          )}
+        </div>
       </div>
 
-      {showMoreFilters && (
-        <div className="filter-row" style={{ paddingTop: 0 }}>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, cursor: 'pointer' }}>
-            <input
-              type="checkbox"
-              checked={iptvFilter}
-              onChange={e => { setIptvFilter(e.target.checked); setPage(0); }}
-            />
-            IPTV only
-          </label>
+      {error && (
+        <div style={{ padding: '10px 16px', background: 'var(--red-bg, #fef2f2)', color: 'var(--red, #dc2626)', borderRadius: 8, marginBottom: 12, fontSize: 13, display: 'flex', alignItems: 'center', gap: 10 }}>
+          {error}
+          <button className="btn btn-sm btn-secondary" style={{ marginLeft: 'auto' }} onClick={() => setReloadToken(t => t + 1)}>Retry</button>
         </div>
       )}
 
-      <div className="table-wrap">
+      <div className="table-wrap" style={{ opacity: loading ? 0.5 : 1, transition: 'opacity 0.15s' }}>
         <table className="data">
           <thead>
             <tr>
@@ -585,7 +598,15 @@ export default function CustomersPage() {
             </tr>
           </thead>
           <tbody>
-            {paginated.map(c => (
+            {loading && customers.length === 0 ? (
+              Array.from({ length: 8 }).map((_, i) => (
+                <tr key={i}>
+                  {Array.from({ length: 9 }).map((__, j) => (
+                    <td key={j}><div style={{ height: 16, background: 'var(--border)', borderRadius: 4, opacity: 0.5 }} /></td>
+                  ))}
+                </tr>
+              ))
+            ) : paginated.map(c => (
               <tr key={c.id} className={`clickable ${selected?.id === c.id ? 'selected' : ''}`} onClick={() => handleSelectCustomer(c.id)}>
                 <td onClick={e => e.stopPropagation()}><input type="checkbox" /></td>
                 <td>
