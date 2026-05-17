@@ -153,6 +153,11 @@ export default function BillingPage() {
     { label: 'Overdue', value: fmt(overdueTotal), color: 'red', icon: 'alertTri' },
   ];
 
+  const countStats: { label: string; value: string; color: string; icon: IconName }[] = [
+    { label: 'Bills Collected', value: String(summary?.paidBills ?? 0), color: 'green', icon: 'checkCircle' },
+    { label: 'Bills Remaining', value: String(summary?.unpaidBills ?? 0), color: 'amber', icon: 'clock' },
+  ];
+
   const reloadAfterMutation = async (notice: string) => {
     setMessage(notice);
     setReloadToken(t => t + 1);
@@ -269,8 +274,19 @@ export default function BillingPage() {
         </div>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 20 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 12 }}>
         {stats.map((s, i) => (
+          <div key={i} className="card card-pad" style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+            <IconBadge name={s.icon} color={s.color} size={40} />
+            <div style={{ flex: 1 }}>
+              <div className="muted" style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>{s.label}</div>
+              <div style={{ fontSize: 20, fontWeight: 600, letterSpacing: '-0.02em', marginTop: 2 }} className="num">{s.value}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12, marginBottom: 20 }}>
+        {countStats.map((s, i) => (
           <div key={i} className="card card-pad" style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
             <IconBadge name={s.icon} color={s.color} size={40} />
             <div style={{ flex: 1 }}>
