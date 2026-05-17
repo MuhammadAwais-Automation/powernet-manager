@@ -351,13 +351,14 @@ export default function CustomersPage() {
   const [statusFilter, setStatusFilter] = useState('');
   const [pkgFilter, setPkgFilter] = useState('');
   const [iptvFilter, setIptvFilter] = useState(false);
+  const [showMoreFilters, setShowMoreFilters] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [reloadToken, setReloadToken] = useState(0);
   const [exporting, setExporting] = useState(false);
   const PAGE_SIZE = 50;
   const [page, setPage] = useState(0);
 
-  useEffect(() => { setPage(0); }, [search, areaFilter, statusFilter, pkgFilter, reloadToken]);
+  useEffect(() => { setPage(0); }, [search, areaFilter, statusFilter, pkgFilter, iptvFilter, reloadToken]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => setSearch(rawSearch), 250);
@@ -399,6 +400,7 @@ export default function CustomersPage() {
       areaId: areaFilter || undefined,
       packageId: pkgFilter || undefined,
       status: statusFilter ? (statusFilter as CustomerStatus) : undefined,
+      iptv: iptvFilter || undefined,
       // eslint-disable-next-line react-hooks/exhaustive-deps
     })
       .then(result => {
@@ -546,8 +548,26 @@ export default function CustomersPage() {
           {packages.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
         </select>
         <div className="spacer" />
-        <button className="btn btn-ghost btn-sm"><Icon name="filter" size={14} />More filters</button>
+        <button
+          className={`btn btn-ghost btn-sm${showMoreFilters ? ' active' : ''}`}
+          onClick={() => setShowMoreFilters(v => !v)}
+        >
+          <Icon name="filter" size={14} />More filters
+        </button>
       </div>
+
+      {showMoreFilters && (
+        <div className="filter-row" style={{ paddingTop: 0 }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, cursor: 'pointer' }}>
+            <input
+              type="checkbox"
+              checked={iptvFilter}
+              onChange={e => { setIptvFilter(e.target.checked); setPage(0); }}
+            />
+            IPTV only
+          </label>
+        </div>
+      )}
 
       <div className="table-wrap">
         <table className="data">
