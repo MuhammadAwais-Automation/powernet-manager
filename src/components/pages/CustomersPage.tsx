@@ -181,7 +181,7 @@ function AddCustomerDrawer({
 
 // ── Customer Detail Drawer ───────────────────────────────────────────────────
 
-function CustomerDetail({ customer, onClose, onEdit, readOnly }: { customer: CustomerWithRelations; onClose: () => void; onEdit: () => void; readOnly?: boolean; }) {
+function CustomerDetail({ customer, onClose, onEdit, onSuspend, readOnly }: { customer: CustomerWithRelations; onClose: () => void; onEdit: () => void; onSuspend: () => void; readOnly?: boolean; }) {
   const [bills, setBills] = useState<Bill[]>([]);
   const [billsError, setBillsError] = useState<string | null>(null);
 
@@ -323,7 +323,9 @@ function CustomerDetail({ customer, onClose, onEdit, readOnly }: { customer: Cus
       {!readOnly && (
         <div className="drawer-foot">
           <button className="btn btn-secondary" onClick={onEdit}><Icon name="edit" size={14} />Edit</button>
-          <button className="btn btn-danger"><Icon name="ban" size={14} />Suspend</button>
+          {customer.status !== 'suspended' && (
+            <button className="btn btn-danger" onClick={onSuspend}><Icon name="ban" size={14} />Suspend</button>
+          )}
         </div>
       )}
     </>
@@ -348,10 +350,12 @@ export default function CustomersPage() {
   const [areaFilter, setAreaFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [pkgFilter, setPkgFilter] = useState('');
+  const [reloadToken, setReloadToken] = useState(0);
+  const [exporting, setExporting] = useState(false);
   const PAGE_SIZE = 50;
   const [page, setPage] = useState(0);
 
-  useEffect(() => { setPage(0); }, [search, areaFilter, statusFilter, pkgFilter]);
+  useEffect(() => { setPage(0); }, [search, areaFilter, statusFilter, pkgFilter, reloadToken]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => setSearch(rawSearch), 250);
@@ -393,6 +397,7 @@ export default function CustomersPage() {
       areaId: areaFilter || undefined,
       packageId: pkgFilter || undefined,
       status: statusFilter ? (statusFilter as CustomerStatus) : undefined,
+      // eslint-disable-next-line react-hooks/exhaustive-deps
     })
       .then(result => {
         if (cancelled) return;
@@ -407,18 +412,17 @@ export default function CustomersPage() {
       });
 
     return () => { cancelled = true; };
-  }, [page, search, areaFilter, statusFilter, pkgFilter]);
+  }, [page, search, areaFilter, statusFilter, pkgFilter, reloadToken]);
 
   const [editCustomer, setEditCustomer] = useState<CustomerWithRelations | null>(null);
 
-  const handleCustomerSaved = (c: CustomerWithRelations) => {
-    setCustomers(prev => [c, ...prev]);
-    setTotalCustomers(prev => prev + 1);
+  const handleCustomerSaved = (_c: CustomerWithRelations) => {
+    setReloadToken(t => t + 1);
   };
 
-  const handleCustomerUpdated = (updated: CustomerWithRelations) => {
-    setCustomers(prev => prev.map(c => c.id === updated.id ? updated : c));
+  const handleCustomerUpdated = (_updated: CustomerWithRelations) => {
     setSelected(null);
+    setReloadToken(t => t + 1);
   };
 
   const handleSelectCustomer = async (id: string) => {
@@ -429,6 +433,56 @@ export default function CustomersPage() {
   const handleEditCustomer = async (id: string) => {
     const full = await getCustomerById(id);
     if (full) setEditCustomer(full);
+  };
+
+  const handleSuspend = async () => {
+    if (!selected) return;
+    if (!window.confirm(`Suspend ${selected.full_name}?`)) return;
+    try {
+      await updateCustomer(selected.id, { status: 'suspended' });
+      setSelected(null);
+      setReloadToken(t => t + 1);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Could not suspend customer');
+    }
+  };
+
+  const handleExport = async () => {
+    setExporting(true);
+    setError(null);
+    try {
+      const MAX = 2000;
+      const BATCH = 500;
+      let all: CustomerListRow[] = [];
+      let p = 0;
+      while (all.length < MAX) {
+        const result = await getCustomerList({
+          page: p, pageSize: BATCH,
+          search, areaId: areaFilter || undefined,
+          packageId: pkgFilter || undefined,
+          status: statusFilter ? (statusFilter as CustomerStatus) : undefined,
+        });
+        all = all.concat(result.rows);
+        if (all.length >= result.total || result.rows.length < BATCH) break;
+        p++;
+      }
+      const esc = (v: string | number | null | undefined) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+      const headers = ['Customer Code', 'Full Name', 'CNIC', 'Phone', 'Area', 'Package', 'Status', 'Due Amount'];
+      const rows = all.map(c => [
+        esc(c.customer_code), esc(c.full_name), esc(c.cnic), esc(c.phone),
+        esc(c.area?.name), esc(c.package?.name), esc(c.status), esc(c.due_amount),
+      ].join(','));
+      const csv = [headers.join(','), ...rows].join('\n');
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = `customers-${statusFilter || 'all'}.csv`; a.click();
+      URL.revokeObjectURL(url);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Export failed');
+    } finally {
+      setExporting(false);
+    }
   };
 
   const totalPages = Math.ceil(totalCustomers / PAGE_SIZE);
@@ -460,7 +514,7 @@ export default function CustomersPage() {
           <p>{totalCustomers.toLocaleString()} total · managing active, suspended and onboarding subscribers</p>
         </div>
         <div className="row gap-sm">
-          <button className="btn btn-secondary"><Icon name="download" size={14} />Export CSV</button>
+          <button className="btn btn-secondary" onClick={handleExport} disabled={exporting}><Icon name="download" size={14} />{exporting ? 'Exporting...' : 'Export CSV'}</button>
           {!readOnly && (
             <button className="btn btn-primary" onClick={() => setShowAdd(true)}><Icon name="plus" size={14} />Add Customer</button>
           )}
@@ -535,7 +589,7 @@ export default function CustomersPage() {
                 </td>
                 <td onClick={e => e.stopPropagation()} style={{ textAlign: 'right' }}>
                   <div className="row gap-sm" style={{ justifyContent: 'flex-end' }}>
-                    <button className="icon-btn" style={{ width: 28, height: 28 }}><Icon name="eye" size={14} /></button>
+                    <button className="icon-btn" style={{ width: 28, height: 28 }} onClick={() => handleSelectCustomer(c.id)}><Icon name="eye" size={14} /></button>
                     {!readOnly && (
                       <button className="icon-btn" style={{ width: 28, height: 28 }} onClick={() => handleEditCustomer(c.id)}><Icon name="edit" size={14} /></button>
                     )}
@@ -568,6 +622,7 @@ export default function CustomersPage() {
             customer={selected}
             onClose={() => setSelected(null)}
             onEdit={() => { setEditCustomer(selected); setSelected(null); }}
+            onSuspend={handleSuspend}
             readOnly={readOnly}
           />
         )}
