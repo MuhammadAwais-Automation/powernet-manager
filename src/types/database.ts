@@ -81,7 +81,7 @@ export type Bill = {
   id: string
   customer_id: string
   amount: number
-  paid_amount: number
+  paid_amount: number | null
   month: string
   status: BillStatus
   collected_by: string | null

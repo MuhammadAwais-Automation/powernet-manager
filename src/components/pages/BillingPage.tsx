@@ -155,6 +155,9 @@ export default function BillingPage() {
 
   const [exporting, setExporting] = useState(false);
   const [detailBill, setDetailBill] = useState<BillWithRelations | null>(null);
+  const [markPaidTarget, setMarkPaidTarget] = useState<BillWithRelations | null>(null);
+  const [markPaidMethod, setMarkPaidMethod] = useState<PaymentMethod>('cash');
+  const msgTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleExport = async () => {
     setExporting(true);
@@ -196,7 +199,7 @@ export default function BillingPage() {
       ].join(','));
 
       const csv = [headers.join(','), ...rows].join('\n');
-      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -210,9 +213,11 @@ export default function BillingPage() {
     }
   };
 
-  const reloadAfterMutation = async (notice: string) => {
+  const reloadAfterMutation = (notice: string) => {
+    if (msgTimerRef.current) clearTimeout(msgTimerRef.current);
     setMessage(notice);
     setReloadToken(t => t + 1);
+    msgTimerRef.current = setTimeout(() => setMessage(null), 4000);
   };
 
   const handleGenerateBills = async () => {
@@ -231,13 +236,20 @@ export default function BillingPage() {
     }
   };
 
-  const handleMarkPaid = async (bill: BillWithRelations) => {
-    setPayingBillId(bill.id);
+  const openMarkPaid = (bill: BillWithRelations) => {
+    setMarkPaidTarget(bill);
+    setMarkPaidMethod('cash');
     setError(null);
     setMessage(null);
+  };
+
+  const confirmMarkPaid = async () => {
+    if (!markPaidTarget) return;
+    setPayingBillId(markPaidTarget.id);
+    setMarkPaidTarget(null);
     try {
-      const result = await markBillPaid(bill, currentStaff?.id ?? null);
-      await reloadAfterMutation(`Payment recorded. Receipt ${result.receiptNo}`);
+      const result = await markBillPaid(markPaidTarget, currentStaff?.id ?? null, markPaidMethod);
+      reloadAfterMutation(`Payment recorded. Receipt ${result.receiptNo}`);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Could not mark bill paid');
     } finally {
@@ -326,7 +338,7 @@ export default function BillingPage() {
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, gap: 12 }}>
             <Tabs value={tab} onChange={value => setTab(value as BillingTab)} items={[
               { value: 'All', label: 'All Bills', count: summary?.totalBills ?? 0 },
-              { value: 'Unpaid', label: 'Unpaid', count: summary?.unpaidBills ?? 0 },
+              { value: 'Unpaid', label: 'Unpaid', count: summary?.pendingBills ?? 0 },
               { value: 'Paid', label: 'Paid', count: summary?.paidBills ?? 0 },
               { value: 'Overdue', label: 'Overdue', count: summary?.overdueBills ?? 0 },
             ]} />
@@ -408,8 +420,8 @@ export default function BillingPage() {
                       <td style={{ textAlign: 'right' }}>
                         <div className="row gap-sm" style={{ justifyContent: 'flex-end' }}>
                           {b.status !== 'paid' && remainingAmount(b) > 0 && (
-                            <button className="btn btn-secondary btn-sm" onClick={() => handleMarkPaid(b)} disabled={payingBillId === b.id}>
-                              <Icon name="check" size={12} />{payingBillId === b.id ? 'Saving' : 'Mark paid'}
+                            <button className="btn btn-secondary btn-sm" onClick={() => openMarkPaid(b)} disabled={payingBillId === b.id}>
+                              <Icon name="check" size={12} />{payingBillId === b.id ? 'Saving...' : 'Mark paid'}
                             </button>
                           )}
                           <button className="icon-btn" style={{ width: 28, height: 28 }} title="Bill details" onClick={() => setDetailBill(b)}>
@@ -450,7 +462,13 @@ export default function BillingPage() {
               </div>
             </div>
             <div className="card-pad" style={{ paddingTop: 8 }}>
-              <BarChart data={summary?.dailyCollections ?? []} accent="#3B82F6" labelKey="d" />
+              {!loading && (summary?.dailyCollections ?? []).length === 0 ? (
+                <div style={{ padding: '24px 0', textAlign: 'center', color: 'var(--text-muted)', fontSize: 13 }}>
+                  No collections recorded for {billingMonth}
+                </div>
+              ) : (
+                <BarChart data={summary?.dailyCollections ?? []} accent="#3B82F6" labelKey="d" />
+              )}
             </div>
           </div>
         </div>
@@ -619,8 +637,36 @@ export default function BillingPage() {
 
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
               <button className="btn btn-secondary" onClick={() => setDetailBill(null)}>Close</button>
-              <button className="btn btn-primary" onClick={() => window.print()}>
+              <button className="btn btn-primary" onClick={() => {
+                const b = detailBill;
+                const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Receipt ${b.receipt_no ?? b.id.slice(0,8)}</title><style>body{font-family:sans-serif;padding:32px;max-width:400px;margin:auto}h2{margin-bottom:4px}p{margin:4px 0;font-size:14px}.row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #eee}.label{color:#888;font-size:12px}</style></head><body><h2>Payment Receipt</h2><p class="label">#${(b.receipt_no ?? b.id.slice(0,8)).toUpperCase()}</p><div class="row"><span class="label">Customer</span><span>${b.customer?.full_name ?? '—'} (${b.customer?.customer_code ?? ''})</span></div><div class="row"><span class="label">Month</span><span>${b.month}</span></div><div class="row"><span class="label">Amount</span><span>Rs. ${b.amount.toLocaleString()}</span></div><div class="row"><span class="label">Paid</span><span>Rs. ${(b.paid_amount ?? 0).toLocaleString()}</span></div><div class="row"><span class="label">Status</span><span>${b.status}</span></div>${b.payment_method ? `<div class="row"><span class="label">Method</span><span>${b.payment_method}</span></div>` : ''}${b.collector ? `<div class="row"><span class="label">Collected By</span><span>${b.collector.full_name}</span></div>` : ''}<script>window.onload=()=>window.print()</script></body></html>`;
+                const w = window.open('', '_blank');
+                if (w) { w.document.write(html); w.document.close(); }
+              }}>
                 <Icon name="download" size={14} />Print Receipt
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {markPaidTarget && (
+        <Modal open={!!markPaidTarget} onClose={() => setMarkPaidTarget(null)} width={400}>
+          <div style={{ padding: '24px 28px' }}>
+            <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 4 }}>Confirm Payment</div>
+            <div className="muted" style={{ fontSize: 13, marginBottom: 20 }}>
+              {markPaidTarget.customer?.full_name ?? 'Unknown'} · {markPaidTarget.customer?.customer_code ?? ''} · <strong>Rs. {remainingAmount(markPaidTarget).toLocaleString()}</strong>
+            </div>
+            <div className="field" style={{ marginBottom: 20 }}>
+              <label>Payment Method</label>
+              <select className="select" value={markPaidMethod} onChange={e => setMarkPaidMethod(e.target.value as PaymentMethod)}>
+                {PAYMENT_METHODS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+              </select>
+            </div>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button className="btn btn-secondary" onClick={() => setMarkPaidTarget(null)}>Cancel</button>
+              <button className="btn btn-primary" onClick={confirmMarkPaid}>
+                <Icon name="check" size={14} />Confirm Payment
               </button>
             </div>
           </div>

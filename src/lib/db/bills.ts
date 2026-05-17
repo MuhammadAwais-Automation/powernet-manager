@@ -37,6 +37,7 @@ export type BillingSummary = {
   month: string
   totalBills: number
   paidBills: number
+  pendingBills: number
   unpaidBills: number
   overdueBills: number
   totalBilled: number
@@ -59,7 +60,6 @@ export type BillsPageResult = {
   total: number
 }
 
-let billsCache: Record<string, { data: BillWithRelations[]; expiresAt: number }> = {}
 let billsPageCache: Record<string, { data: BillsPageResult; expiresAt: number }> = {}
 let billingSummaryCache: Record<string, { data: BillingSummary; expiresAt: number }> = {}
 const CACHE_MS = 60_000
@@ -82,35 +82,8 @@ const BILL_PAGE_SELECT = `
 `
 
 function clearBillsCache() {
-  billsCache = {}
   billsPageCache = {}
   billingSummaryCache = {}
-}
-
-function cacheKey(month?: string) {
-  return month ?? 'all'
-}
-
-export async function getBills(month?: string): Promise<BillWithRelations[]> {
-  const key = cacheKey(month)
-  if (billsCache[key] && billsCache[key].expiresAt > Date.now()) return billsCache[key].data
-
-  let query = supabase
-    .from('bills')
-    .select(`
-      *,
-      customer:customers(id, customer_code, full_name, package_id),
-      collector:staff(id, full_name)
-    `)
-    .order('created_at', { ascending: false })
-
-  if (month) query = query.eq('month', month)
-
-  const { data, error } = await query
-  if (error) throw error
-  const bills = data as BillWithRelations[]
-  billsCache[key] = { data: bills, expiresAt: Date.now() + CACHE_MS }
-  return bills
 }
 
 export async function getBillsPage(params: BillsPageParams): Promise<BillsPageResult> {
@@ -172,11 +145,12 @@ export async function getBillingSummary(month: string): Promise<BillingSummary> 
   const cached = billingSummaryCache[month]
   if (cached && cached.expiresAt > Date.now()) return cached.data
 
-  const [reportsRes, totalRes, paidRes, unpaidRes, overdueRes, overdueRowsRes] = await Promise.all([
+  const [reportsRes, totalRes, paidRes, unpaidRes, pendingRes, overdueRes, overdueRowsRes] = await Promise.all([
     supabase.rpc('get_reports_summary', { p_month: month }),
     supabase.from('bills').select('id', { count: 'exact', head: true }).eq('month', month),
     supabase.from('bills').select('id', { count: 'exact', head: true }).eq('month', month).eq('status', 'paid'),
     supabase.from('bills').select('id', { count: 'exact', head: true }).eq('month', month).neq('status', 'paid'),
+    supabase.from('bills').select('id', { count: 'exact', head: true }).eq('month', month).eq('status', 'pending'),
     supabase.from('bills').select('id', { count: 'exact', head: true }).eq('month', month).eq('status', 'overdue'),
     supabase.from('bills').select('amount, paid_amount').eq('month', month).eq('status', 'overdue'),
   ])
@@ -185,6 +159,7 @@ export async function getBillingSummary(month: string): Promise<BillingSummary> 
   if (totalRes.error) throw totalRes.error
   if (paidRes.error) throw paidRes.error
   if (unpaidRes.error) throw unpaidRes.error
+  if (pendingRes.error) throw pendingRes.error
   if (overdueRes.error) throw overdueRes.error
   if (overdueRowsRes.error) throw overdueRowsRes.error
 
@@ -201,6 +176,7 @@ export async function getBillingSummary(month: string): Promise<BillingSummary> 
     month: typeof raw.month === 'string' ? raw.month : month,
     totalBills: totalRes.count ?? 0,
     paidBills: paidRes.count ?? 0,
+    pendingBills: pendingRes.count ?? 0,
     unpaidBills: unpaidRes.count ?? 0,
     overdueBills: overdueRes.count ?? 0,
     totalBilled: toNumber(raw.cards?.revenue),
@@ -234,7 +210,15 @@ export async function generateMonthlyBills(month: string): Promise<GenerateBills
   const { data, error } = await supabase.rpc('generate_monthly_bills', { p_month: month })
   if (error) throw error
   clearBillsCache()
-  return data as GenerateBillsResult
+  const d = data as Record<string, unknown> | null
+  if (!d || typeof d.created !== 'number') throw new Error('generate_monthly_bills returned unexpected data')
+  return {
+    month: typeof d.month === 'string' ? d.month : month,
+    eligible: typeof d.eligible === 'number' ? d.eligible : 0,
+    created: d.created,
+    existing: typeof d.existing === 'number' ? d.existing : 0,
+    zeroAmount: typeof d.zeroAmount === 'number' ? d.zeroAmount : 0,
+  }
 }
 
 export async function recordBillPayment(input: RecordPaymentInput): Promise<RecordPaymentResult> {
@@ -247,12 +231,23 @@ export async function recordBillPayment(input: RecordPaymentInput): Promise<Reco
   })
   if (error) throw error
   clearBillsCache()
-  return data as RecordPaymentResult
+  const d = data as Record<string, unknown> | null
+  if (!d || typeof d.receiptNo !== 'string') throw new Error('record_bill_payment returned unexpected data')
+  return {
+    billId: typeof d.billId === 'string' ? d.billId : input.billId,
+    customerId: typeof d.customerId === 'string' ? d.customerId : '',
+    amountPaid: toNumber(d.amountPaid),
+    paidAmount: toNumber(d.paidAmount),
+    remainingAmount: toNumber(d.remainingAmount),
+    status: (d.status === 'paid' || d.status === 'overdue') ? d.status : 'pending',
+    receiptNo: d.receiptNo,
+  }
 }
 
 export async function markBillPaid(
   bill: Pick<Bill, 'id' | 'amount' | 'paid_amount'>,
-  collectedBy?: string | null
+  collectedBy?: string | null,
+  method: PaymentMethod = 'cash'
 ): Promise<RecordPaymentResult> {
   const remaining = Math.max(bill.amount - (bill.paid_amount ?? 0), 0)
   if (remaining <= 0) throw new Error('Bill is already fully paid')
@@ -260,8 +255,8 @@ export async function markBillPaid(
     billId: bill.id,
     amount: remaining,
     collectedBy,
-    method: 'cash',
-    note: 'Marked paid from billing page',
+    method,
+    note: null,
   })
 }
 
