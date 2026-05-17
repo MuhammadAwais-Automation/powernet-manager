@@ -35,3 +35,7 @@ export const DASHBOARD_ROLES: StaffRole[] = ['admin', 'complaint_manager']
 export function isDashboardRole(role: StaffRole): boolean {
   return DASHBOARD_ROLES.includes(role)
 }
+
+export const VALID_PAGE_IDS = new Set<string>([
+  'dashboard', 'customers', 'billing', 'complaints', 'staff', 'areas', 'reports', 'settings',
+])

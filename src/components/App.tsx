@@ -1,5 +1,5 @@
 'use client';
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import Icon from './Icon';
 import DashboardPage from './pages/DashboardPage';
 import CustomersPage from './pages/CustomersPage';
@@ -11,7 +11,7 @@ import ReportsPage from './pages/ReportsPage';
 import LoginScreen from './auth/LoginScreen';
 import AccessDenied from './auth/AccessDenied';
 import { AuthProvider, useAuth } from '@/lib/auth/auth-context';
-import { NAV_BY_ROLE, DEFAULT_PAGE_BY_ROLE, canAccessPage, type PageId } from '@/lib/auth/permissions';
+import { NAV_BY_ROLE, DEFAULT_PAGE_BY_ROLE, canAccessPage, VALID_PAGE_IDS, type PageId } from '@/lib/auth/permissions';
 import { initials } from '@/lib/utils';
 
 const ALL_NAV: { id: PageId; label: string; icon: string }[] = [
@@ -152,16 +152,32 @@ function FullScreenSpinner() {
 
 function Shell() {
   const { staff, loading, logout } = useAuth();
-  const [active, setActive] = useState<PageId>('dashboard');
+  const [active, setActive] = useState<PageId>(() => {
+    try {
+      const saved = sessionStorage.getItem('powernet_current_page');
+      if (saved && VALID_PAGE_IDS.has(saved)) return saved as PageId;
+    } catch { /* SSR / private browsing guard */ }
+    return 'dashboard';
+  });
   const [isDark, setIsDark] = useState(false);
+
+  const handlePageChange = useCallback((page: PageId) => {
+    setActive(page);
+    try { sessionStorage.setItem('powernet_current_page', page); } catch { /* SSR guard */ }
+  }, []);
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
   }, [isDark]);
 
   useEffect(() => {
-    if (staff) setActive(DEFAULT_PAGE_BY_ROLE[staff.role]);
-  }, [staff]);
+    if (!staff) return;
+    try {
+      const saved = sessionStorage.getItem('powernet_current_page');
+      if (saved && VALID_PAGE_IDS.has(saved) && canAccessPage(staff.role, saved as PageId)) return;
+    } catch { /* SSR guard */ }
+    handlePageChange(DEFAULT_PAGE_BY_ROLE[staff.role]);
+  }, [staff, handlePageChange]);
 
   const allowedNav = useMemo(() => staff ? NAV_BY_ROLE[staff.role] : [], [staff]);
 
@@ -194,7 +210,7 @@ function Shell() {
 
   return (
     <div className="app">
-      <Sidebar active={active} setActive={setActive} allowedNav={allowedNav}
+      <Sidebar active={active} setActive={handlePageChange} allowedNav={allowedNav}
         staffName={staff.full_name} staffRole={staff.role} onLogout={logout} />
       <main style={{ minWidth: 0, display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
         <Topbar meta={meta} isDark={isDark} onToggleTheme={() => setIsDark(d => !d)}

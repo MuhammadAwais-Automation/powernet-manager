@@ -72,12 +72,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     }
     bootstrap()
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (!session) {
         setStaff(null)
         setLoading(false)
         return
       }
+      // TOKEN_REFRESHED is a silent JWT rotation — staff identity unchanged, skip re-fetch
+      if (event === 'TOKEN_REFRESHED') return
       window.setTimeout(() => {
         if (!active) return
         setLoading(true)
@@ -126,6 +128,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = useCallback(async () => {
     await withTimeout(supabase.auth.signOut(), AUTH_TIMEOUT_MS, 'Logout timed out').catch(() => undefined)
+    try { sessionStorage.removeItem('powernet_current_page') } catch { /* SSR guard */ }
     setStaff(null)
   }, [])
 
