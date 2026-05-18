@@ -38,6 +38,7 @@ export type BillingSummary = {
   totalBills: number
   paidBills: number
   pendingBills: number
+  partialBills: number
   unpaidBills: number
   overdueBills: number
   totalBilled: number
@@ -53,6 +54,7 @@ export type BillsPageParams = {
   pageSize: number
   status?: BillStatusFilter
   search?: string
+  areaId?: string
 }
 
 export type BillsPageResult = {
@@ -77,7 +79,7 @@ const BILL_PAGE_SELECT = `
   payment_method,
   payment_note,
   created_at,
-  customer:customers(id, customer_code, full_name, package_id),
+  customer:customers(id, customer_code, full_name, package_id, area_id, address_type, address_value),
   collector:staff(id, full_name)
 `
 
@@ -92,8 +94,13 @@ export async function getBillsPage(params: BillsPageParams): Promise<BillsPageRe
   if (billsPageCache[key] && billsPageCache[key].expiresAt > Date.now()) return billsPageCache[key].data
 
   const search = normalizeBillingSearch(params.search)
-  const customerIds = search ? await findBillingCustomerIds(search, CUSTOMER_SEARCH_LIMIT) : undefined
-  if (search && customerIds?.length === 0) {
+  const [searchIds, areaIds] = await Promise.all([
+    search ? findBillingCustomerIds(search, CUSTOMER_SEARCH_LIMIT) : undefined,
+    params.areaId ? findAreaCustomerIds(params.areaId, 5000) : undefined,
+  ])
+
+  const customerIds = mergeCustomerIdFilters(searchIds, areaIds)
+  if (customerIds?.length === 0) {
     const emptyResult = { rows: [], total: 0 }
     billsPageCache[key] = { data: emptyResult, expiresAt: Date.now() + CACHE_MS }
     return emptyResult
@@ -107,6 +114,7 @@ export async function getBillsPage(params: BillsPageParams): Promise<BillsPageRe
     .range(from, to)
 
   if (params.status === 'unpaid') query = query.neq('status', 'paid')
+  else if (params.status === 'partial') query = query.neq('status', 'paid').gt('paid_amount', 0)
   else if (params.status) query = query.eq('status', params.status)
   if (customerIds) query = query.in('customer_id', customerIds)
 
@@ -145,7 +153,7 @@ export async function getBillingSummary(month: string): Promise<BillingSummary> 
   const cached = billingSummaryCache[month]
   if (cached && cached.expiresAt > Date.now()) return cached.data
 
-  const [reportsRes, totalRes, paidRes, unpaidRes, pendingRes, overdueRes, overdueRowsRes] = await Promise.all([
+  const [reportsRes, totalRes, paidRes, unpaidRes, pendingRes, overdueRes, overdueRowsRes, partialRes] = await Promise.all([
     supabase.rpc('get_reports_summary', { p_month: month }),
     supabase.from('bills').select('id', { count: 'exact', head: true }).eq('month', month),
     supabase.from('bills').select('id', { count: 'exact', head: true }).eq('month', month).eq('status', 'paid'),
@@ -153,6 +161,7 @@ export async function getBillingSummary(month: string): Promise<BillingSummary> 
     supabase.from('bills').select('id', { count: 'exact', head: true }).eq('month', month).eq('status', 'pending'),
     supabase.from('bills').select('id', { count: 'exact', head: true }).eq('month', month).eq('status', 'overdue'),
     supabase.from('bills').select('amount, paid_amount').eq('month', month).eq('status', 'overdue'),
+    supabase.from('bills').select('id', { count: 'exact', head: true }).eq('month', month).neq('status', 'paid').gt('paid_amount', 0),
   ])
 
   if (reportsRes.error) throw reportsRes.error
@@ -162,6 +171,7 @@ export async function getBillingSummary(month: string): Promise<BillingSummary> 
   if (pendingRes.error) throw pendingRes.error
   if (overdueRes.error) throw overdueRes.error
   if (overdueRowsRes.error) throw overdueRowsRes.error
+  if (partialRes.error) throw partialRes.error
 
   const raw = (reportsRes.data ?? {}) as {
     month?: unknown
@@ -177,6 +187,7 @@ export async function getBillingSummary(month: string): Promise<BillingSummary> 
     totalBills: totalRes.count ?? 0,
     paidBills: paidRes.count ?? 0,
     pendingBills: pendingRes.count ?? 0,
+    partialBills: partialRes.count ?? 0,
     unpaidBills: unpaidRes.count ?? 0,
     overdueBills: overdueRes.count ?? 0,
     totalBilled: toNumber(raw.cards?.revenue),
@@ -262,6 +273,24 @@ export async function markBillPaid(
 
 function toNumber(value: unknown): number {
   return typeof value === 'number' && Number.isFinite(value) ? value : 0
+}
+
+async function findAreaCustomerIds(areaId: string, limit: number): Promise<string[]> {
+  const { data, error } = await supabase
+    .from('customers')
+    .select('id')
+    .eq('area_id', areaId)
+    .limit(limit)
+  if (error) throw error
+  return (data ?? []).map(row => row.id).filter(Boolean)
+}
+
+function mergeCustomerIdFilters(a: string[] | undefined, b: string[] | undefined): string[] | undefined {
+  if (a === undefined && b === undefined) return undefined
+  if (a === undefined) return b
+  if (b === undefined) return a
+  const setB = new Set(b)
+  return a.filter(id => setB.has(id))
 }
 
 async function findBillingCustomerIds(search: string, limit: number): Promise<string[]> {

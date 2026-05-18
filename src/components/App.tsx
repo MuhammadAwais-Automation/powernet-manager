@@ -63,20 +63,20 @@ function Sidebar({ active, setActive, allowedNav, staffName, staffRole, onLogout
       <div className="sidebar-section-label">Main</div>
       <nav className="sidebar-nav">
         {visibleMain.map(n => (
-          <a key={n.id} className={`sidebar-link ${active === n.id ? 'active' : ''}`}
-            onClick={e => { e.preventDefault(); setActive(n.id); }} href="#">
+          <button key={n.id} type="button" className={`sidebar-link ${active === n.id ? 'active' : ''}`}
+            onClick={() => setActive(n.id)}>
             <Icon name={n.icon as 'grid' | 'users' | 'card' | 'alert' | 'briefcase' | 'pin' | 'chart'} size={17} />
             <span>{n.label}</span>
-          </a>
+          </button>
         ))}
         {showSettings && (
           <>
             <div style={{ height: 8 }} />
             <div className="sidebar-section-label" style={{ padding: '8px 12px 6px' }}>System</div>
-            <a className={`sidebar-link ${active === 'settings' ? 'active' : ''}`}
-              onClick={e => { e.preventDefault(); setActive('settings'); }} href="#">
+            <button type="button" className={`sidebar-link ${active === 'settings' ? 'active' : ''}`}
+              onClick={() => setActive('settings')}>
               <Icon name="settings" size={17} /><span>Settings</span>
-            </a>
+            </button>
           </>
         )}
       </nav>

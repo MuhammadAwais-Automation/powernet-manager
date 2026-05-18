@@ -14,10 +14,11 @@ import {
   type GenerateBillsResult,
 } from '@/lib/db/bills';
 import { getStaff } from '@/lib/db/staff';
+import { getAreas } from '@/lib/db/areas';
 import { getCurrentBillingMonth, normalizeBillingMonth } from '@/lib/billing/core';
 import { normalizeBillingSearch, normalizeBillStatusFilter, type BillingTab } from '@/lib/billing/query';
 import { useAuth } from '@/lib/auth/auth-context';
-import type { BillWithRelations, PaymentMethod, StaffWithArea } from '@/types/database';
+import type { Area, BillWithRelations, PaymentMethod, StaffWithArea } from '@/types/database';
 
 const PAYMENT_METHODS: { value: PaymentMethod; label: string }[] = [
   { value: 'cash', label: 'Cash' },
@@ -43,6 +44,8 @@ export default function BillingPage() {
   const [summary, setSummary] = useState<BillingSummary | null>(null);
   const [totalBills, setTotalBills] = useState(0);
   const [staff, setStaff] = useState<StaffWithArea[]>([]);
+  const [areas, setAreas] = useState<Area[]>([]);
+  const [areaFilter, setAreaFilter] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -72,28 +75,31 @@ export default function BillingPage() {
     return () => window.clearTimeout(timeout);
   }, [search]);
 
-  useEffect(() => { setPage(0); }, [billingMonth, tab, debouncedSearch]);
+  useEffect(() => { setPage(0); }, [billingMonth, tab, debouncedSearch, areaFilter]);
 
   const loadBilling = async () => {
     setLoading(true);
     setError(null);
     try {
       const month = normalizeBillingMonth(billingMonth);
-      const [billPage, billingSummary, staffRows] = await Promise.all([
+      const [billPage, billingSummary, staffRows, areaRows] = await Promise.all([
         getBillsPage({
           month,
           page,
           pageSize: PAGE_SIZE,
           status: normalizeBillStatusFilter(tab),
           search: debouncedSearch,
+          areaId: areaFilter || undefined,
         }),
         getBillingSummary(month),
         getStaff(),
+        getAreas(),
       ]);
       setBills(billPage.rows);
       setTotalBills(billPage.total);
       setSummary(billingSummary);
       setStaff(staffRows);
+      setAreas(areaRows);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Could not load bills');
     } finally {
@@ -104,7 +110,7 @@ export default function BillingPage() {
   useEffect(() => {
     loadBilling();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [billingMonth, page, tab, debouncedSearch, reloadToken]);
+  }, [billingMonth, page, tab, debouncedSearch, areaFilter, reloadToken]);
 
   useEffect(() => {
     let cancelled = false;
@@ -339,17 +345,29 @@ export default function BillingPage() {
             <Tabs value={tab} onChange={value => setTab(value as BillingTab)} items={[
               { value: 'All', label: 'All Bills', count: summary?.totalBills ?? 0 },
               { value: 'Unpaid', label: 'Unpaid', count: summary?.pendingBills ?? 0 },
+              { value: 'Partial', label: 'Partial', count: summary?.partialBills ?? 0 },
               { value: 'Paid', label: 'Paid', count: summary?.paidBills ?? 0 },
               { value: 'Overdue', label: 'Overdue', count: summary?.overdueBills ?? 0 },
             ]} />
-            <div className="search" style={{ minWidth: 260, height: 36, border: '1px solid var(--border)', borderRadius: 8, padding: '0 12px', display: 'flex', alignItems: 'center', gap: 8, background: 'var(--bg-elev)' }}>
-              <Icon name="search" size={14} />
-              <input
-                placeholder="Search bills..."
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                style={{ border: 'none', outline: 'none', background: 'none', fontSize: 13, flex: 1 }}
-              />
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <select
+                className="select"
+                value={areaFilter}
+                onChange={e => setAreaFilter(e.target.value)}
+                style={{ height: 36, fontSize: 13, minWidth: 130 }}
+              >
+                <option value="">All Areas</option>
+                {areas.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+              </select>
+              <div className="search" style={{ minWidth: 220, height: 36, border: '1px solid var(--border)', borderRadius: 8, padding: '0 12px', display: 'flex', alignItems: 'center', gap: 8, background: 'var(--bg-elev)' }}>
+                <Icon name="search" size={14} />
+                <input
+                  placeholder="Search bills..."
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                  style={{ border: 'none', outline: 'none', background: 'none', fontSize: 13, flex: 1 }}
+                />
+              </div>
             </div>
           </div>
 
@@ -585,6 +603,9 @@ export default function BillingPage() {
                   <div className="muted" style={{ fontSize: 11, textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.05em' }}>Customer</div>
                   <div style={{ fontWeight: 600, fontSize: 13, marginTop: 4 }}>{detailBill.customer?.full_name ?? '—'}</div>
                   <div className="muted mono" style={{ fontSize: 11 }}>{detailBill.customer?.customer_code ?? ''}</div>
+                  {detailBill.customer?.address_value && (
+                    <div className="muted" style={{ fontSize: 11, marginTop: 2 }}>{detailBill.customer.address_value}</div>
+                  )}
                 </div>
                 <div className="card card-pad" style={{ padding: '10px 14px' }}>
                   <div className="muted" style={{ fontSize: 11, textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.05em' }}>Billing Month</div>

@@ -1,12 +1,13 @@
-export type BillingTab = 'All' | 'Unpaid' | 'Paid' | 'Overdue'
+export type BillingTab = 'All' | 'Unpaid' | 'Paid' | 'Overdue' | 'Partial'
 export type BillStatus = 'pending' | 'paid' | 'overdue'
-export type BillStatusFilter = BillStatus | 'unpaid' | undefined
+export type BillStatusFilter = BillStatus | 'unpaid' | 'partial' | undefined
 export type BillsPageQuery = {
   month: string
   page: number
   pageSize: number
   status?: BillStatusFilter
   search?: string
+  areaId?: string
 }
 
 export function getBillRange(page: number, pageSize: number): { from: number; to: number } {
@@ -21,6 +22,7 @@ export function normalizeBillStatusFilter(tab: BillingTab): BillStatusFilter {
   if (tab === 'Paid') return 'paid'
   if (tab === 'Overdue') return 'overdue'
   if (tab === 'Unpaid') return 'unpaid'
+  if (tab === 'Partial') return 'partial'
   return undefined
 }
 
@@ -37,6 +39,7 @@ export function buildBillsPageCacheKey(params: BillsPageQuery): string {
     pageSize: params.pageSize,
     status: params.status,
     search: normalizeBillingSearch(params.search),
+    areaId: params.areaId,
     from,
     to,
   })

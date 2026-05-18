@@ -265,7 +265,7 @@ function CustomerDetail({ customer, onClose, onEdit, onSuspend, readOnly }: { cu
           <div className="card-pad" style={{ paddingTop: 8, paddingBottom: 8 }}>
             <InfoRow label="Package" value={customer.package?.name} />
             <InfoRow label="Area" value={customer.area?.name} />
-            {customer.username && <InfoRow label="Username" value={customer.username} mono />}
+            <InfoRow label="Username / Login ID" value={customer.username ?? '—'} mono />
             {customer.onu_number && <InfoRow label="ONU Number" value={customer.onu_number} mono />}
             <InfoRow label="IPTV"
               value={customer.iptv
@@ -351,6 +351,7 @@ export default function CustomersPage() {
   const [statusFilter, setStatusFilter] = useState('');
   const [pkgFilter, setPkgFilter] = useState('');
   const [iptvFilter, setIptvFilter] = useState(false);
+  const [connectedBefore, setConnectedBefore] = useState('');
   const [showMoreFilters, setShowMoreFilters] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [reloadToken, setReloadToken] = useState(0);
@@ -401,6 +402,7 @@ export default function CustomersPage() {
       packageId: pkgFilter || undefined,
       status: statusFilter ? (statusFilter as CustomerStatus) : undefined,
       iptv: iptvFilter || undefined,
+      connectedBefore: connectedBefore || undefined,
       // eslint-disable-next-line react-hooks/exhaustive-deps
     })
       .then(result => {
@@ -416,7 +418,7 @@ export default function CustomersPage() {
       });
 
     return () => { cancelled = true; };
-  }, [page, search, areaFilter, statusFilter, pkgFilter, iptvFilter, reloadToken]);
+  }, [page, search, areaFilter, statusFilter, pkgFilter, iptvFilter, connectedBefore, reloadToken]);
 
   const [editCustomer, setEditCustomer] = useState<CustomerWithRelations | null>(null);
 
@@ -570,6 +572,16 @@ export default function CustomersPage() {
                 />
                 <span>IPTV subscribers only</span>
               </label>
+              <div style={{ paddingTop: 6 }}>
+                <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)', marginBottom: 6 }}>Connected before</div>
+                <input
+                  type="date"
+                  className="select"
+                  value={connectedBefore}
+                  onChange={e => { setConnectedBefore(e.target.value); setPage(0); }}
+                  style={{ width: '100%', fontSize: 12 }}
+                />
+              </div>
             </div>
           )}
         </div>
@@ -592,6 +604,7 @@ export default function CustomersPage() {
               <th>Phone</th>
               <th>Area</th>
               <th>Package</th>
+              <th>Connected</th>
               <th>Status</th>
               <th>Due Amount</th>
               <th style={{ textAlign: 'right' }}>Actions</th>
@@ -601,7 +614,7 @@ export default function CustomersPage() {
             {loading && customers.length === 0 ? (
               Array.from({ length: 8 }).map((_, i) => (
                 <tr key={i}>
-                  {Array.from({ length: 9 }).map((__, j) => (
+                  {Array.from({ length: 10 }).map((__, j) => (
                     <td key={j}><div style={{ height: 16, background: 'var(--border)', borderRadius: 4, opacity: 0.5 }} /></td>
                   ))}
                 </tr>
@@ -622,6 +635,7 @@ export default function CustomersPage() {
                 <td className="mono" style={{ fontSize: 12 }}>{c.phone ?? '—'}</td>
                 <td>{c.area?.name ?? '—'}</td>
                 <td>{c.package?.name ?? '—'}</td>
+                <td className="mono muted" style={{ fontSize: 12 }}>{c.connection_date ?? '—'}</td>
                 <td>
                   <Badge color={c.status === 'active' ? 'green' : c.status === 'free' ? 'blue' : c.status === 'suspended' ? 'amber' : 'red'} dot>
                     {c.status}
