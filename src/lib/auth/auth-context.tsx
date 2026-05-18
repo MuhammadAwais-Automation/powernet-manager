@@ -78,8 +78,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setLoading(false)
         return
       }
-      // TOKEN_REFRESHED is a silent JWT rotation — staff identity unchanged, skip re-fetch
-      if (event === 'TOKEN_REFRESHED') return
+      // Silent events: JWT rotation or tab-refocus revalidation for the same user.
+      // Never call setLoading(true) for these — it unmounts the entire page tree,
+      // closing open drawers and triggering full data re-fetches on every tab return.
+      if (event === 'TOKEN_REFRESHED' || event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
+        window.setTimeout(() => {
+          if (!active) return
+          // If we already have this exact auth user loaded, do nothing.
+          // setStaff with a callback lets us read current value without a closure.
+          setStaff(prev => {
+            if (prev?.auth_user_id === session.user.id) return prev
+            // Different user arrived silently (edge case) — fetch without loading spinner
+            fetchStaffByAuthId(session.user.id).then(s => {
+              if (!active) return
+              if (!s || !isDashboardRole(s.role) || !s.is_active) {
+                supabase.auth.signOut().catch(() => undefined)
+                setStaff(null)
+              } else {
+                setStaff(s)
+              }
+            }).catch(async () => {
+              await supabase.auth.signOut().catch(() => undefined)
+              if (active) setStaff(null)
+            })
+            return prev
+          })
+        }, 0)
+        return
+      }
       window.setTimeout(() => {
         if (!active) return
         setLoading(true)

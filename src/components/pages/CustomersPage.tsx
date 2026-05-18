@@ -627,7 +627,7 @@ export default function CustomersPage() {
                     <Avatar name={c.full_name} size={32} />
                     <div>
                       <div className="nm">{c.full_name}</div>
-                      <div className="sub mono">{c.customer_code}</div>
+                      <div className="sub mono">{c.username ?? c.customer_code}</div>
                     </div>
                   </div>
                 </td>
