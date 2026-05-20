@@ -95,15 +95,24 @@ function StaffFormModal({ open, onClose, areas, onSaved, editTarget }: {
           const { staff: created } = await res.json();
           saved = created;
         } else {
-          saved = await createStaff({
-            full_name: form.full_name.trim(),
-            role:      form.role,
-            phone:     form.phone || null,
-            area_id:   form.area_id || null,
-            username:  form.username.trim().toLowerCase(),
-            is_active: true,
-            password:  form.password.trim(),
+          const res = await fetch('/api/admin/create-staff', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', ...(await getAuthHeaders()) },
+            body: JSON.stringify({
+              username:  form.username.trim().toLowerCase(),
+              password:  form.password.trim(),
+              full_name: form.full_name.trim(),
+              phone:     form.phone || null,
+              area_id:   form.area_id || null,
+              role:      form.role,
+            }),
           });
+          if (!res.ok) {
+            const data = await res.json().catch(() => ({}));
+            throw new Error(data.error ?? 'Could not create staff');
+          }
+          const { staff: created } = await res.json();
+          saved = created;
         }
       }
       onSaved(saved);
