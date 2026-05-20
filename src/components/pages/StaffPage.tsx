@@ -27,6 +27,13 @@ const ROLE_COLORS: Record<string, 'blue' | 'amber' | 'green' | 'purple' | 'gray'
 
 const DASHBOARD_ROLES = new Set(['admin', 'complaint_manager']);
 
+const STAFF_ROLE_OPTIONS = [
+  { value: 'technician', label: 'Technician' },
+  { value: 'recovery_agent', label: 'Recovery Agent' },
+  { value: 'helper', label: 'Helper' },
+  { value: 'complaint_manager', label: 'Complaint Manager' },
+];
+
 async function getAuthHeaders(): Promise<Record<string, string>> {
   const { data: { session } } = await supabase.auth.getSession();
   const token = session?.access_token;
@@ -160,11 +167,10 @@ function StaffFormModal({ open, onClose, areas, onSaved, editTarget }: {
           <div className="field">
             <label>Role *</label>
             <select className="select" value={form.role} onChange={e => set('role', e.target.value)}>
-              <option value="technician">Technician</option>
-              <option value="recovery_agent">Recovery Agent</option>
-              <option value="helper">Helper</option>
-              <option value="admin">Admin</option>
-              <option value="complaint_manager">Complaint Manager</option>
+              {editTarget?.role === 'admin' && <option value="admin">Admin (fixed)</option>}
+              {STAFF_ROLE_OPTIONS.map(role => (
+                <option key={role.value} value={role.value}>{role.label}</option>
+              ))}
             </select>
           </div>
           <div className="field">

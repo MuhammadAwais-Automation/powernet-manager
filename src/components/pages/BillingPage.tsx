@@ -7,26 +7,13 @@ import {
   getBillsPage,
   getBillingSummary,
   generateMonthlyBills,
-  markBillPaid,
-  recordBillPayment,
-  searchUnpaidBills,
   type BillingSummary,
   type GenerateBillsResult,
 } from '@/lib/db/bills';
-import { getStaff } from '@/lib/db/staff';
 import { getAreas } from '@/lib/db/areas';
 import { getCurrentBillingMonth, normalizeBillingMonth } from '@/lib/billing/core';
 import { normalizeBillingSearch, normalizeBillStatusFilter, type BillingTab } from '@/lib/billing/query';
-import { useAuth } from '@/lib/auth/auth-context';
-import type { Area, BillWithRelations, PaymentMethod, StaffWithArea } from '@/types/database';
-
-const PAYMENT_METHODS: { value: PaymentMethod; label: string }[] = [
-  { value: 'cash', label: 'Cash' },
-  { value: 'bank', label: 'Bank' },
-  { value: 'easypaisa', label: 'Easypaisa' },
-  { value: 'jazzcash', label: 'JazzCash' },
-  { value: 'other', label: 'Other' },
-];
+import type { Area, BillWithRelations } from '@/types/database';
 
 function remainingAmount(bill: Pick<BillWithRelations, 'amount' | 'paid_amount'>): number {
   return Math.max(bill.amount - (bill.paid_amount ?? 0), 0);
@@ -39,11 +26,9 @@ function statusColor(status: string): 'green' | 'red' | 'amber' {
 }
 
 export default function BillingPage() {
-  const { staff: currentStaff } = useAuth();
   const [bills, setBills] = useState<BillWithRelations[]>([]);
   const [summary, setSummary] = useState<BillingSummary | null>(null);
   const [totalBills, setTotalBills] = useState(0);
-  const [staff, setStaff] = useState<StaffWithArea[]>([]);
   const [areas, setAreas] = useState<Area[]>([]);
   const [areaFilter, setAreaFilter] = useState('');
   const [loading, setLoading] = useState(true);
@@ -56,17 +41,6 @@ export default function BillingPage() {
   const [page, setPage] = useState(0);
   const [reloadToken, setReloadToken] = useState(0);
   const [generating, setGenerating] = useState(false);
-  const [payingBillId, setPayingBillId] = useState<string | null>(null);
-  const [billSearch, setBillSearch] = useState('');
-  const [unpaidBillOptions, setUnpaidBillOptions] = useState<BillWithRelations[]>([]);
-  const [searchingUnpaid, setSearchingUnpaid] = useState(false);
-  const [recordForm, setRecordForm] = useState({
-    billId: '',
-    amount: '',
-    collectedBy: '',
-    method: 'cash' as PaymentMethod,
-    note: '',
-  });
 
   const PAGE_SIZE = 50;
 
@@ -82,7 +56,7 @@ export default function BillingPage() {
     setError(null);
     try {
       const month = normalizeBillingMonth(billingMonth);
-      const [billPage, billingSummary, staffRows, areaRows] = await Promise.all([
+      const [billPage, billingSummary, areaRows] = await Promise.all([
         getBillsPage({
           month,
           page,
@@ -92,13 +66,11 @@ export default function BillingPage() {
           areaId: areaFilter || undefined,
         }),
         getBillingSummary(month),
-        getStaff(),
         getAreas(),
       ]);
       setBills(billPage.rows);
       setTotalBills(billPage.total);
       setSummary(billingSummary);
-      setStaff(staffRows);
       setAreas(areaRows);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Could not load bills');
@@ -111,39 +83,6 @@ export default function BillingPage() {
     loadBilling();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [billingMonth, page, tab, debouncedSearch, areaFilter, reloadToken]);
-
-  useEffect(() => {
-    let cancelled = false;
-    const timeout = window.setTimeout(async () => {
-      const normalized = normalizeBillingSearch(billSearch);
-      if (!normalized) {
-        setUnpaidBillOptions([]);
-        setSearchingUnpaid(false);
-        return;
-      }
-
-      setSearchingUnpaid(true);
-      try {
-        const options = await searchUnpaidBills(normalizeBillingMonth(billingMonth), normalized, 12);
-        if (!cancelled) setUnpaidBillOptions(options);
-      } catch (e: unknown) {
-        if (!cancelled) setError(e instanceof Error ? e.message : 'Could not search unpaid bills');
-      } finally {
-        if (!cancelled) setSearchingUnpaid(false);
-      }
-    }, 250);
-
-    return () => {
-      cancelled = true;
-      window.clearTimeout(timeout);
-    };
-  }, [billSearch, billingMonth, reloadToken]);
-
-  const currentPageUnpaidBills = bills.filter(b => b.status !== 'paid' && remainingAmount(b) > 0);
-  const billOptions = Array.from(
-    new Map([...unpaidBillOptions, ...currentPageUnpaidBills].map(bill => [bill.id, bill])).values()
-  );
-  const selectedBill = billOptions.find(b => b.id === recordForm.billId) ?? null;
 
   const totalBilled = summary?.totalBilled ?? 0;
   const totalPaid = summary?.totalPaid ?? 0;
@@ -161,8 +100,6 @@ export default function BillingPage() {
 
   const [exporting, setExporting] = useState(false);
   const [detailBill, setDetailBill] = useState<BillWithRelations | null>(null);
-  const [markPaidTarget, setMarkPaidTarget] = useState<BillWithRelations | null>(null);
-  const [markPaidMethod, setMarkPaidMethod] = useState<PaymentMethod>('cash');
   const msgTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleExport = async () => {
@@ -242,59 +179,11 @@ export default function BillingPage() {
     }
   };
 
-  const openMarkPaid = (bill: BillWithRelations) => {
-    setMarkPaidTarget(bill);
-    setMarkPaidMethod('cash');
-    setError(null);
-    setMessage(null);
-  };
-
-  const confirmMarkPaid = async () => {
-    if (!markPaidTarget) return;
-    setPayingBillId(markPaidTarget.id);
-    setMarkPaidTarget(null);
-    try {
-      const result = await markBillPaid(markPaidTarget, currentStaff?.id ?? null, markPaidMethod);
-      reloadAfterMutation(`Payment recorded. Receipt ${result.receiptNo}`);
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Could not mark bill paid');
-    } finally {
-      setPayingBillId(null);
-    }
-  };
-
-  const handleRecordPayment = async () => {
-    if (!selectedBill) { setError('Select an unpaid bill first'); return; }
-    const amount = Number(recordForm.amount);
-    if (!Number.isFinite(amount) || amount <= 0) { setError('Enter a valid payment amount'); return; }
-    if (amount > remainingAmount(selectedBill)) { setError('Payment amount exceeds remaining balance'); return; }
-
-    setPayingBillId(selectedBill.id);
-    setError(null);
-    setMessage(null);
-    try {
-      const result = await recordBillPayment({
-        billId: selectedBill.id,
-        amount,
-        collectedBy: recordForm.collectedBy || currentStaff?.id || null,
-        method: recordForm.method,
-        note: recordForm.note || null,
-      });
-      setRecordForm({ billId: '', amount: '', collectedBy: '', method: 'cash', note: '' });
-      await reloadAfterMutation(`Payment recorded. Receipt ${result.receiptNo}`);
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Could not record payment');
-    } finally {
-      setPayingBillId(null);
-    }
-  };
-
-
   return (
     <div className="page">
       <div className="page-header">
         <div>
-          <h1>Billing & Payments</h1>
+          <h1>Billing</h1>
           <p>{billingMonth} cycle · {summary?.totalBills ?? totalBills} bills · {fmt(totalBilled)} total invoiced</p>
         </div>
         <div className="row gap-sm">
@@ -437,11 +326,6 @@ export default function BillingPage() {
                       <td className="mono" style={{ fontSize: 11 }}>{b.receipt_no ?? '-'}</td>
                       <td style={{ textAlign: 'right' }}>
                         <div className="row gap-sm" style={{ justifyContent: 'flex-end' }}>
-                          {b.status !== 'paid' && remainingAmount(b) > 0 && (
-                            <button className="btn btn-secondary btn-sm" onClick={() => openMarkPaid(b)} disabled={payingBillId === b.id}>
-                              <Icon name="check" size={12} />{payingBillId === b.id ? 'Saving...' : 'Mark paid'}
-                            </button>
-                          )}
                           <button className="icon-btn" style={{ width: 28, height: 28 }} title="Bill details" onClick={() => setDetailBill(b)}>
                             <Icon name="fileText" size={14} />
                           </button>
@@ -506,81 +390,6 @@ export default function BillingPage() {
               </div>
               <button className="btn btn-primary" style={{ width: '100%' }} onClick={handleGenerateBills} disabled={generating}>
                 <Icon name="fileText" size={14} />{generating ? 'Generating...' : 'Generate Bills'}
-              </button>
-            </div>
-          </div>
-
-          <div className="card">
-            <div className="card-head">
-              <div><h3>Record Cash Payment</h3><div className="sub">Manual collection receipt</div></div>
-            </div>
-            <div className="card-pad" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <div className="field">
-                <label>Unpaid Bill</label>
-                <input
-                  className="input"
-                  placeholder="Search customer code/name..."
-                  value={billSearch}
-                  onChange={e => setBillSearch(e.target.value)}
-                  style={{ marginBottom: 8 }}
-                />
-                <select
-                  className="select"
-                  value={recordForm.billId}
-                  onChange={e => {
-                    const bill = billOptions.find(b => b.id === e.target.value);
-                    setRecordForm(f => ({
-                      ...f,
-                      billId: e.target.value,
-                      amount: bill ? String(remainingAmount(bill)) : '',
-                    }));
-                  }}
-                >
-                  <option value="">{searchingUnpaid ? 'Searching...' : 'Select bill...'}</option>
-                  {billOptions.map(b => (
-                    <option key={b.id} value={b.id}>
-                      {b.customer?.customer_code ?? b.id.slice(0, 8)} · {b.customer?.full_name ?? 'Unknown'} · {fmt(remainingAmount(b))}
-                    </option>
-                  ))}
-                </select>
-                {normalizeBillingSearch(billSearch) && !searchingUnpaid && unpaidBillOptions.length === 0 && (
-                  <div className="muted" style={{ fontSize: 12, marginTop: 6 }}>
-                    No unpaid bill found for this search in {billingMonth}.
-                  </div>
-                )}
-              </div>
-              <div className="field">
-                <label>Amount (Rs.)</label>
-                <input className="input" type="number" min={1} placeholder="0" value={recordForm.amount}
-                  onChange={e => setRecordForm(f => ({ ...f, amount: e.target.value }))} />
-              </div>
-              <div className="field">
-                <label>Collected By</label>
-                <select className="select" value={recordForm.collectedBy}
-                  onChange={e => setRecordForm(f => ({ ...f, collectedBy: e.target.value }))}>
-                  <option value="">Current user / unassigned</option>
-                  {staff.filter(s => s.is_active).map(s => <option key={s.id} value={s.id}>{s.full_name}</option>)}
-                </select>
-              </div>
-              <div className="field">
-                <label>Method</label>
-                <select className="select" value={recordForm.method}
-                  onChange={e => setRecordForm(f => ({ ...f, method: e.target.value as PaymentMethod }))}>
-                  {PAYMENT_METHODS.map(method => <option key={method.value} value={method.value}>{method.label}</option>)}
-                </select>
-              </div>
-              <div className="field">
-                <label>Notes (optional)</label>
-                <input className="input" placeholder="e.g. partial payment, receipt #4428" value={recordForm.note}
-                  onChange={e => setRecordForm(f => ({ ...f, note: e.target.value }))} />
-              </div>
-              {selectedBill && (
-                <div className="muted" style={{ fontSize: 12 }}>
-                  Remaining balance: <span className="num" style={{ color: 'var(--text)', fontWeight: 600 }}>{fmt(remainingAmount(selectedBill))}</span>
-                </div>
-              )}
-              <button className="btn btn-primary" style={{ width: '100%' }} onClick={handleRecordPayment} disabled={!recordForm.billId || payingBillId === recordForm.billId}>
-                <Icon name="cash" size={14} />{payingBillId === recordForm.billId ? 'Recording...' : 'Record Payment'}
               </button>
             </div>
           </div>
@@ -671,28 +480,6 @@ export default function BillingPage() {
         </Modal>
       )}
 
-      {markPaidTarget && (
-        <Modal open={!!markPaidTarget} onClose={() => setMarkPaidTarget(null)} width={400}>
-          <div style={{ padding: '24px 28px' }}>
-            <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 4 }}>Confirm Payment</div>
-            <div className="muted" style={{ fontSize: 13, marginBottom: 20 }}>
-              {markPaidTarget.customer?.full_name ?? 'Unknown'} · {markPaidTarget.customer?.customer_code ?? ''} · <strong>Rs. {remainingAmount(markPaidTarget).toLocaleString()}</strong>
-            </div>
-            <div className="field" style={{ marginBottom: 20 }}>
-              <label>Payment Method</label>
-              <select className="select" value={markPaidMethod} onChange={e => setMarkPaidMethod(e.target.value as PaymentMethod)}>
-                {PAYMENT_METHODS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
-              </select>
-            </div>
-            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-              <button className="btn btn-secondary" onClick={() => setMarkPaidTarget(null)}>Cancel</button>
-              <button className="btn btn-primary" onClick={confirmMarkPaid}>
-                <Icon name="check" size={14} />Confirm Payment
-              </button>
-            </div>
-          </div>
-        </Modal>
-      )}
     </div>
   );
 }
