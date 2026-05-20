@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import Icon from '../Icon';
 import { Badge, Switch, Modal } from '../ui';
 import { supabase } from '@/lib/supabase';
-import { getStaff, createStaff, updateStaff, updateStaffPassword } from '@/lib/db/staff';
+import { getStaff, updateStaff, updateStaffPassword } from '@/lib/db/staff';
 import { getAreas } from '@/lib/db/areas';
 import { initials, avClass } from '@/lib/utils';
 import { useAuth } from '@/lib/auth/auth-context';

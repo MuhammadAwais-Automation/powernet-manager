@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
+import { createOrReuseStaffAuthUser } from '@/lib/admin/staff-auth-users'
 
 const USERNAME_DOMAIN = '@powernet.local'
 const MOBILE_ROLES = new Set(['technician', 'recovery_agent', 'helper'])
@@ -38,19 +39,31 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Invalid mobile staff role' }, { status: 400 })
   }
 
-  const email = `${username.trim().toLowerCase()}${USERNAME_DOMAIN}`
+  const normalizedUsername = username.trim().toLowerCase()
+  const email = `${normalizedUsername}${USERNAME_DOMAIN}`
 
-  const { data: created, error: createErr } = await supabaseAdmin.auth.admin.createUser({
-    email,
-    password,
-    email_confirm: true,
-  })
-  if (createErr || !created.user) {
-    const msg = createErr?.message ?? 'Could not create auth user'
-    if (msg.toLowerCase().includes('already')) {
-      return NextResponse.json({ error: 'Username already exists' }, { status: 409 })
-    }
-    return NextResponse.json({ error: msg }, { status: 500 })
+  const { data: existingStaff, error: existingStaffErr } = await supabaseAdmin
+    .from('staff')
+    .select('id')
+    .eq('username', normalizedUsername)
+    .maybeSingle()
+  if (existingStaffErr) {
+    return NextResponse.json({ error: existingStaffErr.message }, { status: 500 })
+  }
+  if (existingStaff) {
+    return NextResponse.json({ error: 'Username already exists' }, { status: 409 })
+  }
+
+  let authUser
+  let createdAuthUser = false
+  try {
+    const result = await createOrReuseStaffAuthUser(email, password)
+    authUser = result.user
+    createdAuthUser = result.created
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : 'Could not create auth user'
+    const status = msg.toLowerCase().includes('already') ? 409 : 500
+    return NextResponse.json({ error: status === 409 ? 'Username already exists' : msg }, { status })
   }
 
   const { data: staffRow, error: staffErr } = await supabaseAdmin
@@ -60,15 +73,15 @@ export async function POST(req: Request) {
       role,
       phone: phone ?? null,
       area_id: area_id ?? null,
-      username: username.trim().toLowerCase(),
-      auth_user_id: created.user.id,
+      username: normalizedUsername,
+      auth_user_id: authUser.id,
       is_active: true,
     })
     .select('id, full_name, role, phone, area_id, username, auth_user_id, is_active, created_at')
     .single()
 
   if (staffErr || !staffRow) {
-    await supabaseAdmin.auth.admin.deleteUser(created.user.id)
+    if (createdAuthUser) await supabaseAdmin.auth.admin.deleteUser(authUser.id)
     return NextResponse.json({ error: staffErr?.message ?? 'Could not create staff row' }, { status: 500 })
   }
 
