@@ -87,7 +87,7 @@ export type Bill = {
   collected_by: string | null
   paid_at: string | null
   receipt_no: string | null
-  payment_method: 'cash' | 'bank' | 'easypaisa' | 'jazzcash' | 'other' | null
+  payment_method: PaymentMethod | null
   payment_note: string | null
   created_at: string
 }
