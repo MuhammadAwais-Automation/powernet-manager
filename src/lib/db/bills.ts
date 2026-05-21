@@ -126,6 +126,7 @@ export async function getBillsPage(params: BillsPageParams): Promise<BillsPageRe
 
   if (params.status === 'unpaid') query = query.neq('status', 'paid')
   else if (params.status === 'partial') query = query.neq('status', 'paid').gt('paid_amount', 0)
+  else if (params.status === 'visited') query = query.eq('payment_method', 'visit')
   else if (params.status) query = query.eq('status', params.status)
   if (customerIds) query = query.in('customer_id', customerIds)
 

@@ -176,7 +176,7 @@ function ShellContent({ staff, logout }: {
 
   const meta = PAGE_META[active];
 
-  const PAGES: { id: PageId; component: React.ReactNode }[] = [
+  const PAGES = useMemo<{ id: PageId; component: React.ReactNode }[]>(() => [
     { id: 'dashboard',  component: <DashboardPage refreshToken={billingVersion} /> },
     { id: 'customers',  component: <CustomersPage /> },
     { id: 'billing',    component: <BillingPage refreshToken={billingVersion} /> },
@@ -196,7 +196,8 @@ function ShellContent({ staff, logout }: {
         </div>
       </div>
     )},
-  ];
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  ], [billingVersion]);
 
   return (
     <div className="app">

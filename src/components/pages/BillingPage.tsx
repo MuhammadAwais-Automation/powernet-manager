@@ -237,6 +237,7 @@ export default function BillingPage({ refreshToken = 0 }: { refreshToken?: numbe
               { value: 'Partial', label: 'Partial', count: summary?.partialBills ?? 0 },
               { value: 'Paid', label: 'Paid', count: summary?.paidBills ?? 0 },
               { value: 'Overdue', label: 'Overdue', count: summary?.overdueBills ?? 0 },
+              { value: 'Visited', label: 'Visited', count: tab === 'Visited' ? totalBills : undefined },
             ]} />
             <div className="billing-filter-controls">
               <select
@@ -421,23 +422,39 @@ export default function BillingPage({ refreshToken = 0 }: { refreshToken?: numbe
                   <div className="mono" style={{ fontWeight: 600, fontSize: 13, marginTop: 4 }}>{detailBill.receipt_no}</div>
                 </div>
               )}
+              {detailBill.paid_at && (
+                <div className="card card-pad" style={{ padding: '10px 14px' }}>
+                  <div className="muted" style={{ fontSize: 11, textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.05em' }}>Paid At</div>
+                  <div style={{ fontWeight: 600, fontSize: 13, marginTop: 4 }}>{new Date(detailBill.paid_at).toLocaleString()}</div>
+                </div>
+              )}
               {(detailBill.payment_method || detailBill.collector) && (
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                   {detailBill.payment_method && (
                     <div className="card card-pad" style={{ padding: '10px 14px' }}>
-                      <div className="muted" style={{ fontSize: 11, textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.05em' }}>Method</div>
-                      <div style={{ fontWeight: 600, fontSize: 13, marginTop: 4, textTransform: 'capitalize' }}>{detailBill.payment_method}</div>
+                      <div className="muted" style={{ fontSize: 11, textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.05em' }}>
+                        {detailBill.payment_method === 'visit' ? 'Visit Type' : 'Method'}
+                      </div>
+                      <div style={{ fontWeight: 600, fontSize: 13, marginTop: 4 }}>
+                        {detailBill.payment_method === 'visit' ? (
+                          <Badge color="amber" dot>{detailBill.payment_note ?? 'Visit'}</Badge>
+                        ) : (
+                          <span style={{ textTransform: 'capitalize' }}>{detailBill.payment_method}</span>
+                        )}
+                      </div>
                     </div>
                   )}
                   {detailBill.collector && (
                     <div className="card card-pad" style={{ padding: '10px 14px' }}>
-                      <div className="muted" style={{ fontSize: 11, textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.05em' }}>Collected By</div>
+                      <div className="muted" style={{ fontSize: 11, textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.05em' }}>
+                        {detailBill.payment_method === 'visit' ? 'Visited By' : 'Collected By'}
+                      </div>
                       <div style={{ fontWeight: 600, fontSize: 13, marginTop: 4 }}>{detailBill.collector.full_name}</div>
                     </div>
                   )}
                 </div>
               )}
-              {detailBill.payment_note && (
+              {detailBill.payment_note && detailBill.payment_method !== 'visit' && (
                 <div className="card card-pad" style={{ padding: '10px 14px' }}>
                   <div className="muted" style={{ fontSize: 11, textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.05em' }}>Notes</div>
                   <div style={{ fontSize: 13, marginTop: 4 }}>{detailBill.payment_note}</div>
