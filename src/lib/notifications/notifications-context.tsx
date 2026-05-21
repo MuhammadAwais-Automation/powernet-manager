@@ -6,6 +6,7 @@ import { clearBillsCache, getBillByIdWithRelations } from '@/lib/db/bills'
 import { clearDashboardCache } from '@/lib/db/dashboard'
 import {
   buildBillingNotification,
+  didBillRefreshChange,
   didPaymentChange,
   type BillingNotification,
   type BillingRealtimeBillRow,
@@ -53,11 +54,13 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'bills' }, async payload => {
         const oldRow = payload.old as BillingRealtimeBillRow | null
         const newRow = payload.new as BillingRealtimeBillRow | null
-        if (!didPaymentChange(oldRow, newRow) || !newRow?.id) return
+        if (!didBillRefreshChange(oldRow, newRow) || !newRow?.id) return
 
         clearBillsCache()
         clearDashboardCache()
         setBillingVersion(version => version + 1)
+
+        if (!didPaymentChange(oldRow, newRow)) return
 
         try {
           const bill = await getBillByIdWithRelations(newRow.id)
@@ -84,7 +87,11 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
           console.error('Could not build billing notification', error)
         }
       })
-      .subscribe()
+      .subscribe(status => {
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          console.warn('Dashboard billing realtime channel is not healthy:', status)
+        }
+      })
 
     return () => {
       void supabase.removeChannel(channel)

@@ -57,6 +57,20 @@ assert.strictEqual(
   ),
   true
 )
+assert.strictEqual(
+  billing.didPaymentChange(
+    { id: 'bill-1', paid_amount: 0, status: 'pending', payment_method: null },
+    { id: 'bill-1', paid_amount: 0, status: 'pending', payment_method: 'visit', paid_at: '2026-05-21T10:00:00Z' }
+  ),
+  false
+)
+assert.strictEqual(
+  billing.didBillRefreshChange(
+    { id: 'bill-1', paid_amount: 0, status: 'pending', payment_method: null },
+    { id: 'bill-1', paid_amount: 0, status: 'pending', payment_method: 'visit', paid_at: '2026-05-21T10:00:00Z' }
+  ),
+  true
+)
 
 assert.strictEqual(
   billing.buildBillingNotificationDedupeKey({
