@@ -41,6 +41,7 @@ export type BillingSummary = {
   partialBills: number
   unpaidBills: number
   overdueBills: number
+  visitedBills: number
   totalBilled: number
   totalPaid: number
   totalRemaining: number
@@ -165,7 +166,7 @@ export async function getBillingSummary(month: string): Promise<BillingSummary> 
   const cached = billingSummaryCache[month]
   if (cached && cached.expiresAt > Date.now()) return cached.data
 
-  const [reportsRes, totalRes, paidRes, unpaidRes, pendingRes, overdueRes, overdueRowsRes, partialRes] = await Promise.all([
+  const [reportsRes, totalRes, paidRes, unpaidRes, pendingRes, overdueRes, overdueRowsRes, partialRes, visitedRes] = await Promise.all([
     supabase.rpc('get_reports_summary', { p_month: month }),
     supabase.from('bills').select('id', { count: 'exact', head: true }).eq('month', month),
     supabase.from('bills').select('id', { count: 'exact', head: true }).eq('month', month).eq('status', 'paid'),
@@ -174,6 +175,7 @@ export async function getBillingSummary(month: string): Promise<BillingSummary> 
     supabase.from('bills').select('id', { count: 'exact', head: true }).eq('month', month).eq('status', 'overdue'),
     supabase.from('bills').select('amount, paid_amount').eq('month', month).eq('status', 'overdue'),
     supabase.from('bills').select('id', { count: 'exact', head: true }).eq('month', month).neq('status', 'paid').gt('paid_amount', 0),
+    supabase.from('bills').select('id', { count: 'exact', head: true }).eq('month', month).eq('payment_method', 'visit'),
   ])
 
   if (reportsRes.error) throw reportsRes.error
@@ -184,6 +186,7 @@ export async function getBillingSummary(month: string): Promise<BillingSummary> 
   if (overdueRes.error) throw overdueRes.error
   if (overdueRowsRes.error) throw overdueRowsRes.error
   if (partialRes.error) throw partialRes.error
+  if (visitedRes.error) throw visitedRes.error
 
   const raw = (reportsRes.data ?? {}) as {
     month?: unknown
@@ -202,6 +205,7 @@ export async function getBillingSummary(month: string): Promise<BillingSummary> 
     partialBills: partialRes.count ?? 0,
     unpaidBills: unpaidRes.count ?? 0,
     overdueBills: overdueRes.count ?? 0,
+    visitedBills: visitedRes.count ?? 0,
     totalBilled: toNumber(raw.cards?.revenue),
     totalPaid: toNumber(raw.cards?.collections),
     totalRemaining: toNumber(raw.cards?.pending),

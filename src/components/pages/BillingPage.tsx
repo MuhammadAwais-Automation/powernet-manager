@@ -237,7 +237,7 @@ export default function BillingPage({ refreshToken = 0 }: { refreshToken?: numbe
               { value: 'Partial', label: 'Partial', count: summary?.partialBills ?? 0 },
               { value: 'Paid', label: 'Paid', count: summary?.paidBills ?? 0 },
               { value: 'Overdue', label: 'Overdue', count: summary?.overdueBills ?? 0 },
-              { value: 'Visited', label: 'Visited', count: tab === 'Visited' ? totalBills : undefined },
+              { value: 'Visited', label: 'Visited', count: summary?.visitedBills ?? 0 },
             ]} />
             <div className="billing-filter-controls">
               <select

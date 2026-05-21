@@ -55,6 +55,8 @@ export function didPaymentChange(
   if (oldRow?.status !== newRow.status && newRow.status === 'paid') return true
   if (!oldRow?.receipt_no && Boolean(newRow.receipt_no)) return true
   if (oldRow?.paid_at !== newRow.paid_at && Boolean(newRow.paid_at)) return true
+  if (oldRow?.payment_method !== newRow.payment_method && Boolean(newRow.payment_method)) return true
+  if (oldRow?.collected_by !== newRow.collected_by && Boolean(newRow.collected_by)) return true
   return false
 }
 
