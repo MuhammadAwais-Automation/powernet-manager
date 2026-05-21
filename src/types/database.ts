@@ -97,7 +97,7 @@ export type BillWithRelations = Bill & {
   collector: Pick<Staff, 'id' | 'full_name'> | null
 }
 
-export type PaymentMethod = 'cash' | 'bank' | 'easypaisa' | 'jazzcash' | 'other'
+export type PaymentMethod = 'cash' | 'bank' | 'easypaisa' | 'jazzcash' | 'other' | 'visit'
 
 export type Payment = {
   id: string
