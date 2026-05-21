@@ -11,8 +11,11 @@ import {
   type BillingRealtimeBillRow,
 } from './billing'
 
+const MAX_TOASTS = 3
+
 type NotificationsContextValue = {
   items: BillingNotification[]
+  toasts: BillingNotification[]
   unreadCount: number
   billingVersion: number
   isInboxOpen: boolean
@@ -21,20 +24,27 @@ type NotificationsContextValue = {
   markAllRead: () => void
   markRead: (id: string) => void
   clearAll: () => void
+  dismissToast: (id: string) => void
 }
 
 const NotificationsContext = createContext<NotificationsContextValue | null>(null)
 
 export function NotificationsProvider({ children }: { children: React.ReactNode }) {
   const [items, setItems] = useState<BillingNotification[]>([])
+  const [toasts, setToasts] = useState<BillingNotification[]>([])
   const [billingVersion, setBillingVersion] = useState(0)
   const [isInboxOpen, setInboxOpen] = useState(false)
   const seenKeysRef = useRef<Set<string>>(new Set())
+
+  const dismissToast = useCallback((id: string) => {
+    setToasts(current => current.filter(t => t.id !== id))
+  }, [])
 
   const addBillingNotification = useCallback((notification: BillingNotification) => {
     if (seenKeysRef.current.has(notification.dedupeKey)) return
     seenKeysRef.current.add(notification.dedupeKey)
     setItems(current => [notification, ...current].slice(0, 50))
+    setToasts(current => [notification, ...current].slice(0, MAX_TOASTS))
   }, [])
 
   useEffect(() => {
@@ -83,6 +93,7 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
 
   const value = useMemo<NotificationsContextValue>(() => ({
     items,
+    toasts,
     unreadCount: items.filter(item => !item.read).length,
     billingVersion,
     isInboxOpen,
@@ -96,7 +107,8 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
       seenKeysRef.current.clear()
       setItems([])
     },
-  }), [billingVersion, isInboxOpen, items])
+    dismissToast,
+  }), [billingVersion, dismissToast, isInboxOpen, items, toasts])
 
   return (
     <NotificationsContext.Provider value={value}>

@@ -881,3 +881,90 @@ table.data tr.selected { background: var(--blue-50); }
   .billing-search { width: 100%; min-width: 0; }
   .drawer { width: 100% !important; }
 }
+/* ── Payment Toast Notifications ─────────────────────────────── */
+.payment-toast-container {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  pointer-events: none;
+}
+
+.payment-toast {
+  pointer-events: all;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: 10px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.14);
+  width: 340px;
+  animation: toast-slide-in 0.25s cubic-bezier(0.16,1,0.3,1);
+}
+
+.payment-toast--full .payment-toast__icon {
+  color: #22c55e;
+}
+
+.payment-toast--partial .payment-toast__icon {
+  color: #f59e0b;
+}
+
+.payment-toast__icon {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.payment-toast__body {
+  flex: 1;
+  min-width: 0;
+}
+
+.payment-toast__title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 2px;
+}
+
+.payment-toast__message {
+  font-size: 12px;
+  color: var(--text-sub);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.payment-toast__meta {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 3px;
+}
+
+.payment-toast__close {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-muted);
+  padding: 2px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.15s;
+}
+
+.payment-toast__close:hover {
+  color: var(--text);
+}
+
+@keyframes toast-slide-in {
+  from { opacity: 0; transform: translateX(40px); }
+  to   { opacity: 1; transform: translateX(0); }
+}

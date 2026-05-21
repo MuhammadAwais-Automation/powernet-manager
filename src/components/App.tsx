@@ -10,7 +10,8 @@ import AreasPage from './pages/AreasPage';
 import ReportsPage from './pages/ReportsPage';
 import LoginScreen from './auth/LoginScreen';
 import AccessDenied from './auth/AccessDenied';
-import { NotificationBell, NotificationDrawer } from './notifications/NotificationCenter';
+import { NotificationBell, NotificationDrawer } from './notifications/NotificationCenter'
+import { PaymentToastContainer } from './notifications/PaymentToast';
 import { AuthProvider, useAuth } from '@/lib/auth/auth-context';
 import { NotificationsProvider, useNotifications } from '@/lib/notifications/notifications-context';
 import { NAV_BY_ROLE, DEFAULT_PAGE_BY_ROLE, canAccessPage, VALID_PAGE_IDS, type PageId } from '@/lib/auth/permissions';
@@ -217,6 +218,7 @@ function ShellContent({ staff, logout }: {
         </div>
       </main>
       <NotificationDrawer />
+      <PaymentToastContainer />
     </div>
   );
 }
