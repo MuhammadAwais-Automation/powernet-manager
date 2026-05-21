@@ -25,7 +25,7 @@ function statusColor(status: string): 'green' | 'red' | 'amber' {
   return 'amber';
 }
 
-export default function BillingPage() {
+export default function BillingPage({ refreshToken = 0 }: { refreshToken?: number }) {
   const [bills, setBills] = useState<BillWithRelations[]>([]);
   const [summary, setSummary] = useState<BillingSummary | null>(null);
   const [totalBills, setTotalBills] = useState(0);
@@ -82,7 +82,7 @@ export default function BillingPage() {
   useEffect(() => {
     loadBilling();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [billingMonth, page, tab, debouncedSearch, areaFilter, reloadToken]);
+  }, [billingMonth, page, tab, debouncedSearch, areaFilter, reloadToken, refreshToken]);
 
   const totalBilled = summary?.totalBilled ?? 0;
   const totalPaid = summary?.totalPaid ?? 0;
@@ -228,9 +228,9 @@ export default function BillingPage() {
         ))}
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: 16 }}>
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, gap: 12 }}>
+      <div className="billing-workspace">
+        <div className="billing-table-section">
+          <div className="billing-filter-row">
             <Tabs value={tab} onChange={value => setTab(value as BillingTab)} items={[
               { value: 'All', label: 'All Bills', count: summary?.totalBills ?? 0 },
               { value: 'Unpaid', label: 'Unpaid', count: summary?.pendingBills ?? 0 },
@@ -238,23 +238,22 @@ export default function BillingPage() {
               { value: 'Paid', label: 'Paid', count: summary?.paidBills ?? 0 },
               { value: 'Overdue', label: 'Overdue', count: summary?.overdueBills ?? 0 },
             ]} />
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <div className="billing-filter-controls">
               <select
                 className="select"
                 value={areaFilter}
                 onChange={e => setAreaFilter(e.target.value)}
-                style={{ height: 36, fontSize: 13, minWidth: 130 }}
+                style={{ height: 36, fontSize: 13, minWidth: 150 }}
               >
                 <option value="">All Areas</option>
                 {areas.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
               </select>
-              <div className="search" style={{ minWidth: 220, height: 36, border: '1px solid var(--border)', borderRadius: 8, padding: '0 12px', display: 'flex', alignItems: 'center', gap: 8, background: 'var(--bg-elev)' }}>
+              <div className="billing-search">
                 <Icon name="search" size={14} />
                 <input
                   placeholder="Search bills..."
                   value={search}
                   onChange={e => setSearch(e.target.value)}
-                  style={{ border: 'none', outline: 'none', background: 'none', fontSize: 13, flex: 1 }}
                 />
               </div>
             </div>
@@ -375,25 +374,6 @@ export default function BillingPage() {
           </div>
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <div className="card">
-            <div className="card-head">
-              <div><h3>Generate Bills</h3><div className="sub">Bulk invoice active customers</div></div>
-            </div>
-            <div className="card-pad" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <div className="field">
-                <label>Billing Month</label>
-                <input className="input" type="month" value={billingMonth} onChange={e => setBillingMonth(e.target.value)} />
-              </div>
-              <div style={{ padding: 12, borderRadius: 10, background: 'var(--bg-muted)', fontSize: 12, color: 'var(--text-muted)' }}>
-                Active customers with a monthly due/package price will receive one bill for this month. Existing bills are skipped safely.
-              </div>
-              <button className="btn btn-primary" style={{ width: '100%' }} onClick={handleGenerateBills} disabled={generating}>
-                <Icon name="fileText" size={14} />{generating ? 'Generating...' : 'Generate Bills'}
-              </button>
-            </div>
-          </div>
-        </div>
       </div>
       {detailBill && (
         <Modal open={!!detailBill} onClose={() => setDetailBill(null)} width={480}>

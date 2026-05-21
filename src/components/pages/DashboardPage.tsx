@@ -6,18 +6,31 @@ import { RevenueLineChart, Donut, Sparkline } from '../charts';
 import { getDashboardStats, getRecentActivity } from '@/lib/db/dashboard';
 import type { DashboardStats, ActivityItem } from '@/lib/db/dashboard';
 
-export default function DashboardPage() {
+export default function DashboardPage({ refreshToken = 0 }: { refreshToken?: number }) {
   const [stats, setStats]       = useState<DashboardStats | null>(null);
   const [activity, setActivity] = useState<ActivityItem[]>([]);
   const [loading, setLoading]   = useState(true);
   const [error, setError]       = useState<string | null>(null);
 
   useEffect(() => {
+    if (!stats) setLoading(true);
+    setError(null);
+    let active = true;
     Promise.all([getDashboardStats(), getRecentActivity()])
-      .then(([s, a]) => { setStats(s); setActivity(a); })
-      .catch((e: unknown) => setError(e instanceof Error ? e.message : 'Could not load dashboard'))
-      .finally(() => setLoading(false));
-  }, []);
+      .then(([s, a]) => {
+        if (!active) return;
+        setStats(s);
+        setActivity(a);
+      })
+      .catch((e: unknown) => {
+        if (active) setError(e instanceof Error ? e.message : 'Could not load dashboard');
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => { active = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [refreshToken]);
 
   const fmt = (n: number) =>
     n >= 100000 ? `Rs. ${(n / 100000).toFixed(2)}L` : `Rs. ${n.toLocaleString()}`;

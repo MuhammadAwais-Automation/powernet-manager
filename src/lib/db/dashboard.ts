@@ -39,6 +39,11 @@ let activityCache: { value: ActivityItem[]; expiresAt: number } | null = null
 const DASHBOARD_CACHE_MS = 60_000
 const ACTIVITY_CACHE_MS = 30_000
 
+export function clearDashboardCache() {
+  dashboardCache = null
+  activityCache = null
+}
+
 function formatRelative(ts: string | null): string {
   if (!ts) return '-'
   const diff = Date.now() - new Date(ts).getTime()

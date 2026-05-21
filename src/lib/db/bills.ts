@@ -66,7 +66,7 @@ let billsPageCache: Record<string, { data: BillsPageResult; expiresAt: number }>
 let billingSummaryCache: Record<string, { data: BillingSummary; expiresAt: number }> = {}
 const CACHE_MS = 60_000
 const CUSTOMER_SEARCH_LIMIT = 250
-const BILL_PAGE_SELECT = `
+export const BILL_PAGE_SELECT = `
   id,
   customer_id,
   amount,
@@ -83,9 +83,20 @@ const BILL_PAGE_SELECT = `
   collector:staff(id, full_name)
 `
 
-function clearBillsCache() {
+export function clearBillsCache() {
   billsPageCache = {}
   billingSummaryCache = {}
+}
+
+export async function getBillByIdWithRelations(id: string): Promise<BillWithRelations | null> {
+  const { data, error } = await supabase
+    .from('bills')
+    .select(BILL_PAGE_SELECT)
+    .eq('id', id)
+    .maybeSingle()
+
+  if (error) throw error
+  return (data ?? null) as unknown as BillWithRelations | null
 }
 
 export async function getBillsPage(params: BillsPageParams): Promise<BillsPageResult> {

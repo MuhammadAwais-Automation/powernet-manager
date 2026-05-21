@@ -10,9 +10,12 @@ import AreasPage from './pages/AreasPage';
 import ReportsPage from './pages/ReportsPage';
 import LoginScreen from './auth/LoginScreen';
 import AccessDenied from './auth/AccessDenied';
+import { NotificationBell, NotificationDrawer } from './notifications/NotificationCenter';
 import { AuthProvider, useAuth } from '@/lib/auth/auth-context';
+import { NotificationsProvider, useNotifications } from '@/lib/notifications/notifications-context';
 import { NAV_BY_ROLE, DEFAULT_PAGE_BY_ROLE, canAccessPage, VALID_PAGE_IDS, type PageId } from '@/lib/auth/permissions';
 import { initials } from '@/lib/utils';
+import type { Staff } from '@/types/database';
 
 const ALL_NAV: { id: PageId; label: string; icon: string }[] = [
   { id: 'dashboard',  label: 'Dashboard',          icon: 'grid' },
@@ -95,13 +98,10 @@ function Sidebar({ active, setActive, allowedNav, staffName, staffRole, onLogout
   );
 }
 
-function Topbar({ meta, isDark, onToggleTheme, staffName, staffRole, onLogout }: {
+function Topbar({ meta, isDark, onToggleTheme }: {
   meta: { title: string; sub: string };
   isDark: boolean;
   onToggleTheme: () => void;
-  staffName: string;
-  staffRole: string;
-  onLogout: () => void;
 }) {
   return (
     <header className="topbar">
@@ -114,20 +114,10 @@ function Topbar({ meta, isDark, onToggleTheme, staffName, staffRole, onLogout }:
         <input placeholder="Search…" />
         <span className="kbd">⌘K</span>
       </div>
-      <button className="icon-btn" title="Theme" onClick={onToggleTheme}>
-        <Icon name={isDark ? 'sun' : 'moon'} size={16} />
-      </button>
-      <div style={{ width: 1, height: 28, background: 'var(--border)' }} />
-      <div className="row gap-sm">
-        <div className="topbar-avatar">{initials(staffName)}</div>
-        <div style={{ display: 'flex', flexDirection: 'column' }}>
-          <span style={{ fontSize: 12, fontWeight: 600, lineHeight: 1.2 }}>{staffName}</span>
-          <span style={{ fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.2 }}>
-            {ROLE_LABEL_SHORT[staffRole] ?? staffRole}
-          </span>
-        </div>
-        <button className="icon-btn" title="Logout" onClick={onLogout}>
-          <Icon name="logout" size={16} />
+      <div className="topbar-actions">
+        <NotificationBell />
+        <button className="icon-btn" title="Theme" onClick={onToggleTheme}>
+          <Icon name={isDark ? 'sun' : 'moon'} size={16} />
         </button>
       </div>
     </header>
@@ -150,8 +140,10 @@ function FullScreenSpinner() {
   );
 }
 
-function Shell() {
-  const { staff, loading, logout } = useAuth();
+function ShellContent({ staff, logout }: {
+  staff: Staff;
+  logout: () => void;
+}) {
   const [active, setActive] = useState<PageId>(() => {
     try {
       const saved = sessionStorage.getItem('powernet_current_page');
@@ -160,6 +152,7 @@ function Shell() {
     return 'dashboard';
   });
   const [isDark, setIsDark] = useState(false);
+  const { billingVersion } = useNotifications();
 
   const handlePageChange = useCallback((page: PageId) => {
     setActive(page);
@@ -181,15 +174,12 @@ function Shell() {
 
   const allowedNav = useMemo(() => staff ? NAV_BY_ROLE[staff.role] : [], [staff]);
 
-  if (loading) return <FullScreenSpinner />;
-  if (!staff) return <LoginScreen />;
-
   const meta = PAGE_META[active];
 
   const PAGES: { id: PageId; component: React.ReactNode }[] = [
-    { id: 'dashboard',  component: <DashboardPage /> },
+    { id: 'dashboard',  component: <DashboardPage refreshToken={billingVersion} /> },
     { id: 'customers',  component: <CustomersPage /> },
-    { id: 'billing',    component: <BillingPage /> },
+    { id: 'billing',    component: <BillingPage refreshToken={billingVersion} /> },
     { id: 'complaints', component: <ComplaintsPage /> },
     { id: 'staff',      component: <StaffPage /> },
     { id: 'areas',      component: <AreasPage /> },
@@ -214,7 +204,7 @@ function Shell() {
         staffName={staff.full_name} staffRole={staff.role} onLogout={logout} />
       <main style={{ minWidth: 0, display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
         <Topbar meta={meta} isDark={isDark} onToggleTheme={() => setIsDark(d => !d)}
-          staffName={staff.full_name} staffRole={staff.role} onLogout={logout} />
+        />
         <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
           {!canAccessPage(staff.role, active) ? <AccessDenied /> : (
             PAGES.map(({ id, component }) => (
@@ -225,7 +215,21 @@ function Shell() {
           )}
         </div>
       </main>
+      <NotificationDrawer />
     </div>
+  );
+}
+
+function Shell() {
+  const { staff, loading, logout } = useAuth();
+
+  if (loading) return <FullScreenSpinner />;
+  if (!staff) return <LoginScreen />;
+
+  return (
+    <NotificationsProvider>
+      <ShellContent staff={staff} logout={logout} />
+    </NotificationsProvider>
   );
 }
 
