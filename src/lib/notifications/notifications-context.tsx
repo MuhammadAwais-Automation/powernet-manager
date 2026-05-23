@@ -8,6 +8,7 @@ import {
   buildBillingNotification,
   didBillRefreshChange,
   didPaymentChange,
+  didNotifyChange,
   type BillingNotification,
   type BillingRealtimeBillRow,
 } from './billing'
@@ -60,7 +61,7 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
         clearDashboardCache()
         setBillingVersion(version => version + 1)
 
-        if (!didPaymentChange(oldRow, newRow)) return
+        if (!didNotifyChange(oldRow, newRow)) return
 
         try {
           const bill = await getBillByIdWithRelations(newRow.id)
@@ -80,6 +81,8 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
             status: bill.status,
             receiptNo: bill.receipt_no,
             paidAt: bill.paid_at ?? new Date().toISOString(),
+            paymentMethod: bill.payment_method,
+            paymentNote: bill.payment_note,
           })
 
           addBillingNotification(notification)

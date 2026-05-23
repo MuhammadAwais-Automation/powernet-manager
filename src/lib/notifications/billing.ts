@@ -1,4 +1,4 @@
-export type BillingNotificationType = 'payment_full' | 'payment_partial'
+export type BillingNotificationType = 'payment_full' | 'payment_partial' | 'visit'
 
 export type BillingRealtimeBillRow = {
   id?: string | null
@@ -42,6 +42,8 @@ export type BillingNotificationSource = {
   status: string
   receiptNo?: string | null
   paidAt?: string | null
+  paymentMethod?: string | null
+  paymentNote?: string | null
 }
 
 export function didPaymentChange(
@@ -57,6 +59,24 @@ export function didPaymentChange(
   if (!oldRow?.receipt_no && Boolean(newRow.receipt_no)) return true
   if (newPaid > 0 && oldRow?.paid_at !== newRow.paid_at && Boolean(newRow.paid_at)) return true
   return false
+}
+
+export function didNotifyChange(
+  oldRow?: BillingRealtimeBillRow | null,
+  newRow?: BillingRealtimeBillRow | null
+): boolean {
+  if (!newRow?.id) return false
+
+  // Check if it is a visit log
+  if (newRow.payment_method === 'visit') {
+    // Notify if method changed to 'visit' or if a new visit was recorded (different paid_at timestamp)
+    if (oldRow?.payment_method !== 'visit') return true
+    if (oldRow?.paid_at !== newRow.paid_at && Boolean(newRow.paid_at)) return true
+    return false
+  }
+
+  // Otherwise, use standard payment change detection
+  return didPaymentChange(oldRow, newRow)
 }
 
 export function didBillRefreshChange(
@@ -76,7 +96,16 @@ export function buildBillingNotificationDedupeKey(input: {
   paidAmount: number
   status: string
   receiptNo?: string | null
+  paymentMethod?: string | null
+  paymentNote?: string | null
 }): string {
+  if (input.paymentMethod === 'visit') {
+    return [
+      input.billId,
+      'visit',
+      input.paymentNote ?? 'no-note',
+    ].join(':')
+  }
   return [
     input.billId,
     input.status,
@@ -85,28 +114,60 @@ export function buildBillingNotificationDedupeKey(input: {
   ].join(':')
 }
 
+function formatVisitNote(note?: string | null): string {
+  if (!note) return 'Visited'
+  switch (note.toLowerCase()) {
+    case 'house_locked': return 'House Locked'
+    case 'promise_to_pay': return 'Promise to Pay'
+    case 'refused_to_pay': return 'Refused to Pay'
+    case 'payment_collected': return 'Payment Collected'
+    default: return note.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
+  }
+}
+
 export function buildBillingNotification(source: BillingNotificationSource): BillingNotification {
-  const isFull = source.remainingAmount <= 0 || source.status === 'paid'
+  const isVisit = source.paymentMethod === 'visit'
+  const isFull = !isVisit && (source.remainingAmount <= 0 || source.status === 'paid')
   const amountText = formatRs(source.amount)
   const collector = source.collectorName ? ` via ${source.collectorName}` : ''
-  const title = isFull ? 'Full payment received' : 'Partial payment received'
-  const message = `${source.customerName} paid ${amountText}${collector}`
+  
+  let title = ''
+  let message = ''
+  let type: BillingNotificationType = 'payment_full'
+
+  if (isVisit) {
+    type = 'visit'
+    const visitReason = formatVisitNote(source.paymentNote)
+    title = `Customer Visited (${visitReason})`
+    message = `${source.customerName} was visited${collector} — Status: ${visitReason}`
+  } else if (isFull) {
+    type = 'payment_full'
+    title = 'Full payment received'
+    message = `${source.customerName} paid ${amountText}${collector}`
+  } else {
+    type = 'payment_partial'
+    title = 'Partial payment received'
+    message = `${source.customerName} paid ${amountText}${collector}`
+  }
+
   const dedupeKey = buildBillingNotificationDedupeKey({
     billId: source.billId,
     paidAmount: source.paidAmount,
     status: source.status,
     receiptNo: source.receiptNo,
+    paymentMethod: source.paymentMethod,
+    paymentNote: source.paymentNote,
   })
 
   return {
     id: `${dedupeKey}:${source.paidAt ?? Date.now()}`,
     dedupeKey,
-    type: isFull ? 'payment_full' : 'payment_partial',
+    type,
     billId: source.billId,
     customerName: source.customerName,
     customerCode: source.customerCode,
     collectorName: source.collectorName,
-    amountPaid: source.amount,
+    amountPaid: isVisit ? 0 : source.amount,
     paidAmount: source.paidAmount,
     remainingAmount: Math.max(source.remainingAmount, 0),
     status: source.status,

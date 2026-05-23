@@ -37,8 +37,8 @@ export function NotificationDrawer() {
     <Drawer open={isInboxOpen} onClose={closeInbox} width={420}>
       <div className="drawer-head notification-drawer-head">
         <div>
-          <div className="notification-title">Payment Inbox</div>
-          <div className="notification-sub">{unreadCount} unread live billing updates</div>
+          <div className="notification-title">Operations Inbox</div>
+          <div className="notification-sub">{unreadCount} unread live updates</div>
         </div>
         <button className="icon-btn" title="Close" onClick={closeInbox}>
           <Icon name="x" size={16} />
@@ -49,9 +49,9 @@ export function NotificationDrawer() {
         {items.length === 0 ? (
           <div className="notification-empty">
             <span className="notification-empty-icon"><Icon name="bell" size={22} /></span>
-            <div className="notification-empty-title">No payment activity yet</div>
+            <div className="notification-empty-title">No activity yet</div>
             <div className="notification-empty-sub">
-              Recovery agent payments will appear here live without page reload.
+              Recovery agent payments and visits will appear here live without page reload.
             </div>
           </div>
         ) : (
@@ -62,7 +62,16 @@ export function NotificationDrawer() {
               onClick={() => markRead(item.id)}
             >
               <span className="notification-item-icon">
-                <Icon name={item.type === 'payment_full' ? 'checkCircle' : 'cash'} size={18} />
+                <Icon
+                  name={
+                    item.type === 'payment_full'
+                      ? 'checkCircle'
+                      : item.type === 'visit'
+                      ? 'mapPin'
+                      : 'cash'
+                  }
+                  size={18}
+                />
               </span>
               <span className="notification-item-main">
                 <span className="notification-item-row">
@@ -75,9 +84,24 @@ export function NotificationDrawer() {
                 </span>
               </span>
               <span className="notification-item-side">
-                <span className="notification-amount">{formatRs(item.amountPaid)}</span>
-                <Badge color={item.type === 'payment_full' ? 'green' : 'amber'} dot>
-                  {item.type === 'payment_full' ? 'paid' : 'partial'}
+                {item.type !== 'visit' && (
+                  <span className="notification-amount">{formatRs(item.amountPaid)}</span>
+                )}
+                <Badge
+                  color={
+                    item.type === 'payment_full'
+                      ? 'green'
+                      : item.type === 'visit'
+                      ? 'blue'
+                      : 'amber'
+                  }
+                  dot
+                >
+                  {item.type === 'payment_full'
+                    ? 'paid'
+                    : item.type === 'visit'
+                    ? 'visited'
+                    : 'partial'}
                 </Badge>
               </span>
             </button>
