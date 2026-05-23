@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import Icon from '../Icon';
 import { Badge, Avatar, Modal, Tabs } from '../ui';
-import { getComplaints, createComplaint } from '@/lib/db/complaints';
+import { getComplaints, createComplaint, updateComplaint } from '@/lib/db/complaints';
 import { getAreas } from '@/lib/db/areas';
 import { getStaff } from '@/lib/db/staff';
 import { searchCustomers, type CustomerSearchResult } from '@/lib/db/customers';
@@ -168,14 +168,39 @@ function LogComplaintModal({ onClose, staff, onSaved }: {
   );
 }
 
-function ComplaintModal({ complaint, onClose, staff }: {
+function ComplaintModal({ complaint, onClose, staff, onSaved }: {
   complaint: ComplaintWithRelations;
   onClose: () => void;
   staff: StaffWithArea[];
+  onSaved: () => void;
 }) {
+  const [assignedTo, setAssignedTo] = useState(complaint.assigned_to ?? '');
+  const [status, setStatus] = useState(complaint.status);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
   const priLabel: Record<string, string> = { high: 'High', medium: 'Medium', low: 'Low' };
   const statusColor = (s: string) => s === 'open' ? 'red' : s === 'in_progress' ? 'amber' : 'green';
   const statusLabel = (s: string) => s === 'open' ? 'Open' : s === 'in_progress' ? 'In Progress' : 'Resolved';
+
+  const handleSave = async () => {
+    setSaving(true);
+    setError(null);
+    try {
+      const resolvedAt = status === 'resolved' ? new Date().toISOString() : (status === 'open' ? null : complaint.resolved_at);
+      await updateComplaint(complaint.id, {
+        assigned_to: assignedTo || null,
+        status,
+        resolved_at: resolvedAt,
+      });
+      onSaved();
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save changes');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <Modal open={!!complaint} onClose={onClose} width={640}>
@@ -183,15 +208,21 @@ function ComplaintModal({ complaint, onClose, staff }: {
         <div>
           <div className="row gap-sm" style={{ marginBottom: 4 }}>
             <span className="mono muted" style={{ fontSize: 12 }}>{complaint.complaint_code}</span>
-            <Badge color={statusColor(complaint.status)} dot>{statusLabel(complaint.status)}</Badge>
+            <Badge color={statusColor(status)} dot>{statusLabel(status)}</Badge>
             <span className={`pri-dot ${complaint.priority}`} />
             <span className="muted" style={{ fontSize: 12 }}>{priLabel[complaint.priority]} priority</span>
           </div>
           <div style={{ fontSize: 17, fontWeight: 600, letterSpacing: '-0.01em' }}>{complaint.issue}</div>
         </div>
-        <button className="icon-btn" onClick={onClose}><Icon name="close" size={16} /></button>
+        <button className="icon-btn" onClick={onClose} disabled={saving}><Icon name="close" size={16} /></button>
       </div>
       <div className="modal-body">
+        {error && (
+          <div style={{ color: '#EF4444', background: '#FEF2F2', padding: 10, borderRadius: 6, fontSize: 13, marginBottom: 14, border: '1px solid #FCA5A5' }}>
+            {error}
+          </div>
+        )}
+
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 18 }}>
           {[
             { label: 'Customer', content: <div className="row gap-sm"><Avatar name={complaint.customer?.full_name ?? '?'} size={24} /><span style={{ fontSize: 13, fontWeight: 500 }}>{complaint.customer?.full_name ?? '—'}</span></div> },
@@ -208,7 +239,7 @@ function ComplaintModal({ complaint, onClose, staff }: {
 
         <div className="field" style={{ marginBottom: 14 }}>
           <label>Assign to Technician</label>
-          <select className="select" defaultValue={complaint.assigned_to ?? ''}>
+          <select className="select" value={assignedTo} onChange={e => setAssignedTo(e.target.value)} disabled={saving}>
             <option value="">— Unassigned —</option>
             {staff.filter(s => s.role === 'technician').map(s => <option key={s.id} value={s.id}>{s.full_name}</option>)}
           </select>
@@ -218,7 +249,13 @@ function ComplaintModal({ complaint, onClose, staff }: {
           <label>Status</label>
           <div className="row gap-sm">
             {(['open', 'in_progress', 'resolved'] as const).map(s => (
-              <button key={s} className={`btn ${complaint.status === s ? 'btn-primary' : 'btn-secondary'} btn-sm`} style={{ flex: 1 }}>
+              <button
+                key={s}
+                className={`btn ${status === s ? 'btn-primary' : 'btn-secondary'} btn-sm`}
+                style={{ flex: 1 }}
+                onClick={() => setStatus(s)}
+                disabled={saving}
+              >
                 {statusLabel(s)}
               </button>
             ))}
@@ -231,23 +268,26 @@ function ComplaintModal({ complaint, onClose, staff }: {
             <div className="ttl">Opened by customer</div>
             <div className="sub">{complaint.customer?.full_name ?? '—'} · {new Date(complaint.opened_at).toLocaleDateString('en-PK')}</div>
           </div>
-          <div className={`tl-item ${complaint.technician ? 'done' : ''}`}>
-            <div className="ttl">{complaint.technician ? `Assigned to ${complaint.technician.full_name}` : 'Awaiting assignment'}</div>
-            <div className="sub">{complaint.technician ? 'Technician notified via SMS' : 'No technician selected yet'}</div>
+          <div className={`tl-item ${assignedTo ? 'done' : ''}`}>
+            <div className="ttl">{assignedTo ? `Assigned to ${staff.find(s => s.id === assignedTo)?.full_name ?? 'Technician'}` : 'Awaiting assignment'}</div>
+            <div className="sub">{assignedTo ? 'Technician notified via SMS' : 'No technician selected yet'}</div>
           </div>
-          <div className={`tl-item ${complaint.status === 'in_progress' ? 'active' : complaint.status === 'resolved' ? 'done' : ''}`}>
+          <div className={`tl-item ${status === 'in_progress' ? 'active' : status === 'resolved' ? 'done' : ''}`}>
             <div className="ttl">In progress</div>
-            <div className="sub">{complaint.status === 'resolved' ? 'Work completed on-site' : complaint.status === 'in_progress' ? 'Technician on-site investigating' : '—'}</div>
+            <div className="sub">{status === 'resolved' ? 'Work completed on-site' : status === 'in_progress' ? 'Technician on-site investigating' : '—'}</div>
           </div>
-          <div className={`tl-item ${complaint.status === 'resolved' ? 'done' : ''}`}>
+          <div className={`tl-item ${status === 'resolved' ? 'done' : ''}`}>
             <div className="ttl">Resolved</div>
-            <div className="sub">{complaint.status === 'resolved' ? 'Customer confirmation received' : '—'}</div>
+            <div className="sub">{status === 'resolved' ? 'Customer confirmation received' : '—'}</div>
           </div>
         </div>
       </div>
       <div className="modal-foot">
-        <button className="btn btn-ghost" onClick={onClose}>Close</button>
-        <button className="btn btn-primary"><Icon name="check" size={14} />Save changes</button>
+        <button className="btn btn-ghost" onClick={onClose} disabled={saving}>Close</button>
+        <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
+          <Icon name={saving ? 'refresh' : 'check'} size={14} style={{ marginRight: 6 }} />
+          {saving ? 'Saving...' : 'Save changes'}
+        </button>
       </div>
     </Modal>
   );
@@ -424,7 +464,18 @@ export default function ComplaintsPage({ refreshToken = 0 }: { refreshToken?: nu
         </div>
       )}
 
-      {open && <ComplaintModal complaint={open} onClose={() => setOpen(null)} staff={staff} />}
+      {open && (
+        <ComplaintModal
+          complaint={open}
+          onClose={() => setOpen(null)}
+          staff={staff}
+          onSaved={() => {
+            getComplaints()
+              .then(c => setComplaints(c))
+              .catch(() => {});
+          }}
+        />
+      )}
       {logOpen && (
         <LogComplaintModal
           onClose={() => setLogOpen(false)}

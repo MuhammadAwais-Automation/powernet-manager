@@ -35,8 +35,9 @@ export function didComplaintStatusChange(
   newRow?: ComplaintRealtimeRow | null,
 ): boolean {
   if (!newRow?.id) return false
-  if (!oldRow?.status || !newRow.status) return false
-  if (oldRow.status === newRow.status) return false
+  if (!newRow.status) return false
+  // If we have both old and new status, only notify if it changed
+  if (oldRow && oldRow.status && oldRow.status === newRow.status) return false
   // Only notify on meaningful technician-driven transitions
   return (
     newRow.status === 'in_progress' ||
