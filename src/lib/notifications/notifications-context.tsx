@@ -7,7 +7,6 @@ import { clearDashboardCache } from '@/lib/db/dashboard'
 import {
   buildBillingNotification,
   didBillRefreshChange,
-  didPaymentChange,
   didNotifyChange,
   type BillingNotification,
   type BillingRealtimeBillRow,
