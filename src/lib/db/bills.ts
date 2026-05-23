@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase'
+import { withTimeout } from '@/lib/async/with-timeout'
 import {
   buildBillsPageCacheKey,
   getBillRange,
@@ -107,8 +108,8 @@ export async function getBillsPage(params: BillsPageParams): Promise<BillsPageRe
 
   const search = normalizeBillingSearch(params.search)
   const [searchIds, areaIds] = await Promise.all([
-    search ? findBillingCustomerIds(search, CUSTOMER_SEARCH_LIMIT) : undefined,
-    params.areaId ? findAreaCustomerIds(params.areaId, 5000) : undefined,
+    search ? withTimeout(findBillingCustomerIds(search, CUSTOMER_SEARCH_LIMIT), 15_000, 'Customer search timed out') : undefined,
+    params.areaId ? withTimeout(findAreaCustomerIds(params.areaId, 5000), 15_000, 'Area filter timed out') : undefined,
   ])
 
   const customerIds = mergeCustomerIdFilters(searchIds, areaIds)

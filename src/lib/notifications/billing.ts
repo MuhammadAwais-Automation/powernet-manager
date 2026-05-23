@@ -15,6 +15,7 @@ export type BillingRealtimeBillRow = {
 export type BillingNotification = {
   id: string
   dedupeKey: string
+  kind: 'billing'
   type: BillingNotificationType
   billId: string
   customerName: string
@@ -162,6 +163,7 @@ export function buildBillingNotification(source: BillingNotificationSource): Bil
   return {
     id: `${dedupeKey}:${source.paidAt ?? Date.now()}`,
     dedupeKey,
+    kind: 'billing' as const,
     type,
     billId: source.billId,
     customerName: source.customerName,

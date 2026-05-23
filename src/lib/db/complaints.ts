@@ -1,10 +1,16 @@
 import { supabase } from '@/lib/supabase'
 import type { Complaint, ComplaintWithRelations } from '@/types/database'
 
+const COMPLAINT_SELECT = `
+  *,
+  customer:customers(id, full_name, area_id),
+  technician:staff(id, full_name)
+`
+
 let complaintsCache: { data: ComplaintWithRelations[]; expiresAt: number } | null = null
 const CACHE_MS = 60_000
 
-function clearComplaintsCache() {
+export function clearComplaintsCache() {
   complaintsCache = null
 }
 
@@ -13,11 +19,7 @@ export async function getComplaints(): Promise<ComplaintWithRelations[]> {
 
   const { data, error } = await supabase
     .from('complaints')
-    .select(`
-      *,
-      customer:customers(id, full_name, area_id),
-      technician:staff(id, full_name)
-    `)
+    .select(COMPLAINT_SELECT)
     .order('opened_at', { ascending: false })
   if (error) throw error
   const complaints = data as ComplaintWithRelations[]
@@ -25,8 +27,33 @@ export async function getComplaints(): Promise<ComplaintWithRelations[]> {
   return complaints
 }
 
+export async function getComplaintById(id: string): Promise<ComplaintWithRelations | null> {
+  const { data, error } = await supabase
+    .from('complaints')
+    .select(COMPLAINT_SELECT)
+    .eq('id', id)
+    .maybeSingle()
+  if (error) throw error
+  return (data ?? null) as ComplaintWithRelations | null
+}
+
+export async function updateComplaint(
+  id: string,
+  input: Partial<Pick<Complaint, 'status' | 'assigned_to' | 'resolved_at'>>,
+): Promise<Complaint> {
+  const { data, error } = await supabase
+    .from('complaints')
+    .update(input)
+    .eq('id', id)
+    .select()
+    .single()
+  if (error) throw error
+  clearComplaintsCache()
+  return data as Complaint
+}
+
 export async function createComplaint(
-  input: Omit<Complaint, 'id' | 'complaint_code' | 'opened_at' | 'resolved_at'>
+  input: Omit<Complaint, 'id' | 'complaint_code' | 'opened_at' | 'resolved_at'>,
 ): Promise<Complaint> {
   const { data, error } = await supabase
     .from('complaints')

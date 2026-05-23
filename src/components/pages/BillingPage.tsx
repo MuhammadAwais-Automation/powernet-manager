@@ -1,5 +1,5 @@
 'use client';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import Icon, { type IconName } from '../Icon';
 import { Badge, Avatar, IconBadge, Tabs, Modal } from '../ui';
 import { BarChart } from '../charts';
@@ -44,26 +44,60 @@ export default function BillingPage({ refreshToken = 0 }: { refreshToken?: numbe
 
   const PAGE_SIZE = 50;
 
+  // ── Debounce search ──────────────────────────────────────────────────────────
   useEffect(() => {
     const timeout = window.setTimeout(() => setDebouncedSearch(normalizeBillingSearch(search) ?? ''), 250);
     return () => window.clearTimeout(timeout);
   }, [search]);
 
-  useEffect(() => { setPage(0); }, [billingMonth, tab, debouncedSearch, areaFilter]);
+  // ── loadKey: single source of truth for triggering a data fetch ──────────────
+  // Instead of having TWO effects that both react to areaFilter (one resets page,
+  // one calls loadBilling), we use a single "loadKey" counter.  Any filter/page
+  // change bumps loadKey and the single load-effect reacts only to loadKey.
+  // This eliminates the double-fetch race condition entirely.
+  const [loadKey, setLoadKey] = useState(0);
 
-  const loadBilling = async () => {
+  // Always-fresh ref so the load callback never captures stale state
+  const latestRef = useRef({ billingMonth, page, tab, debouncedSearch, areaFilter });
+  latestRef.current = { billingMonth, page, tab, debouncedSearch, areaFilter };
+
+  // ── Reset page + bump loadKey when any filter changes ───────────────────────
+  // We keep page reset here; if page was already 0, setPage(0) is a no-op, but
+  // loadKey still bumps so the load fires exactly once.
+  useEffect(() => {
+    setPage(0);
+    setLoadKey(k => k + 1);
+  }, [billingMonth, tab, debouncedSearch, areaFilter]);
+
+  // ── Bump loadKey when page changes (pagination clicks) ───────────────────────
+  // Note: page change triggered by the filter-reset above will have already been
+  // handled by the effect above (loadKey was bumped there). We only want to fire
+  // an additional load when the user explicitly paginates.
+  const prevPageRef = useRef(page);
+  useEffect(() => {
+    if (prevPageRef.current !== page) {
+      prevPageRef.current = page;
+      setLoadKey(k => k + 1);
+    }
+  }, [page]);
+
+  const loadBilling = useCallback(async () => {
+    // Capture current values from ref so we never read stale closure state
+    const { billingMonth: month0, page: page0, tab: tab0, debouncedSearch: search0, areaFilter: area0 } = latestRef.current;
     setLoading(true);
+    setBills([]);        // Clear previous results immediately — prevents stale skeleton
+    setTotalBills(0);
     setError(null);
     try {
-      const month = normalizeBillingMonth(billingMonth);
+      const month = normalizeBillingMonth(month0);
       const [billPage, billingSummary, areaRows] = await Promise.all([
         getBillsPage({
           month,
-          page,
+          page: page0,
           pageSize: PAGE_SIZE,
-          status: normalizeBillStatusFilter(tab),
-          search: debouncedSearch,
-          areaId: areaFilter || undefined,
+          status: normalizeBillStatusFilter(tab0),
+          search: search0,
+          areaId: area0 || undefined,
         }),
         getBillingSummary(month),
         getAreas(),
@@ -77,12 +111,13 @@ export default function BillingPage({ refreshToken = 0 }: { refreshToken?: numbe
     } finally {
       setLoading(false);
     }
-  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
+  // ── Single load effect — fires only when loadKey, reloadToken, or refreshToken changes
   useEffect(() => {
     loadBilling();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [billingMonth, page, tab, debouncedSearch, areaFilter, reloadToken, refreshToken]);
+  }, [loadKey, reloadToken, refreshToken, loadBilling]);
 
   const totalBilled = summary?.totalBilled ?? 0;
   const totalPaid = summary?.totalPaid ?? 0;

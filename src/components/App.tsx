@@ -153,7 +153,7 @@ function ShellContent({ staff, logout }: {
     return 'dashboard';
   });
   const [isDark, setIsDark] = useState(false);
-  const { billingVersion } = useNotifications();
+  const { billingVersion, complaintsVersion } = useNotifications();
 
   const handlePageChange = useCallback((page: PageId) => {
     setActive(page);
@@ -181,7 +181,7 @@ function ShellContent({ staff, logout }: {
     { id: 'dashboard',  component: <DashboardPage refreshToken={billingVersion} /> },
     { id: 'customers',  component: <CustomersPage /> },
     { id: 'billing',    component: <BillingPage refreshToken={billingVersion} /> },
-    { id: 'complaints', component: <ComplaintsPage /> },
+    { id: 'complaints', component: <ComplaintsPage refreshToken={complaintsVersion} /> },
     { id: 'staff',      component: <StaffPage /> },
     { id: 'areas',      component: <AreasPage /> },
     { id: 'reports',    component: <ReportsPage /> },
@@ -198,7 +198,7 @@ function ShellContent({ staff, logout }: {
       </div>
     )},
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  ], [billingVersion]);
+  ], [billingVersion, complaintsVersion]);
 
   return (
     <div className="app">

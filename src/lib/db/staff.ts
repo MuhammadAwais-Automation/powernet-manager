@@ -78,3 +78,12 @@ export async function updateStaffPassword(staffId: string, newPassword: string):
   if (error) throw error
   clearStaffCache()
 }
+
+export async function deleteStaff(id: string): Promise<void> {
+  const { error } = await supabase
+    .from('staff')
+    .delete()
+    .eq('id', id)
+  if (error) throw error
+  clearStaffCache()
+}

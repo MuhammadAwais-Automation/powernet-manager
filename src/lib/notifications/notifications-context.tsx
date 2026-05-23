@@ -4,6 +4,7 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useR
 import { supabase } from '@/lib/supabase'
 import { clearBillsCache, getBillByIdWithRelations } from '@/lib/db/bills'
 import { clearDashboardCache } from '@/lib/db/dashboard'
+import { clearComplaintsCache, getComplaintById } from '@/lib/db/complaints'
 import {
   buildBillingNotification,
   didBillRefreshChange,
@@ -11,14 +12,24 @@ import {
   type BillingNotification,
   type BillingRealtimeBillRow,
 } from './billing'
+import {
+  buildComplaintNotification,
+  didComplaintStatusChange,
+  type ComplaintNotification,
+  type ComplaintRealtimeRow,
+} from './complaints'
 
 const MAX_TOASTS = 3
 
+// Unified notification type — discriminated union on `kind`
+export type AppNotification = BillingNotification | ComplaintNotification
+
 type NotificationsContextValue = {
-  items: BillingNotification[]
-  toasts: BillingNotification[]
+  items: AppNotification[]
+  toasts: AppNotification[]
   unreadCount: number
   billingVersion: number
+  complaintsVersion: number
   isInboxOpen: boolean
   openInbox: () => void
   closeInbox: () => void
@@ -31,9 +42,10 @@ type NotificationsContextValue = {
 const NotificationsContext = createContext<NotificationsContextValue | null>(null)
 
 export function NotificationsProvider({ children }: { children: React.ReactNode }) {
-  const [items, setItems] = useState<BillingNotification[]>([])
-  const [toasts, setToasts] = useState<BillingNotification[]>([])
+  const [items, setItems] = useState<AppNotification[]>([])
+  const [toasts, setToasts] = useState<AppNotification[]>([])
   const [billingVersion, setBillingVersion] = useState(0)
+  const [complaintsVersion, setComplaintsVersion] = useState(0)
   const [isInboxOpen, setInboxOpen] = useState(false)
   const seenKeysRef = useRef<Set<string>>(new Set())
 
@@ -41,13 +53,14 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
     setToasts(current => current.filter(t => t.id !== id))
   }, [])
 
-  const addBillingNotification = useCallback((notification: BillingNotification) => {
+  const addNotification = useCallback((notification: AppNotification) => {
     if (seenKeysRef.current.has(notification.dedupeKey)) return
     seenKeysRef.current.add(notification.dedupeKey)
     setItems(current => [notification, ...current].slice(0, 50))
     setToasts(current => [notification, ...current].slice(0, MAX_TOASTS))
   }, [])
 
+  // ── Billing realtime subscription (bills table) ───────────────────────────────
   useEffect(() => {
     const channel = supabase
       .channel('dashboard-billing-payments')
@@ -84,7 +97,7 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
             paymentNote: bill.payment_note,
           })
 
-          addBillingNotification(notification)
+          addNotification(notification)
         } catch (error) {
           console.error('Could not build billing notification', error)
         }
@@ -98,13 +111,59 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
     return () => {
       void supabase.removeChannel(channel)
     }
-  }, [addBillingNotification])
+  }, [addNotification])
+
+  // ── Complaints realtime subscription (complaints table) ───────────────────────
+  useEffect(() => {
+    const channel = supabase
+      .channel('dashboard-complaint-updates')
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'complaints' }, async payload => {
+        const oldRow = payload.old as ComplaintRealtimeRow | null
+        const newRow = payload.new as ComplaintRealtimeRow | null
+
+        // Always clear cache so the complaints page refreshes
+        clearComplaintsCache()
+        setComplaintsVersion(v => v + 1)
+
+        // Only show a notification on meaningful technician-driven status changes
+        if (!didComplaintStatusChange(oldRow, newRow) || !newRow?.id) return
+
+        try {
+          const complaint = await getComplaintById(newRow.id)
+          if (!complaint) return
+
+          const notification = buildComplaintNotification({
+            complaintId: complaint.id,
+            complaintCode: complaint.complaint_code,
+            customerName: complaint.customer?.full_name ?? 'Unknown customer',
+            technicianName: complaint.technician?.full_name ?? null,
+            priority: complaint.priority,
+            status: complaint.status,
+            updatedAt: new Date().toISOString(),
+          })
+
+          addNotification(notification)
+        } catch (error) {
+          console.error('Could not build complaint notification', error)
+        }
+      })
+      .subscribe(status => {
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          console.warn('Dashboard complaints realtime channel is not healthy:', status)
+        }
+      })
+
+    return () => {
+      void supabase.removeChannel(channel)
+    }
+  }, [addNotification])
 
   const value = useMemo<NotificationsContextValue>(() => ({
     items,
     toasts,
     unreadCount: items.filter(item => !item.read).length,
     billingVersion,
+    complaintsVersion,
     isInboxOpen,
     openInbox: () => setInboxOpen(true),
     closeInbox: () => setInboxOpen(false),
@@ -117,7 +176,7 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
       setItems([])
     },
     dismissToast,
-  }), [billingVersion, dismissToast, isInboxOpen, items, toasts])
+  }), [billingVersion, complaintsVersion, dismissToast, isInboxOpen, items, toasts])
 
   return (
     <NotificationsContext.Provider value={value}>

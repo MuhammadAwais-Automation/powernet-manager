@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import Icon from '../Icon';
 import { Badge, Switch, Modal } from '../ui';
 import { supabase } from '@/lib/supabase';
-import { getStaff, updateStaff, updateStaffPassword } from '@/lib/db/staff';
+import { getStaff, updateStaff, updateStaffPassword, deleteStaff } from '@/lib/db/staff';
 import { getAreas } from '@/lib/db/areas';
 import { initials, avClass } from '@/lib/utils';
 import { useAuth } from '@/lib/auth/auth-context';
@@ -346,13 +346,119 @@ function CredentialsModal({ staff, onClose, onPasswordReset }: {
   );
 }
 
+// ── Delete Confirm Modal ─────────────────────────────────────────────────────
+
+function DeleteConfirmModal({ staff, onClose, onConfirm }: {
+  staff: StaffWithArea;
+  onClose: () => void;
+  onConfirm: () => Promise<void>;
+}) {
+  const [deleting, setDeleting] = useState(false);
+  const [error, setError]       = useState<string | null>(null);
+  const roleLabel = ROLE_LABELS[staff.role] ?? staff.role;
+  const roleColor = ROLE_COLORS[staff.role] ?? 'gray';
+
+  const handleConfirm = async () => {
+    setDeleting(true);
+    setError(null);
+    try {
+      await onConfirm();
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Delete failed');
+      setDeleting(false);
+    }
+  };
+
+  return (
+    <Modal open onClose={onClose} width={420}>
+      <div className="modal-head">
+        <div>
+          <div style={{ fontSize: 16, fontWeight: 600, color: '#dc2626' }}>Remove Staff Member</div>
+          <div className="muted" style={{ fontSize: 12, marginTop: 2 }}>This action cannot be undone</div>
+        </div>
+        <button className="icon-btn" onClick={onClose}><Icon name="close" size={16} /></button>
+      </div>
+
+      <div className="modal-body">
+        {/* Staff info card */}
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 12,
+          padding: '14px 16px', borderRadius: 10,
+          background: 'var(--bg-muted)', border: '1px solid var(--border)',
+          marginBottom: 16,
+        }}>
+          <span className={`av ${avClass(staff.full_name)}`} style={{ width: 40, height: 40, fontSize: 13, flexShrink: 0 }}>
+            {initials(staff.full_name)}
+          </span>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontWeight: 600, fontSize: 14 }}>{staff.full_name}</div>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
+              <span style={{
+                padding: '1px 7px', borderRadius: 99, fontSize: 11, fontWeight: 600,
+                background: roleColor === 'blue' ? '#dbeafe' : roleColor === 'amber' ? '#fef3c7' :
+                             roleColor === 'green' ? '#dcfce7' : roleColor === 'purple' ? '#f3e8ff' : '#f3f4f6',
+                color: roleColor === 'blue' ? '#1d4ed8' : roleColor === 'amber' ? '#d97706' :
+                        roleColor === 'green' ? '#16a34a' : roleColor === 'purple' ? '#7c3aed' : '#6b7280',
+              }}>{roleLabel}</span>
+              {staff.username && (
+                <span className="mono" style={{ marginLeft: 8, color: 'var(--brand)' }}>@{staff.username}</span>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Warning */}
+        <div style={{
+          padding: '12px 14px', borderRadius: 8,
+          background: '#fef2f2', border: '1px solid #fecaca',
+          fontSize: 13, color: '#991b1b', lineHeight: 1.5,
+        }}>
+          <strong>Warning:</strong> Yeh staff member permanently delete ho jaye ga.
+          {DASHBOARD_ROLES.has(staff.role) && (
+            <span> Inke dashboard login account bhi remove ho jaye ga.</span>
+          )}
+        </div>
+
+        {error && (
+          <div style={{
+            marginTop: 12, padding: '10px 14px',
+            background: '#fef2f2', color: '#dc2626',
+            borderRadius: 8, fontSize: 13,
+          }}>
+            {error}
+          </div>
+        )}
+      </div>
+
+      <div className="modal-foot">
+        <button className="btn btn-ghost" onClick={onClose} disabled={deleting}>Cancel</button>
+        <button
+          className="btn"
+          style={{
+            background: deleting ? '#fca5a5' : '#dc2626',
+            color: '#fff',
+            borderColor: 'transparent',
+            opacity: deleting ? 0.8 : 1,
+          }}
+          onClick={handleConfirm}
+          disabled={deleting}
+        >
+          <Icon name="trash" size={13} />
+          {deleting ? 'Deleting…' : 'Delete'}
+        </button>
+      </div>
+    </Modal>
+  );
+}
+
 // ── Staff Card ────────────────────────────────────────────────────────────────
 
-function StaffCard({ s, onEdit, onViewCreds, onToggleActive }: {
+function StaffCard({ s, onEdit, onViewCreds, onToggleActive, onDelete }: {
   s: StaffWithArea;
   onEdit: () => void;
   onViewCreds: () => void;
   onToggleActive: (v: boolean) => void;
+  onDelete: () => void;
 }) {
   const roleLabel = ROLE_LABELS[s.role] ?? s.role;
   const roleColor = ROLE_COLORS[s.role] ?? 'gray';
@@ -401,6 +507,24 @@ function StaffCard({ s, onEdit, onViewCreds, onToggleActive }: {
           <button className="icon-btn" style={{ width: 32, height: 32 }} onClick={onEdit}>
             <Icon name="edit" size={14} />
           </button>
+          <button
+            className="icon-btn"
+            style={{ width: 32, height: 32 }}
+            onClick={onDelete}
+            title="Remove staff member"
+            onMouseEnter={e => {
+              (e.currentTarget as HTMLButtonElement).style.background = '#fef2f2';
+              (e.currentTarget as HTMLButtonElement).style.color = '#dc2626';
+              (e.currentTarget as HTMLButtonElement).style.borderColor = '#fecaca';
+            }}
+            onMouseLeave={e => {
+              (e.currentTarget as HTMLButtonElement).style.background = '';
+              (e.currentTarget as HTMLButtonElement).style.color = '';
+              (e.currentTarget as HTMLButtonElement).style.borderColor = '';
+            }}
+          >
+            <Icon name="trash" size={14} />
+          </button>
         </div>
       </div>
     </div>
@@ -415,9 +539,10 @@ export default function StaffPage() {
   const [areas, setAreas]             = useState<Area[]>([]);
   const [loading, setLoading]         = useState(true);
   const [error, setError]             = useState<string | null>(null);
-  const [addOpen, setAddOpen]         = useState(false);
-  const [editTarget, setEditTarget]   = useState<StaffWithArea | null>(null);
-  const [credsTarget, setCredsTarget] = useState<StaffWithArea | null>(null);
+  const [addOpen, setAddOpen]           = useState(false);
+  const [editTarget, setEditTarget]     = useState<StaffWithArea | null>(null);
+  const [credsTarget, setCredsTarget]   = useState<StaffWithArea | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<StaffWithArea | null>(null);
 
   useEffect(() => {
     Promise.all([getStaff(), getAreas()])
@@ -446,6 +571,12 @@ export default function StaffPage() {
     } catch {
       setStaff(prev => prev.map(m => m.id === s.id ? { ...m, is_active: !val } : m));
     }
+  };
+
+  const handleDelete = async (s: StaffWithArea) => {
+    await deleteStaff(s.id);
+    setStaff(prev => prev.filter(m => m.id !== s.id));
+    setDeleteTarget(null);
   };
 
   const handlePasswordReset = async (s: StaffWithArea, newPw: string) => {
@@ -521,7 +652,8 @@ export default function StaffPage() {
           <StaffCard key={s.id} s={s}
             onEdit={() => setEditTarget(s)}
             onViewCreds={() => setCredsTarget(s)}
-            onToggleActive={v => handleToggleActive(s, v)} />
+            onToggleActive={v => handleToggleActive(s, v)}
+            onDelete={() => setDeleteTarget(s)} />
         ))}
       </div>
 
@@ -531,7 +663,8 @@ export default function StaffPage() {
           <StaffCard key={s.id} s={s}
             onEdit={() => setEditTarget(s)}
             onViewCreds={() => setCredsTarget(s)}
-            onToggleActive={v => handleToggleActive(s, v)} />
+            onToggleActive={v => handleToggleActive(s, v)}
+            onDelete={() => setDeleteTarget(s)} />
         ))}
       </div>
 
@@ -541,7 +674,8 @@ export default function StaffPage() {
           <StaffCard key={s.id} s={s}
             onEdit={() => setEditTarget(s)}
             onViewCreds={() => setCredsTarget(s)}
-            onToggleActive={v => handleToggleActive(s, v)} />
+            onToggleActive={v => handleToggleActive(s, v)}
+            onDelete={() => setDeleteTarget(s)} />
         ))}
       </div>
 
@@ -551,7 +685,8 @@ export default function StaffPage() {
           <StaffCard key={s.id} s={s}
             onEdit={() => setEditTarget(s)}
             onViewCreds={() => setCredsTarget(s)}
-            onToggleActive={v => handleToggleActive(s, v)} />
+            onToggleActive={v => handleToggleActive(s, v)}
+            onDelete={() => setDeleteTarget(s)} />
         ))}
       </div>
 
@@ -577,6 +712,13 @@ export default function StaffPage() {
           staff={credsTarget}
           onClose={() => setCredsTarget(null)}
           onPasswordReset={handlePasswordReset} />
+      )}
+
+      {deleteTarget && (
+        <DeleteConfirmModal
+          staff={deleteTarget}
+          onClose={() => setDeleteTarget(null)}
+          onConfirm={() => handleDelete(deleteTarget)} />
       )}
     </div>
   );

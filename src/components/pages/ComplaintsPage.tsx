@@ -253,7 +253,7 @@ function ComplaintModal({ complaint, onClose, staff }: {
   );
 }
 
-export default function ComplaintsPage() {
+export default function ComplaintsPage({ refreshToken = 0 }: { refreshToken?: number }) {
   const [complaints, setComplaints] = useState<ComplaintWithRelations[]>([]);
   const [areas, setAreas] = useState<Area[]>([]);
   const [staff, setStaff] = useState<StaffWithArea[]>([]);
@@ -263,12 +263,24 @@ export default function ComplaintsPage() {
   const [open, setOpen] = useState<ComplaintWithRelations | null>(null);
   const [logOpen, setLogOpen] = useState(false);
 
+  const prevRefreshRef = React.useRef(refreshToken);
+
   useEffect(() => {
+    // Initial load
     Promise.all([getComplaints(), getAreas(), getStaff()])
       .then(([c, a, s]) => { setComplaints(c); setAreas(a); setStaff(s); })
       .catch((e: unknown) => setError(e instanceof Error ? e.message : 'Could not load complaints'))
       .finally(() => setLoading(false));
   }, []);
+
+  // Re-fetch when a realtime complaint update comes in (refreshToken bumped by context)
+  useEffect(() => {
+    if (prevRefreshRef.current === refreshToken) return;
+    prevRefreshRef.current = refreshToken;
+    getComplaints()
+      .then(c => setComplaints(c))
+      .catch(() => { /* silent — existing data stays */ });
+  }, [refreshToken]);
 
   const handleComplaintSaved = (c: ComplaintWithRelations) => {
     setComplaints(prev => [c, ...prev]);

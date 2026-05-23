@@ -4,7 +4,7 @@ import React from 'react'
 import Icon from '../Icon'
 import { Badge, Drawer } from '../ui'
 import { formatRs } from '@/lib/notifications/billing'
-import { useNotifications } from '@/lib/notifications/notifications-context'
+import { useNotifications, type AppNotification } from '@/lib/notifications/notifications-context'
 
 function formatTime(value: string): string {
   const date = new Date(value)
@@ -15,6 +15,34 @@ function formatTime(value: string): string {
     hour: 'numeric',
     minute: '2-digit',
   })
+}
+
+function notificationIcon(item: AppNotification): 'checkCircle' | 'mapPin' | 'cash' | 'wrench' | 'check' {
+  if (item.kind === 'complaint') {
+    return item.type === 'complaint_resolved' ? 'check' : 'wrench'
+  }
+  return item.type === 'payment_full' ? 'checkCircle' : item.type === 'visit' ? 'mapPin' : 'cash'
+}
+
+function notificationBadgeColor(item: AppNotification): 'green' | 'amber' | 'blue' | 'purple' {
+  if (item.kind === 'complaint') {
+    return item.type === 'complaint_resolved' ? 'green' : 'amber'
+  }
+  return item.type === 'payment_full' ? 'green' : item.type === 'visit' ? 'blue' : 'amber'
+}
+
+function notificationBadgeLabel(item: AppNotification): string {
+  if (item.kind === 'complaint') {
+    return item.type === 'complaint_resolved' ? 'resolved' : 'in progress'
+  }
+  return item.type === 'payment_full' ? 'paid' : item.type === 'visit' ? 'visited' : 'partial'
+}
+
+function notificationMeta(item: AppNotification): string {
+  if (item.kind === 'complaint') {
+    return `${item.complaintCode} · ${formatTime(item.createdAt)}`
+  }
+  return `${item.customerCode ?? 'No code'} · ${formatTime(item.createdAt)}`
 }
 
 export function NotificationBell() {
@@ -51,7 +79,7 @@ export function NotificationDrawer() {
             <span className="notification-empty-icon"><Icon name="bell" size={22} /></span>
             <div className="notification-empty-title">No activity yet</div>
             <div className="notification-empty-sub">
-              Recovery agent payments and visits will appear here live without page reload.
+              Recovery agent payments, visits and technician updates will appear here live without page reload.
             </div>
           </div>
         ) : (
@@ -62,16 +90,7 @@ export function NotificationDrawer() {
               onClick={() => markRead(item.id)}
             >
               <span className="notification-item-icon">
-                <Icon
-                  name={
-                    item.type === 'payment_full'
-                      ? 'checkCircle'
-                      : item.type === 'visit'
-                      ? 'mapPin'
-                      : 'cash'
-                  }
-                  size={18}
-                />
+                <Icon name={notificationIcon(item)} size={18} />
               </span>
               <span className="notification-item-main">
                 <span className="notification-item-row">
@@ -80,28 +99,15 @@ export function NotificationDrawer() {
                 </span>
                 <span className="notification-item-message">{item.message}</span>
                 <span className="notification-item-meta">
-                  {item.customerCode ?? 'No code'} · {formatTime(item.createdAt)}
+                  {notificationMeta(item)}
                 </span>
               </span>
               <span className="notification-item-side">
-                {item.type !== 'visit' && (
+                {item.kind === 'billing' && item.type !== 'visit' && (
                   <span className="notification-amount">{formatRs(item.amountPaid)}</span>
                 )}
-                <Badge
-                  color={
-                    item.type === 'payment_full'
-                      ? 'green'
-                      : item.type === 'visit'
-                      ? 'blue'
-                      : 'amber'
-                  }
-                  dot
-                >
-                  {item.type === 'payment_full'
-                    ? 'paid'
-                    : item.type === 'visit'
-                    ? 'visited'
-                    : 'partial'}
+                <Badge color={notificationBadgeColor(item)} dot>
+                  {notificationBadgeLabel(item)}
                 </Badge>
               </span>
             </button>
