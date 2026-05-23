@@ -8,8 +8,10 @@ export function RevenueLineChart({ data, height = 260 }: { data: { m: string; v:
   const pad = { l: 44, r: 20, t: 24, b: 32 };
   const innerW = w - pad.l - pad.r, innerH = h - pad.t - pad.b;
   const vals = data.map(d => d.v);
-  const max = Math.ceil(Math.max(...vals) / 50) * 50 + 50;
-  const x = (i: number) => pad.l + (i / (data.length - 1)) * innerW;
+  const rawMax = Math.max(...vals);
+  const maxVal = Number.isFinite(rawMax) && rawMax > 0 ? rawMax : 50;
+  const max = Math.ceil(maxVal / 50) * 50 + 50;
+  const x = (i: number) => pad.l + (i / (data.length - 1 || 1)) * innerW;
   const y = (v: number) => pad.t + (1 - v / max) * innerH;
   const points = data.map((d, i) => [x(i), y(d.v)] as [number, number]);
   const line = points.map((p, i) => (i === 0 ? 'M' : 'L') + p[0] + ',' + p[1]).join(' ');
@@ -94,9 +96,11 @@ export function BarChart({ data, height = 220, accent, labelKey = 'd', valueKey 
   const w = 640, h = height;
   const pad = { l: 40, r: 16, t: 20, b: 30 };
   const innerW = w - pad.l - pad.r, innerH = h - pad.t - pad.b;
-  const max = Math.ceil(Math.max(...data.map(d => Number(d[valueKey] ?? 0))) / 20) * 20 + 20;
-  const barW = innerW / data.length * 0.58;
-  const gap = innerW / data.length;
+  const rawMax = Math.max(...data.map(d => Number(d[valueKey] ?? 0)));
+  const maxVal = Number.isFinite(rawMax) && rawMax > 0 ? rawMax : 20;
+  const max = Math.ceil(maxVal / 20) * 20 + 20;
+  const barW = innerW / (data.length || 1) * 0.58;
+  const gap = innerW / (data.length || 1);
   const ticks = [0, Math.round(max / 2), max];
   const hatchId = `hatch-${Math.random().toString(36).slice(2, 8)}`;
 
@@ -138,10 +142,11 @@ export function BarChart({ data, height = 220, accent, labelKey = 'd', valueKey 
 export function Sparkline({ data, color = '#F05A2B', width = 120, height = 30 }: {
   data: number[]; color?: string; width?: number; height?: number;
 }) {
+  if (!data || data.length === 0) return null;
   const max = Math.max(...data), min = Math.min(...data);
   const range = max - min || 1;
   const pts = data.map((v, i) => {
-    const px = (i / (data.length - 1)) * width;
+    const px = (i / (data.length - 1 || 1)) * width;
     const py = height - ((v - min) / range) * height;
     return [px, py] as [number, number];
   });
