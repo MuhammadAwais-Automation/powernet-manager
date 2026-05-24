@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase'
+import { RECENT_COMPLAINT_STATUSES } from './complaint-statuses'
 import type { Complaint, ComplaintWithRelations } from '@/types/database'
 
 const COMPLAINT_SELECT = `
@@ -38,30 +39,24 @@ export async function getComplaintById(id: string): Promise<ComplaintWithRelatio
 }
 
 export async function getRecentComplaintStatusEvents(limit = 25): Promise<ComplaintWithRelations[]> {
-  const [resolvedRes, inProgressRes] = await Promise.all([
-    supabase
+  const results = await Promise.all(RECENT_COMPLAINT_STATUSES.map(status => {
+    let query = supabase
       .from('complaints')
       .select(COMPLAINT_SELECT)
-      .eq('status', 'resolved')
-      .not('resolved_at', 'is', null)
-      .order('resolved_at', { ascending: false })
-      .limit(limit),
-    supabase
-      .from('complaints')
-      .select(COMPLAINT_SELECT)
-      .eq('status', 'in_progress')
-      .order('opened_at', { ascending: false })
-      .limit(limit),
-  ])
+      .eq('status', status)
 
-  if (resolvedRes.error) throw resolvedRes.error
-  if (inProgressRes.error) throw inProgressRes.error
+    query = status === 'resolved'
+      ? query.not('resolved_at', 'is', null).order('resolved_at', { ascending: false })
+      : query.order('opened_at', { ascending: false })
+
+    return query.limit(limit)
+  }))
+
+  const firstError = results.find(result => result.error)?.error
+  if (firstError) throw firstError
 
   const byStatusKey = new Map<string, ComplaintWithRelations>()
-  ;[
-    ...((resolvedRes.data ?? []) as ComplaintWithRelations[]),
-    ...((inProgressRes.data ?? []) as ComplaintWithRelations[]),
-  ].forEach(complaint => {
+  results.flatMap(result => (result.data ?? []) as ComplaintWithRelations[]).forEach(complaint => {
     byStatusKey.set(`${complaint.id}:${complaint.status}`, complaint)
   })
 

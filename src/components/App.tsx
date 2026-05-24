@@ -14,6 +14,7 @@ import { NotificationBell, NotificationDrawer } from './notifications/Notificati
 import { PaymentToastContainer } from './notifications/PaymentToast';
 import { AuthProvider, useAuth } from '@/lib/auth/auth-context';
 import { NotificationsProvider, useNotifications } from '@/lib/notifications/notifications-context';
+import { getDashboardRefreshToken } from '@/lib/dashboard/summary';
 import { getNotificationNavigationTarget } from '@/lib/notifications/navigation';
 import { NAV_BY_ROLE, DEFAULT_PAGE_BY_ROLE, canAccessPage, VALID_PAGE_IDS, type PageId } from '@/lib/auth/permissions';
 import { initials } from '@/lib/utils';
@@ -180,6 +181,7 @@ function ShellContent({ staff, logout }: {
   }, [staff, handlePageChange]);
 
   const allowedNav = useMemo(() => staff ? NAV_BY_ROLE[staff.role] : [], [staff]);
+  const dashboardRefreshToken = getDashboardRefreshToken(billingVersion, complaintsVersion);
 
   const meta = PAGE_META[active];
 
@@ -207,7 +209,7 @@ function ShellContent({ staff, logout }: {
             <>
               {canAccessPage(staff.role, 'dashboard') && (
                 <div style={{ display: active === 'dashboard' ? 'contents' : 'none' }}>
-                  <DashboardPage refreshToken={billingVersion} />
+                  <DashboardPage refreshToken={dashboardRefreshToken} />
                 </div>
               )}
               {canAccessPage(staff.role, 'customers') && (

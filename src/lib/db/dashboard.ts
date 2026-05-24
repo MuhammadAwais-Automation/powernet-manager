@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase'
+import { normalizeDashboardStats } from '@/lib/dashboard/summary'
 
 export type DashboardStats = {
   totalCustomers: number
@@ -61,8 +62,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
   const summaryRes = await supabase.rpc('get_dashboard_summary')
   if (summaryRes.error) throw summaryRes.error
 
-  const summary = summaryRes.data as DashboardStats
-  const value: DashboardStats = { ...summary, revenueByMonth: summary.revenueByMonth ?? [] }
+  const value: DashboardStats = normalizeDashboardStats(summaryRes.data)
 
   dashboardCache = { value, expiresAt: Date.now() + DASHBOARD_CACHE_MS }
   return value
