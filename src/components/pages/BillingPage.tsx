@@ -7,6 +7,7 @@ import {
   getBillsPage,
   getBillingSummary,
   generateMonthlyBills,
+  getBillByIdWithRelations,
   type BillingSummary,
   type GenerateBillsResult,
 } from '@/lib/db/bills';
@@ -25,7 +26,11 @@ function statusColor(status: string): 'green' | 'red' | 'amber' {
   return 'amber';
 }
 
-export default function BillingPage({ refreshToken = 0 }: { refreshToken?: number }) {
+export default function BillingPage({ refreshToken = 0, focusBillId = null, focusToken = 0 }: {
+  refreshToken?: number;
+  focusBillId?: string | null;
+  focusToken?: number;
+}) {
   const [bills, setBills] = useState<BillWithRelations[]>([]);
   const [summary, setSummary] = useState<BillingSummary | null>(null);
   const [totalBills, setTotalBills] = useState(0);
@@ -136,6 +141,25 @@ export default function BillingPage({ refreshToken = 0 }: { refreshToken?: numbe
   const [exporting, setExporting] = useState(false);
   const [detailBill, setDetailBill] = useState<BillWithRelations | null>(null);
   const msgTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (!focusBillId || focusToken === 0) return;
+
+    let cancelled = false;
+    getBillByIdWithRelations(focusBillId)
+      .then(bill => {
+        if (cancelled || !bill) return;
+        setDetailBill(bill);
+      })
+      .catch((e: unknown) => {
+        if (cancelled) return;
+        setError(e instanceof Error ? e.message : 'Could not open bill from notification');
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [focusBillId, focusToken]);
 
   const handleExport = async () => {
     setExporting(true);

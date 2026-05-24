@@ -14,9 +14,14 @@ import { NotificationBell, NotificationDrawer } from './notifications/Notificati
 import { PaymentToastContainer } from './notifications/PaymentToast';
 import { AuthProvider, useAuth } from '@/lib/auth/auth-context';
 import { NotificationsProvider, useNotifications } from '@/lib/notifications/notifications-context';
+import { getNotificationNavigationTarget } from '@/lib/notifications/navigation';
 import { NAV_BY_ROLE, DEFAULT_PAGE_BY_ROLE, canAccessPage, VALID_PAGE_IDS, type PageId } from '@/lib/auth/permissions';
 import { initials } from '@/lib/utils';
 import type { Staff } from '@/types/database';
+
+type NotificationFocus =
+  | { page: 'billing'; id: string; requestId: number }
+  | { page: 'complaints'; id: string; requestId: number }
 
 const ALL_NAV: { id: PageId; label: string; icon: string }[] = [
   { id: 'dashboard',  label: 'Dashboard',          icon: 'grid' },
@@ -153,6 +158,7 @@ function ShellContent({ staff, logout }: {
     return 'dashboard';
   });
   const [isDark, setIsDark] = useState(false);
+  const [notificationFocus, setNotificationFocus] = useState<NotificationFocus | null>(null);
   const { billingVersion, complaintsVersion } = useNotifications();
 
   const handlePageChange = useCallback((page: PageId) => {
@@ -177,6 +183,18 @@ function ShellContent({ staff, logout }: {
 
   const meta = PAGE_META[active];
 
+  const handleNotificationOpen = useCallback((item: unknown) => {
+    const target = getNotificationNavigationTarget(item);
+    if (!target || !canAccessPage(staff.role, target.page)) return;
+
+    handlePageChange(target.page);
+    setNotificationFocus(current => ({
+      page: target.page,
+      id: target.page === 'billing' ? target.billId : target.complaintId,
+      requestId: (current?.requestId ?? 0) + 1,
+    }));
+  }, [handlePageChange, staff.role]);
+
   return (
     <div className="app">
       <Sidebar active={active} setActive={handlePageChange} allowedNav={allowedNav}
@@ -199,12 +217,20 @@ function ShellContent({ staff, logout }: {
               )}
               {canAccessPage(staff.role, 'billing') && (
                 <div style={{ display: active === 'billing' ? 'contents' : 'none' }}>
-                  <BillingPage refreshToken={billingVersion} />
+                  <BillingPage
+                    refreshToken={billingVersion}
+                    focusBillId={notificationFocus?.page === 'billing' ? notificationFocus.id : null}
+                    focusToken={notificationFocus?.page === 'billing' ? notificationFocus.requestId : 0}
+                  />
                 </div>
               )}
               {canAccessPage(staff.role, 'complaints') && (
                 <div style={{ display: active === 'complaints' ? 'contents' : 'none' }}>
-                  <ComplaintsPage refreshToken={complaintsVersion} />
+                  <ComplaintsPage
+                    refreshToken={complaintsVersion}
+                    focusComplaintId={notificationFocus?.page === 'complaints' ? notificationFocus.id : null}
+                    focusToken={notificationFocus?.page === 'complaints' ? notificationFocus.requestId : 0}
+                  />
                 </div>
               )}
               {canAccessPage(staff.role, 'staff') && (
@@ -240,8 +266,8 @@ function ShellContent({ staff, logout }: {
           )}
         </div>
       </main>
-      <NotificationDrawer />
-      <PaymentToastContainer />
+      <NotificationDrawer onOpenNotification={handleNotificationOpen} />
+      <PaymentToastContainer onOpenNotification={handleNotificationOpen} />
     </div>
   );
 }

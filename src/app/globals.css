@@ -905,6 +905,12 @@ table.data tr.selected { background: var(--blue-50); }
   box-shadow: 0 8px 24px rgba(0,0,0,0.14);
   width: 340px;
   animation: toast-slide-in 0.25s cubic-bezier(0.16,1,0.3,1);
+  cursor: pointer;
+}
+
+.payment-toast:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
 }
 
 .payment-toast--full .payment-toast__icon {

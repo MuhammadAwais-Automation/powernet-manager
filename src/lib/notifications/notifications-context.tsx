@@ -2,9 +2,9 @@
 
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from '@/lib/supabase'
-import { clearBillsCache, getBillByIdWithRelations } from '@/lib/db/bills'
+import { clearBillsCache, getBillByIdWithRelations, getRecentPaymentEvents, getRecentVisitedBills } from '@/lib/db/bills'
 import { clearDashboardCache } from '@/lib/db/dashboard'
-import { clearComplaintsCache, getComplaintById } from '@/lib/db/complaints'
+import { clearComplaintsCache, getComplaintById, getRecentComplaintStatusEvents } from '@/lib/db/complaints'
 import {
   buildBillingNotification,
   didBillRefreshChange,
@@ -18,8 +18,17 @@ import {
   type ComplaintNotification,
   type ComplaintRealtimeRow,
 } from './complaints'
+import {
+  getReconnectDelayMs,
+  isUnhealthyRealtimeStatus,
+  MAX_REALTIME_RETRIES,
+  POLLING_ACTIVATION_MS,
+  POLLING_INTERVAL_MS,
+  shouldUsePollingFallback,
+} from './realtime-resilience'
 
 const MAX_TOASTS = 3
+const POLL_LIMIT = 25
 
 // Unified notification type — discriminated union on `kind`
 export type AppNotification = BillingNotification | ComplaintNotification
@@ -48,6 +57,13 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
   const [complaintsVersion, setComplaintsVersion] = useState(0)
   const [isInboxOpen, setInboxOpen] = useState(false)
   const seenKeysRef = useRef<Set<string>>(new Set())
+  const seenPaymentIdsRef = useRef<Set<string>>(new Set())
+  const seenVisitKeysRef = useRef<Set<string>>(new Set())
+  const seenComplaintStatusKeysRef = useRef<Set<string>>(new Set())
+  const pollingFallbackActiveRef = useRef(false)
+  const pollingInFlightRef = useRef(false)
+  const billingRealtimeConnectedRef = useRef(false)
+  const complaintsRealtimeConnectedRef = useRef(false)
 
   const dismissToast = useCallback((id: string) => {
     setToasts(current => current.filter(t => t.id !== id))
@@ -60,103 +76,321 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
     setToasts(current => [notification, ...current].slice(0, MAX_TOASTS))
   }, [])
 
-  // ── Billing realtime subscription (bills table) ───────────────────────────────
+  const refreshBillingViews = useCallback(() => {
+    clearBillsCache()
+    clearDashboardCache()
+    setBillingVersion(version => version + 1)
+  }, [])
+
+  const refreshComplaintViews = useCallback(() => {
+    clearComplaintsCache()
+    clearDashboardCache()
+    setComplaintsVersion(version => version + 1)
+  }, [])
+
+  const setPollingFallback = useCallback((active: boolean, reason: string) => {
+    if (pollingFallbackActiveRef.current === active) return
+    pollingFallbackActiveRef.current = active
+    if (active) {
+      console.warn(`Realtime unavailable, using polling fallback: ${reason}`)
+    } else {
+      console.info(`Realtime restored, polling fallback paused: ${reason}`)
+    }
+  }, [])
+
+  const updateRealtimeHealth = useCallback((
+    kind: 'billing' | 'complaints',
+    connected: boolean,
+    reason: string
+  ) => {
+    if (kind === 'billing') billingRealtimeConnectedRef.current = connected
+    else complaintsRealtimeConnectedRef.current = connected
+
+    const shouldPoll = shouldUsePollingFallback({
+      billingConnected: billingRealtimeConnectedRef.current,
+      complaintsConnected: complaintsRealtimeConnectedRef.current,
+    })
+
+    if (connected && !shouldPoll) {
+      setPollingFallback(false, reason)
+    } else if (!connected) {
+      setPollingFallback(true, reason)
+    }
+  }, [setPollingFallback])
+
+  const pollFallbackChanges = useCallback(async (notify: boolean) => {
+    if (pollingInFlightRef.current) return
+    pollingInFlightRef.current = true
+
+    try {
+      const [payments, visits, complaints] = await Promise.all([
+        getRecentPaymentEvents(POLL_LIMIT),
+        getRecentVisitedBills(POLL_LIMIT),
+        getRecentComplaintStatusEvents(POLL_LIMIT),
+      ])
+
+      let billingChanged = false
+      let complaintsChanged = false
+
+      for (const payment of [...payments].reverse()) {
+        if (seenPaymentIdsRef.current.has(payment.id)) continue
+        seenPaymentIdsRef.current.add(payment.id)
+        if (!notify) continue
+
+        const bill = payment.bill
+        const paidAmount = bill?.paid_amount ?? payment.amount
+        const totalAmount = bill?.amount ?? paidAmount
+        const notification = buildBillingNotification({
+          billId: payment.bill_id,
+          customerName: payment.customer?.full_name ?? 'Unknown customer',
+          customerCode: payment.customer?.customer_code,
+          collectorName: payment.collector?.full_name,
+          amount: payment.amount,
+          paidAmount,
+          remainingAmount: Math.max(totalAmount - paidAmount, 0),
+          status: bill?.status ?? 'pending',
+          receiptNo: payment.receipt_no,
+          paidAt: payment.paid_at ?? payment.created_at,
+          paymentMethod: payment.method,
+          paymentNote: payment.note,
+        })
+
+        addNotification(notification)
+        billingChanged = true
+      }
+
+      for (const visit of [...visits].reverse()) {
+        const visitKey = [
+          visit.id,
+          visit.payment_note ?? 'no-note',
+          visit.paid_at ?? 'no-time',
+          visit.collected_by ?? 'no-collector',
+        ].join(':')
+        if (seenVisitKeysRef.current.has(visitKey)) continue
+        seenVisitKeysRef.current.add(visitKey)
+        if (!notify) continue
+
+        const paidAmount = visit.paid_amount ?? 0
+        const notification = buildBillingNotification({
+          billId: visit.id,
+          customerName: visit.customer?.full_name ?? 'Unknown customer',
+          customerCode: visit.customer?.customer_code,
+          collectorName: visit.collector?.full_name,
+          amount: 0,
+          paidAmount,
+          remainingAmount: Math.max(visit.amount - paidAmount, 0),
+          status: visit.status,
+          receiptNo: visit.receipt_no,
+          paidAt: visit.paid_at ?? new Date().toISOString(),
+          paymentMethod: visit.payment_method,
+          paymentNote: visit.payment_note,
+        })
+
+        addNotification(notification)
+        billingChanged = true
+      }
+
+      for (const complaint of [...complaints].reverse()) {
+        const statusKey = `${complaint.id}:${complaint.status}`
+        if (seenComplaintStatusKeysRef.current.has(statusKey)) continue
+        seenComplaintStatusKeysRef.current.add(statusKey)
+        if (!notify) continue
+
+        const notification = buildComplaintNotification({
+          complaintId: complaint.id,
+          complaintCode: complaint.complaint_code,
+          customerName: complaint.customer?.full_name ?? 'Unknown customer',
+          technicianName: complaint.technician?.full_name ?? null,
+          priority: complaint.priority,
+          status: complaint.status,
+          updatedAt: complaint.resolved_at ?? new Date().toISOString(),
+        })
+
+        addNotification(notification)
+        complaintsChanged = true
+      }
+
+      if (billingChanged) refreshBillingViews()
+      if (complaintsChanged) refreshComplaintViews()
+    } catch (error) {
+      console.warn('Polling fallback could not refresh notifications', error)
+    } finally {
+      pollingInFlightRef.current = false
+    }
+  }, [addNotification, refreshBillingViews, refreshComplaintViews])
+
   useEffect(() => {
-    const channel = supabase
-      .channel('dashboard-billing-payments')
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'bills' }, async payload => {
-        const oldRow = payload.old as BillingRealtimeBillRow | null
-        const newRow = payload.new as BillingRealtimeBillRow | null
-        if (!didBillRefreshChange(oldRow, newRow) || !newRow?.id) return
+    void pollFallbackChanges(false)
+    const timer = window.setInterval(() => {
+      if (pollingFallbackActiveRef.current) void pollFallbackChanges(true)
+    }, POLLING_INTERVAL_MS)
 
-        clearBillsCache()
-        clearDashboardCache()
-        setBillingVersion(version => version + 1)
-
-        if (!didNotifyChange(oldRow, newRow)) return
-
-        try {
-          const bill = await getBillByIdWithRelations(newRow.id)
-          if (!bill) return
-
-          const oldPaid = typeof oldRow?.paid_amount === 'number' ? oldRow.paid_amount : 0
-          const paidAmount = bill.paid_amount ?? 0
-          const amountPaid = Math.max(paidAmount - oldPaid, 0) || paidAmount
-          const notification = buildBillingNotification({
-            billId: bill.id,
-            customerName: bill.customer?.full_name ?? 'Unknown customer',
-            customerCode: bill.customer?.customer_code,
-            collectorName: bill.collector?.full_name,
-            amount: amountPaid,
-            paidAmount,
-            remainingAmount: Math.max(bill.amount - paidAmount, 0),
-            status: bill.status,
-            receiptNo: bill.receipt_no,
-            paidAt: bill.paid_at ?? new Date().toISOString(),
-            paymentMethod: bill.payment_method,
-            paymentNote: bill.payment_note,
-          })
-
-          addNotification(notification)
-        } catch (error) {
-          console.error('Could not build billing notification', error)
-        }
+    const activationTimer = window.setTimeout(() => {
+      const shouldPoll = shouldUsePollingFallback({
+        billingConnected: billingRealtimeConnectedRef.current,
+        complaintsConnected: complaintsRealtimeConnectedRef.current,
       })
-      .subscribe(status => {
-        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-          console.warn('Dashboard billing realtime channel is not healthy:', status)
-        }
-      })
+      if (shouldPoll) setPollingFallback(true, 'initial realtime connection did not complete')
+    }, POLLING_ACTIVATION_MS)
 
     return () => {
-      void supabase.removeChannel(channel)
+      window.clearInterval(timer)
+      window.clearTimeout(activationTimer)
     }
-  }, [addNotification])
+  }, [pollFallbackChanges, setPollingFallback])
+
+  // ── Billing realtime subscription (bills table) ───────────────────────────────
+  useEffect(() => {
+    let channel: ReturnType<typeof supabase.channel> | null = null
+    let retryTimer: number | null = null
+    let retryAttempt = 0
+    let disposed = false
+
+    const connect = () => {
+      if (disposed) return
+      channel = supabase
+        .channel('dashboard-billing-payments')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'bills' }, async payload => {
+          const oldRow = payload.old as BillingRealtimeBillRow | null
+          const newRow = payload.new as BillingRealtimeBillRow | null
+          if (!didBillRefreshChange(oldRow, newRow) || !newRow?.id) return
+
+          refreshBillingViews()
+
+          if (!didNotifyChange(oldRow, newRow)) return
+
+          try {
+            const bill = await getBillByIdWithRelations(newRow.id)
+            if (!bill) return
+
+            const oldPaid = typeof oldRow?.paid_amount === 'number' ? oldRow.paid_amount : 0
+            const paidAmount = bill.paid_amount ?? 0
+            const amountPaid = Math.max(paidAmount - oldPaid, 0) || paidAmount
+            const notification = buildBillingNotification({
+              billId: bill.id,
+              customerName: bill.customer?.full_name ?? 'Unknown customer',
+              customerCode: bill.customer?.customer_code,
+              collectorName: bill.collector?.full_name,
+              amount: amountPaid,
+              paidAmount,
+              remainingAmount: Math.max(bill.amount - paidAmount, 0),
+              status: bill.status,
+              receiptNo: bill.receipt_no,
+              paidAt: bill.paid_at ?? new Date().toISOString(),
+              paymentMethod: bill.payment_method,
+              paymentNote: bill.payment_note,
+            })
+
+            addNotification(notification)
+          } catch (error) {
+            console.error('Could not build billing notification', error)
+          }
+        })
+        .subscribe((status, error) => {
+          if (status === 'SUBSCRIBED') {
+            retryAttempt = 0
+            updateRealtimeHealth('billing', true, 'billing channel subscribed')
+            return
+          }
+
+          if (!isUnhealthyRealtimeStatus(status)) return
+
+          updateRealtimeHealth('billing', false, `billing channel ${status}`)
+          console.warn('Dashboard billing realtime channel is not healthy:', status, error)
+
+          if (retryAttempt >= MAX_REALTIME_RETRIES) return
+          const delay = getReconnectDelayMs(retryAttempt)
+          retryAttempt += 1
+          retryTimer = window.setTimeout(() => {
+            const current = channel
+            channel = null
+            if (current) void supabase.removeChannel(current)
+            connect()
+          }, delay)
+        })
+    }
+
+    connect()
+
+    return () => {
+      disposed = true
+      if (retryTimer) window.clearTimeout(retryTimer)
+      if (channel) void supabase.removeChannel(channel)
+    }
+  }, [addNotification, refreshBillingViews, updateRealtimeHealth])
 
   // ── Complaints realtime subscription (complaints table) ───────────────────────
   useEffect(() => {
-    const channel = supabase
-      .channel('dashboard-complaint-updates')
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'complaints' }, async payload => {
-        const oldRow = payload.old as ComplaintRealtimeRow | null
-        const newRow = payload.new as ComplaintRealtimeRow | null
+    let channel: ReturnType<typeof supabase.channel> | null = null
+    let retryTimer: number | null = null
+    let retryAttempt = 0
+    let disposed = false
 
-        // Always clear cache so the complaints page refreshes
-        clearComplaintsCache()
-        setComplaintsVersion(v => v + 1)
+    const connect = () => {
+      if (disposed) return
+      channel = supabase
+        .channel('dashboard-complaint-updates')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'complaints' }, async payload => {
+          const oldRow = payload.old as ComplaintRealtimeRow | null
+          const newRow = payload.new as ComplaintRealtimeRow | null
 
-        // Only show a notification on meaningful technician-driven status changes
-        if (!didComplaintStatusChange(oldRow, newRow) || !newRow?.id) return
+          // Always clear cache so the complaints page refreshes
+          refreshComplaintViews()
 
-        try {
-          const complaint = await getComplaintById(newRow.id)
-          if (!complaint) return
+          // Only show a notification on meaningful technician-driven status changes
+          if (!didComplaintStatusChange(oldRow, newRow) || !newRow?.id) return
 
-          const notification = buildComplaintNotification({
-            complaintId: complaint.id,
-            complaintCode: complaint.complaint_code,
-            customerName: complaint.customer?.full_name ?? 'Unknown customer',
-            technicianName: complaint.technician?.full_name ?? null,
-            priority: complaint.priority,
-            status: complaint.status,
-            updatedAt: new Date().toISOString(),
-          })
+          try {
+            const complaint = await getComplaintById(newRow.id)
+            if (!complaint) return
 
-          addNotification(notification)
-        } catch (error) {
-          console.error('Could not build complaint notification', error)
-        }
-      })
-      .subscribe(status => {
-        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-          console.warn('Dashboard complaints realtime channel is not healthy:', status)
-        }
-      })
+            const notification = buildComplaintNotification({
+              complaintId: complaint.id,
+              complaintCode: complaint.complaint_code,
+              customerName: complaint.customer?.full_name ?? 'Unknown customer',
+              technicianName: complaint.technician?.full_name ?? null,
+              priority: complaint.priority,
+              status: complaint.status,
+              updatedAt: new Date().toISOString(),
+            })
+
+            addNotification(notification)
+          } catch (error) {
+            console.error('Could not build complaint notification', error)
+          }
+        })
+        .subscribe((status, error) => {
+          if (status === 'SUBSCRIBED') {
+            retryAttempt = 0
+            updateRealtimeHealth('complaints', true, 'complaints channel subscribed')
+            return
+          }
+
+          if (!isUnhealthyRealtimeStatus(status)) return
+
+          updateRealtimeHealth('complaints', false, `complaints channel ${status}`)
+          console.warn('Dashboard complaints realtime channel is not healthy:', status, error)
+
+          if (retryAttempt >= MAX_REALTIME_RETRIES) return
+          const delay = getReconnectDelayMs(retryAttempt)
+          retryAttempt += 1
+          retryTimer = window.setTimeout(() => {
+            const current = channel
+            channel = null
+            if (current) void supabase.removeChannel(current)
+            connect()
+          }, delay)
+        })
+    }
+
+    connect()
 
     return () => {
-      void supabase.removeChannel(channel)
+      disposed = true
+      if (retryTimer) window.clearTimeout(retryTimer)
+      if (channel) void supabase.removeChannel(channel)
     }
-  }, [addNotification])
+  }, [addNotification, refreshComplaintViews, updateRealtimeHealth])
 
   const value = useMemo<NotificationsContextValue>(() => ({
     items,
