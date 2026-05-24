@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import Icon from '../Icon';
 import { Badge, Avatar, Modal, Tabs } from '../ui';
-import { getComplaints, createComplaint, updateComplaint } from '@/lib/db/complaints';
+import { getComplaintById, getComplaints, createComplaint, updateComplaint } from '@/lib/db/complaints';
 import { getAreas } from '@/lib/db/areas';
 import { getStaff } from '@/lib/db/staff';
 import { searchCustomers, type CustomerSearchResult } from '@/lib/db/customers';
@@ -293,7 +293,11 @@ function ComplaintModal({ complaint, onClose, staff, onSaved }: {
   );
 }
 
-export default function ComplaintsPage({ refreshToken = 0 }: { refreshToken?: number }) {
+export default function ComplaintsPage({ refreshToken = 0, focusComplaintId = null, focusToken = 0 }: {
+  refreshToken?: number;
+  focusComplaintId?: string | null;
+  focusToken?: number;
+}) {
   const [complaints, setComplaints] = useState<ComplaintWithRelations[]>([]);
   const [areas, setAreas] = useState<Area[]>([]);
   const [staff, setStaff] = useState<StaffWithArea[]>([]);
@@ -321,6 +325,31 @@ export default function ComplaintsPage({ refreshToken = 0 }: { refreshToken?: nu
       .then(c => setComplaints(c))
       .catch(() => { /* silent — existing data stays */ });
   }, [refreshToken]);
+
+  useEffect(() => {
+    if (!focusComplaintId || focusToken === 0) return;
+
+    let cancelled = false;
+    getComplaintById(focusComplaintId)
+      .then(complaint => {
+        if (cancelled || !complaint) return;
+        setComplaints(prev => {
+          const exists = prev.some(item => item.id === complaint.id);
+          return exists
+            ? prev.map(item => item.id === complaint.id ? complaint : item)
+            : [complaint, ...prev];
+        });
+        setOpen(complaint);
+      })
+      .catch((e: unknown) => {
+        if (cancelled) return;
+        setError(e instanceof Error ? e.message : 'Could not open complaint from notification');
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [focusComplaintId, focusToken]);
 
   const handleComplaintSaved = (c: ComplaintWithRelations) => {
     setComplaints(prev => [c, ...prev]);

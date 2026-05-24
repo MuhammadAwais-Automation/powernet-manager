@@ -58,8 +58,16 @@ export function NotificationBell() {
   )
 }
 
-export function NotificationDrawer() {
+export function NotificationDrawer({ onOpenNotification }: {
+  onOpenNotification?: (item: AppNotification) => void
+}) {
   const { items, unreadCount, isInboxOpen, closeInbox, markAllRead, markRead, clearAll } = useNotifications()
+
+  const handleOpenNotification = (item: AppNotification) => {
+    markRead(item.id)
+    closeInbox()
+    onOpenNotification?.(item)
+  }
 
   return (
     <Drawer open={isInboxOpen} onClose={closeInbox} width={420}>
@@ -87,7 +95,7 @@ export function NotificationDrawer() {
             <button
               key={item.id}
               className={`notification-item ${item.read ? 'read' : 'unread'}`}
-              onClick={() => markRead(item.id)}
+              onClick={() => handleOpenNotification(item)}
             >
               <span className="notification-item-icon">
                 <Icon name={notificationIcon(item)} size={18} />

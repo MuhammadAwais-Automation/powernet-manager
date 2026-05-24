@@ -37,6 +37,41 @@ export async function getComplaintById(id: string): Promise<ComplaintWithRelatio
   return (data ?? null) as ComplaintWithRelations | null
 }
 
+export async function getRecentComplaintStatusEvents(limit = 25): Promise<ComplaintWithRelations[]> {
+  const [resolvedRes, inProgressRes] = await Promise.all([
+    supabase
+      .from('complaints')
+      .select(COMPLAINT_SELECT)
+      .eq('status', 'resolved')
+      .not('resolved_at', 'is', null)
+      .order('resolved_at', { ascending: false })
+      .limit(limit),
+    supabase
+      .from('complaints')
+      .select(COMPLAINT_SELECT)
+      .eq('status', 'in_progress')
+      .order('opened_at', { ascending: false })
+      .limit(limit),
+  ])
+
+  if (resolvedRes.error) throw resolvedRes.error
+  if (inProgressRes.error) throw inProgressRes.error
+
+  const byStatusKey = new Map<string, ComplaintWithRelations>()
+  ;[
+    ...((resolvedRes.data ?? []) as ComplaintWithRelations[]),
+    ...((inProgressRes.data ?? []) as ComplaintWithRelations[]),
+  ].forEach(complaint => {
+    byStatusKey.set(`${complaint.id}:${complaint.status}`, complaint)
+  })
+
+  return Array.from(byStatusKey.values()).sort((a, b) => {
+    const aTime = Date.parse(a.resolved_at ?? a.opened_at)
+    const bTime = Date.parse(b.resolved_at ?? b.opened_at)
+    return bTime - aTime
+  })
+}
+
 export async function updateComplaint(
   id: string,
   input: Partial<Pick<Complaint, 'status' | 'assigned_to' | 'resolved_at'>>,

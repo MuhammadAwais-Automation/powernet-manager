@@ -7,9 +7,10 @@ import { useNotifications, type AppNotification } from '@/lib/notifications/noti
 
 const TOAST_DURATION_MS = 5000
 
-function SingleToast({ notification, onDismiss }: {
+function SingleToast({ notification, onDismiss, onOpenNotification }: {
   notification: AppNotification
   onDismiss: (id: string) => void
+  onOpenNotification?: (item: AppNotification) => void
 }) {
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -20,14 +21,34 @@ function SingleToast({ notification, onDismiss }: {
     }
   }, [notification.id, onDismiss])
 
+  const handleOpen = () => {
+    onDismiss(notification.id)
+    onOpenNotification?.(notification)
+  }
+
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.key !== 'Enter' && event.key !== ' ') return
+    event.preventDefault()
+    handleOpen()
+  }
+
+  const handleDismiss = (event: React.MouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation()
+    onDismiss(notification.id)
+  }
+
   // ── Complaint toast ─────────────────────────────────────────────────────────
   if (notification.kind === 'complaint') {
     const isResolved = notification.type === 'complaint_resolved'
     return (
       <div
         className={`payment-toast payment-toast--${isResolved ? 'full' : 'partial'}`}
-        role="alert"
+        role="button"
+        tabIndex={0}
         aria-live="polite"
+        aria-label={`Open ${notification.title}`}
+        onClick={handleOpen}
+        onKeyDown={handleKeyDown}
         style={{ borderLeft: `3px solid ${isResolved ? 'var(--green)' : 'var(--amber)'}` }}
       >
         <div className="payment-toast__icon">
@@ -45,7 +66,7 @@ function SingleToast({ notification, onDismiss }: {
         <button
           className="payment-toast__close"
           aria-label="Dismiss notification"
-          onClick={() => onDismiss(notification.id)}
+          onClick={handleDismiss}
         >
           <Icon name="x" size={14} />
         </button>
@@ -56,7 +77,15 @@ function SingleToast({ notification, onDismiss }: {
   // ── Billing toast (existing behavior) ──────────────────────────────────────
   const isFull = notification.type === 'payment_full'
   return (
-    <div className={`payment-toast payment-toast--${isFull ? 'full' : 'partial'}`} role="alert" aria-live="polite">
+    <div
+      className={`payment-toast payment-toast--${isFull ? 'full' : 'partial'}`}
+      role="button"
+      tabIndex={0}
+      aria-live="polite"
+      aria-label={`Open ${notification.title}`}
+      onClick={handleOpen}
+      onKeyDown={handleKeyDown}
+    >
       <div className="payment-toast__icon">
         <Icon name={isFull ? 'checkCircle' : 'clock'} size={18} />
       </div>
@@ -72,7 +101,7 @@ function SingleToast({ notification, onDismiss }: {
       <button
         className="payment-toast__close"
         aria-label="Dismiss notification"
-        onClick={() => onDismiss(notification.id)}
+        onClick={handleDismiss}
       >
         <Icon name="x" size={14} />
       </button>
@@ -80,7 +109,9 @@ function SingleToast({ notification, onDismiss }: {
   )
 }
 
-export function PaymentToastContainer() {
+export function PaymentToastContainer({ onOpenNotification }: {
+  onOpenNotification?: (item: AppNotification) => void
+}) {
   const { toasts, dismissToast } = useNotifications()
 
   if (toasts.length === 0) return null
@@ -92,6 +123,7 @@ export function PaymentToastContainer() {
           key={notification.id}
           notification={notification}
           onDismiss={dismissToast}
+          onOpenNotification={onOpenNotification}
         />
       ))}
     </div>

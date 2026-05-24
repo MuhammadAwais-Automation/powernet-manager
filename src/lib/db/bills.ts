@@ -6,7 +6,7 @@ import {
   normalizeBillingSearch,
   type BillStatusFilter,
 } from '@/lib/billing/query'
-import type { Bill, BillWithRelations, PaymentMethod } from '@/types/database'
+import type { Bill, BillWithRelations, Payment, PaymentMethod } from '@/types/database'
 
 export type GenerateBillsResult = {
   month: string
@@ -64,6 +64,19 @@ export type BillsPageResult = {
   total: number
 }
 
+export type PaymentEventWithRelations = Payment & {
+  bill: Pick<Bill, 'id' | 'amount' | 'paid_amount' | 'status' | 'payment_method' | 'payment_note'> | null
+  customer: {
+    id: string
+    customer_code: string
+    full_name: string
+  } | null
+  collector: {
+    id: string
+    full_name: string
+  } | null
+}
+
 let billsPageCache: Record<string, { data: BillsPageResult; expiresAt: number }> = {}
 let billingSummaryCache: Record<string, { data: BillingSummary; expiresAt: number }> = {}
 const CACHE_MS = 60_000
@@ -99,6 +112,44 @@ export async function getBillByIdWithRelations(id: string): Promise<BillWithRela
 
   if (error) throw error
   return (data ?? null) as unknown as BillWithRelations | null
+}
+
+export async function getRecentPaymentEvents(limit = 25): Promise<PaymentEventWithRelations[]> {
+  const { data, error } = await supabase
+    .from('payments')
+    .select(`
+      id,
+      bill_id,
+      customer_id,
+      amount,
+      collected_by,
+      method,
+      note,
+      receipt_no,
+      paid_at,
+      created_at,
+      bill:bills(id, amount, paid_amount, status, payment_method, payment_note),
+      customer:customers(id, customer_code, full_name),
+      collector:staff(id, full_name)
+    `)
+    .order('created_at', { ascending: false })
+    .limit(limit)
+
+  if (error) throw error
+  return (data ?? []) as unknown as PaymentEventWithRelations[]
+}
+
+export async function getRecentVisitedBills(limit = 25): Promise<BillWithRelations[]> {
+  const { data, error } = await supabase
+    .from('bills')
+    .select(BILL_PAGE_SELECT)
+    .eq('payment_method', 'visit')
+    .not('paid_at', 'is', null)
+    .order('paid_at', { ascending: false })
+    .limit(limit)
+
+  if (error) throw error
+  return (data ?? []) as unknown as BillWithRelations[]
 }
 
 export async function getBillsPage(params: BillsPageParams): Promise<BillsPageResult> {
