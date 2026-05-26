@@ -3,6 +3,7 @@ import type { StaffRole } from '@/types/database'
 export type PageId =
   | 'dashboard'
   | 'customers'
+  | 'customer_requests'
   | 'billing'
   | 'complaints'
   | 'staff'
@@ -11,7 +12,7 @@ export type PageId =
   | 'settings'
 
 export const NAV_BY_ROLE: Record<StaffRole, PageId[]> = {
-  admin:             ['dashboard', 'customers', 'billing', 'complaints', 'staff', 'areas', 'reports', 'settings'],
+  admin:             ['dashboard', 'customers', 'customer_requests', 'billing', 'complaints', 'staff', 'areas', 'reports', 'settings'],
   complaint_manager: ['complaints', 'customers'],
   technician:        [],
   recovery_agent:    [],
@@ -37,5 +38,5 @@ export function isDashboardRole(role: StaffRole): boolean {
 }
 
 export const VALID_PAGE_IDS = new Set<string>([
-  'dashboard', 'customers', 'billing', 'complaints', 'staff', 'areas', 'reports', 'settings',
+  'dashboard', 'customers', 'customer_requests', 'billing', 'complaints', 'staff', 'areas', 'reports', 'settings',
 ])

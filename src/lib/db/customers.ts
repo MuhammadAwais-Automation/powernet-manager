@@ -1,6 +1,12 @@
 import { supabase } from '@/lib/supabase'
 import type { Area, Customer, CustomerWithRelations, NewCustomer } from '@/types/database'
 
+async function getAuthHeaders(): Promise<Record<string, string>> {
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session?.access_token) throw new Error('Not signed in')
+  return { Authorization: `Bearer ${session.access_token}` }
+}
+
 export async function getCustomers(): Promise<CustomerWithRelations[]> {
   const BATCH = 1000
   let all: CustomerWithRelations[] = []
@@ -54,6 +60,39 @@ export async function updateCustomer(
     .single()
   if (error) throw error
   return data as Customer
+}
+
+export async function resetCustomerPassword(input: {
+  customerId: string
+  temporaryPassword: string
+}): Promise<{
+  loginId: string
+  temporaryPassword: string
+  createdAuthUser: boolean
+  authUserId: string
+}> {
+  const res = await fetch('/api/admin/customer-password/reset', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(await getAuthHeaders()),
+    },
+    body: JSON.stringify({
+      customer_id: input.customerId,
+      temporary_password: input.temporaryPassword,
+    }),
+  })
+
+  const body = await res.json().catch(() => ({}))
+  if (!res.ok) {
+    throw new Error(typeof body.error === 'string' ? body.error : 'Could not reset customer password')
+  }
+  return body as {
+    loginId: string
+    temporaryPassword: string
+    createdAuthUser: boolean
+    authUserId: string
+  }
 }
 
 export type CustomerSearchResult = Pick<

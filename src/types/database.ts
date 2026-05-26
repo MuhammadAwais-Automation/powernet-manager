@@ -21,9 +21,18 @@ export type Customer = {
   id: string
   customer_code: string
   username: string | null
+  auth_user_id: string | null
+  house_id: string | null
   full_name: string
+  father_name: string | null
   cnic: string | null
+  gender: string | null
+  profession: string | null
+  rank_or_position: string | null
+  unit: string | null
   phone: string | null
+  whatsapp: string | null
+  email: string | null
   package_id: string | null
   iptv: boolean
   address_type: AddressType
@@ -52,7 +61,64 @@ export type CustomerListRow = Pick<
   package: Pick<Package, 'id' | 'name'> | null
 }
 
-export type NewCustomer = Omit<Customer, 'id' | 'customer_code' | 'created_at'>
+export type NewCustomer = Omit<
+  Customer,
+  | 'id'
+  | 'customer_code'
+  | 'created_at'
+  | 'auth_user_id'
+  | 'house_id'
+  | 'father_name'
+  | 'gender'
+  | 'profession'
+  | 'rank_or_position'
+  | 'unit'
+  | 'whatsapp'
+  | 'email'
+> & Partial<Pick<
+  Customer,
+  | 'auth_user_id'
+  | 'house_id'
+  | 'father_name'
+  | 'gender'
+  | 'profession'
+  | 'rank_or_position'
+  | 'unit'
+  | 'whatsapp'
+  | 'email'
+>>
+
+export type CustomerSignupStatus = 'pending' | 'approved' | 'rejected'
+
+export type CustomerSignupRequest = {
+  id: string
+  full_name: string
+  father_name: string | null
+  cnic: string
+  gender: string | null
+  profession: string | null
+  rank_or_position: string | null
+  unit: string | null
+  phone: string
+  whatsapp: string | null
+  area_id: string
+  package_id: string
+  house_id: string
+  street_address: string | null
+  email: string | null
+  status: CustomerSignupStatus
+  review_note: string | null
+  approved_customer_id: string | null
+  reviewed_by: string | null
+  reviewed_at: string | null
+  created_at: string
+}
+
+export type CustomerSignupRequestWithRelations = CustomerSignupRequest & {
+  area: Pick<Area, 'id' | 'name' | 'code'> | null
+  package: Pick<Package, 'id' | 'name' | 'default_price'> | null
+  approved_customer: Pick<Customer, 'id' | 'customer_code' | 'full_name'> | null
+}
 
 export type StaffRole =
   | 'technician'

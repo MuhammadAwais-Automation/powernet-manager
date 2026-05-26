@@ -17,7 +17,8 @@ function formatTime(value: string): string {
   })
 }
 
-function notificationIcon(item: AppNotification): 'checkCircle' | 'mapPin' | 'cash' | 'wrench' | 'check' {
+function notificationIcon(item: AppNotification): 'checkCircle' | 'mapPin' | 'cash' | 'wrench' | 'check' | 'users' {
+  if (item.kind === 'customer_signup') return 'users'
   if (item.kind === 'complaint') {
     return item.type === 'complaint_resolved' ? 'check' : 'wrench'
   }
@@ -25,6 +26,7 @@ function notificationIcon(item: AppNotification): 'checkCircle' | 'mapPin' | 'ca
 }
 
 function notificationBadgeColor(item: AppNotification): 'green' | 'amber' | 'blue' | 'purple' {
+  if (item.kind === 'customer_signup') return 'purple'
   if (item.kind === 'complaint') {
     return item.type === 'complaint_resolved' ? 'green' : 'amber'
   }
@@ -32,6 +34,7 @@ function notificationBadgeColor(item: AppNotification): 'green' | 'amber' | 'blu
 }
 
 function notificationBadgeLabel(item: AppNotification): string {
+  if (item.kind === 'customer_signup') return 'signup'
   if (item.kind === 'complaint') {
     return item.type === 'complaint_resolved' ? 'resolved' : 'in progress'
   }
@@ -39,6 +42,9 @@ function notificationBadgeLabel(item: AppNotification): string {
 }
 
 function notificationMeta(item: AppNotification): string {
+  if (item.kind === 'customer_signup') {
+    return `${item.houseId} · ${formatTime(item.createdAt)}`
+  }
   if (item.kind === 'complaint') {
     return `${item.complaintCode} · ${formatTime(item.createdAt)}`
   }
@@ -87,7 +93,7 @@ export function NotificationDrawer({ onOpenNotification }: {
             <span className="notification-empty-icon"><Icon name="bell" size={22} /></span>
             <div className="notification-empty-title">No activity yet</div>
             <div className="notification-empty-sub">
-              Recovery agent payments, visits and technician updates will appear here live without page reload.
+              Recovery payments, technician updates and customer signup requests will appear here live.
             </div>
           </div>
         ) : (

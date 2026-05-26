@@ -8,6 +8,8 @@
     "test:async-core": "node scripts/async-core.test.js",
     "test:billing-core": "node scripts/billing-core.test.js",
     "test:billing-notifications": "node scripts/billing-notifications.test.js",
+    "test:customer-auth-core": "node scripts/customer-auth-core.test.js",
+    "test:customer-signups": "node scripts/customer-signups.test.js",
     "test:dashboard-realtime": "node scripts/dashboard-realtime.test.js",
     "test:notification-navigation": "node scripts/notification-navigation.test.js",
     "test:billing-query": "node scripts/billing-query.test.js",
@@ -19,7 +21,7 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.104.1",
-    "next": "15.5.15",
+    "next": "15.5.18",
     "react": "^18",
     "react-dom": "^18"
   },
@@ -29,7 +31,6 @@
     "@types/react-dom": "^18",
     "eslint": "^9",
     "eslint-config-next": "15.5.15",
-    "typescript": "^5",
-    "xlsx": "^0.18.5"
+    "typescript": "^5"
   }
 }

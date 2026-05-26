@@ -3,6 +3,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import Icon from './Icon';
 import DashboardPage from './pages/DashboardPage';
 import CustomersPage from './pages/CustomersPage';
+import CustomerRequestsPage from './pages/CustomerRequestsPage';
 import BillingPage from './pages/BillingPage';
 import ComplaintsPage from './pages/ComplaintsPage';
 import StaffPage from './pages/StaffPage';
@@ -23,10 +24,12 @@ import type { Staff } from '@/types/database';
 type NotificationFocus =
   | { page: 'billing'; id: string; requestId: number }
   | { page: 'complaints'; id: string; requestId: number }
+  | { page: 'customer_requests'; id: string; requestId: number }
 
 const ALL_NAV: { id: PageId; label: string; icon: string }[] = [
   { id: 'dashboard',  label: 'Dashboard',          icon: 'grid' },
   { id: 'customers',  label: 'Customers',          icon: 'users' },
+  { id: 'customer_requests', label: 'Customer Requests', icon: 'fileText' },
   { id: 'billing',    label: 'Billing & Payments', icon: 'card' },
   { id: 'complaints', label: 'Complaints',         icon: 'alert' },
   { id: 'staff',      label: 'Staff Management',   icon: 'briefcase' },
@@ -37,6 +40,7 @@ const ALL_NAV: { id: PageId; label: string; icon: string }[] = [
 const PAGE_META: Record<PageId, { title: string; sub: string }> = {
   dashboard:  { title: 'Dashboard',          sub: 'Overview of network operations' },
   customers:  { title: 'Customers',          sub: 'Subscribers across service areas' },
+  customer_requests: { title: 'Customer Requests', sub: 'New signup approvals and account activation' },
   billing:    { title: 'Billing & Payments', sub: 'Monthly billing & collections' },
   complaints: { title: 'Complaints',         sub: 'Open & in-progress tickets' },
   staff:      { title: 'Staff Management',   sub: 'Field agents & dashboard users' },
@@ -75,7 +79,7 @@ function Sidebar({ active, setActive, allowedNav, staffName, staffRole, onLogout
         {visibleMain.map(n => (
           <button key={n.id} type="button" className={`sidebar-link ${active === n.id ? 'active' : ''}`}
             onClick={() => setActive(n.id)}>
-            <Icon name={n.icon as 'grid' | 'users' | 'card' | 'alert' | 'briefcase' | 'pin' | 'chart'} size={17} />
+            <Icon name={n.icon as 'grid' | 'users' | 'fileText' | 'card' | 'alert' | 'briefcase' | 'pin' | 'chart'} size={17} />
             <span>{n.label}</span>
           </button>
         ))}
@@ -160,7 +164,7 @@ function ShellContent({ staff, logout }: {
   });
   const [isDark, setIsDark] = useState(false);
   const [notificationFocus, setNotificationFocus] = useState<NotificationFocus | null>(null);
-  const { billingVersion, complaintsVersion } = useNotifications();
+  const { billingVersion, complaintsVersion, customerRequestsVersion } = useNotifications();
 
   const handlePageChange = useCallback((page: PageId) => {
     setActive(page);
@@ -190,11 +194,18 @@ function ShellContent({ staff, logout }: {
     if (!target || !canAccessPage(staff.role, target.page)) return;
 
     handlePageChange(target.page);
-    setNotificationFocus(current => ({
-      page: target.page,
-      id: target.page === 'billing' ? target.billId : target.complaintId,
-      requestId: (current?.requestId ?? 0) + 1,
-    }));
+    setNotificationFocus(current => {
+      const id = target.page === 'billing'
+        ? target.billId
+        : target.page === 'complaints'
+          ? target.complaintId
+          : target.requestId;
+      return {
+        page: target.page,
+        id,
+        requestId: (current?.requestId ?? 0) + 1,
+      };
+    });
   }, [handlePageChange, staff.role]);
 
   return (
@@ -215,6 +226,15 @@ function ShellContent({ staff, logout }: {
               {canAccessPage(staff.role, 'customers') && (
                 <div style={{ display: active === 'customers' ? 'contents' : 'none' }}>
                   <CustomersPage />
+                </div>
+              )}
+              {canAccessPage(staff.role, 'customer_requests') && (
+                <div style={{ display: active === 'customer_requests' ? 'contents' : 'none' }}>
+                  <CustomerRequestsPage
+                    refreshToken={customerRequestsVersion}
+                    focusRequestId={notificationFocus?.page === 'customer_requests' ? notificationFocus.id : null}
+                    focusToken={notificationFocus?.page === 'customer_requests' ? notificationFocus.requestId : 0}
+                  />
                 </div>
               )}
               {canAccessPage(staff.role, 'billing') && (

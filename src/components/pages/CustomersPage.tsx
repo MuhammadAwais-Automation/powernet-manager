@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import Icon from '../Icon';
 import { Badge, Avatar, Switch, Drawer } from '../ui';
-import { createCustomer, getCustomerById, updateCustomer } from '@/lib/db/customers';
+import { createCustomer, getCustomerById, resetCustomerPassword, updateCustomer } from '@/lib/db/customers';
 import { getCustomerList } from '@/lib/db/customer-list';
 import { getCachedAreas, getCachedPackages, setCachedAreas, setCachedPackages } from '@/lib/db/customer-cache';
 import { getAreas } from '@/lib/db/areas';
@@ -181,9 +181,42 @@ function AddCustomerDrawer({
 
 // ── Customer Detail Drawer ───────────────────────────────────────────────────
 
-function CustomerDetail({ customer, onClose, onEdit, onSuspend, readOnly }: { customer: CustomerWithRelations; onClose: () => void; onEdit: () => void; onSuspend: () => void; readOnly?: boolean; }) {
+function makeTemporaryPassword() {
+  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
+  const bytes = new Uint8Array(10);
+  window.crypto.getRandomValues(bytes);
+  return `Pn-${Array.from(bytes, b => alphabet[b % alphabet.length]).join('')}`;
+}
+
+function CustomerDetail({
+  customer,
+  onClose,
+  onEdit,
+  onSuspend,
+  readOnly,
+  canResetPassword,
+  onPasswordReset,
+}: {
+  customer: CustomerWithRelations;
+  onClose: () => void;
+  onEdit: () => void;
+  onSuspend: () => void;
+  readOnly?: boolean;
+  canResetPassword?: boolean;
+  onPasswordReset?: (authUserId: string) => void;
+}) {
   const [bills, setBills] = useState<Bill[]>([]);
   const [billsError, setBillsError] = useState<string | null>(null);
+  const [resetMode, setResetMode] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [resetSaving, setResetSaving] = useState(false);
+  const [resetError, setResetError] = useState<string | null>(null);
+  const [issuedCredentials, setIssuedCredentials] = useState<{
+    loginId: string;
+    temporaryPassword: string;
+    createdAuthUser: boolean;
+  } | null>(null);
 
   useEffect(() => {
     setBillsError(null);
@@ -218,6 +251,41 @@ function CustomerDetail({ customer, onClose, onEdit, onSuspend, readOnly }: { cu
       </span>
     </div>
   );
+
+  const startPasswordReset = () => {
+    setResetError(null);
+    setIssuedCredentials(null);
+    setNewPassword(makeTemporaryPassword());
+    setShowPassword(true);
+    setResetMode(true);
+  };
+
+  const handlePasswordReset = async () => {
+    if (newPassword.length < 8) {
+      setResetError('Password must be at least 8 characters');
+      return;
+    }
+    setResetSaving(true);
+    setResetError(null);
+    try {
+      const result = await resetCustomerPassword({
+        customerId: customer.id,
+        temporaryPassword: newPassword,
+      });
+      setIssuedCredentials({
+        loginId: result.loginId,
+        temporaryPassword: result.temporaryPassword,
+        createdAuthUser: result.createdAuthUser,
+      });
+      setResetMode(false);
+      setNewPassword('');
+      onPasswordReset?.(result.authUserId);
+    } catch (e: unknown) {
+      setResetError(e instanceof Error ? e.message : 'Could not reset password');
+    } finally {
+      setResetSaving(false);
+    }
+  };
 
   return (
     <>
@@ -277,6 +345,71 @@ function CustomerDetail({ customer, onClose, onEdit, onSuspend, readOnly }: { cu
             {customer.reconnected_date && <InfoRow label="Reconnected On" value={customer.reconnected_date} />}
           </div>
         </div>
+
+        {canResetPassword && (
+          <div className="card" style={{ marginBottom: 14 }}>
+            <div className="card-head"><h3>Customer App Login</h3></div>
+            <div className="card-pad" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                            padding: '12px 14px', background: 'var(--bg-muted)', borderRadius: 10,
+                            border: '1px solid var(--border)', gap: 12 }}>
+                <div>
+                  <div className="muted" style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase',
+                                                   letterSpacing: '0.06em', marginBottom: 2 }}>Password</div>
+                  <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>
+                    Hashed in Supabase Auth, not viewable later
+                  </div>
+                </div>
+                <button className="btn btn-secondary btn-sm" onClick={startPasswordReset}>
+                  <Icon name="key" size={12} />Reset
+                </button>
+              </div>
+
+              {issuedCredentials && (
+                <div style={{ padding: '12px 14px', background: 'var(--green-bg, #ecfdf5)',
+                              color: 'var(--green, #047857)', borderRadius: 10, fontSize: 13,
+                              border: '1px solid rgba(4,120,87,0.18)' }}>
+                  <div style={{ fontWeight: 600, marginBottom: 6 }}>
+                    {issuedCredentials.createdAuthUser ? 'Customer login created' : 'Password reset'}
+                  </div>
+                  <div>Login ID: <strong className="mono">{issuedCredentials.loginId}</strong></div>
+                  <div>Temporary password: <strong className="mono">{issuedCredentials.temporaryPassword}</strong></div>
+                </div>
+              )}
+
+              {resetMode && (
+                <div style={{ padding: '12px 14px', background: 'var(--bg-muted)', borderRadius: 10,
+                              border: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {resetError && <div style={{ fontSize: 12, color: '#dc2626' }}>{resetError}</div>}
+                  <div className="field">
+                    <label>New Temporary Password</label>
+                    <div style={{ position: 'relative' }}>
+                      <input className="input" type={showPassword ? 'text' : 'password'}
+                        placeholder="Enter new password" value={newPassword}
+                        onChange={e => setNewPassword(e.target.value)} style={{ paddingRight: 36 }} />
+                      <button type="button" onClick={() => setShowPassword(v => !v)}
+                        style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)',
+                                 background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 2 }}>
+                        <Icon name={showPassword ? 'eye' : 'eyeOff'} size={14} />
+                      </button>
+                    </div>
+                  </div>
+                  <div className="row gap-sm" style={{ flexWrap: 'wrap' }}>
+                    <button className="btn btn-ghost btn-sm" onClick={() => { setResetMode(false); setNewPassword(''); }}>
+                      Cancel
+                    </button>
+                    <button className="btn btn-secondary btn-sm" onClick={() => setNewPassword(makeTemporaryPassword())}>
+                      <Icon name="refresh" size={12} />Generate
+                    </button>
+                    <button className="btn btn-primary btn-sm" onClick={handlePasswordReset} disabled={resetSaving}>
+                      {resetSaving ? 'Savingâ€¦' : 'Set Password'}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Bill History */}
         <div className="card" style={{ marginBottom: 14 }}>
@@ -681,6 +814,8 @@ export default function CustomersPage() {
             onEdit={() => { setEditCustomer(selected); setSelected(null); }}
             onSuspend={handleSuspend}
             readOnly={readOnly}
+            canResetPassword={staff?.role === 'admin'}
+            onPasswordReset={authUserId => setSelected(prev => prev ? { ...prev, auth_user_id: authUserId } : prev)}
           />
         )}
       </Drawer>

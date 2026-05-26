@@ -19,6 +19,11 @@ import {
   type ComplaintRealtimeRow,
 } from './complaints'
 import {
+  buildCustomerSignupNotification,
+  type CustomerSignupNotification,
+  type CustomerSignupRealtimeRow,
+} from './customer-signups'
+import {
   getReconnectDelayMs,
   isUnhealthyRealtimeStatus,
   MAX_REALTIME_RETRIES,
@@ -31,7 +36,7 @@ const MAX_TOASTS = 3
 const POLL_LIMIT = 25
 
 // Unified notification type — discriminated union on `kind`
-export type AppNotification = BillingNotification | ComplaintNotification
+export type AppNotification = BillingNotification | ComplaintNotification | CustomerSignupNotification
 
 type NotificationsContextValue = {
   items: AppNotification[]
@@ -39,6 +44,7 @@ type NotificationsContextValue = {
   unreadCount: number
   billingVersion: number
   complaintsVersion: number
+  customerRequestsVersion: number
   isInboxOpen: boolean
   openInbox: () => void
   closeInbox: () => void
@@ -55,6 +61,7 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
   const [toasts, setToasts] = useState<AppNotification[]>([])
   const [billingVersion, setBillingVersion] = useState(0)
   const [complaintsVersion, setComplaintsVersion] = useState(0)
+  const [customerRequestsVersion, setCustomerRequestsVersion] = useState(0)
   const [isInboxOpen, setInboxOpen] = useState(false)
   const seenKeysRef = useRef<Set<string>>(new Set())
   const seenPaymentIdsRef = useRef<Set<string>>(new Set())
@@ -64,6 +71,7 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
   const pollingInFlightRef = useRef(false)
   const billingRealtimeConnectedRef = useRef(false)
   const complaintsRealtimeConnectedRef = useRef(false)
+  const customerRequestsRealtimeConnectedRef = useRef(false)
 
   const dismissToast = useCallback((id: string) => {
     setToasts(current => current.filter(t => t.id !== id))
@@ -88,6 +96,11 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
     setComplaintsVersion(version => version + 1)
   }, [])
 
+  const refreshCustomerRequestViews = useCallback(() => {
+    clearDashboardCache()
+    setCustomerRequestsVersion(version => version + 1)
+  }, [])
+
   const setPollingFallback = useCallback((active: boolean, reason: string) => {
     if (pollingFallbackActiveRef.current === active) return
     pollingFallbackActiveRef.current = active
@@ -99,12 +112,13 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
   }, [])
 
   const updateRealtimeHealth = useCallback((
-    kind: 'billing' | 'complaints',
+    kind: 'billing' | 'complaints' | 'customer_requests',
     connected: boolean,
     reason: string
   ) => {
     if (kind === 'billing') billingRealtimeConnectedRef.current = connected
-    else complaintsRealtimeConnectedRef.current = connected
+    else if (kind === 'complaints') complaintsRealtimeConnectedRef.current = connected
+    else customerRequestsRealtimeConnectedRef.current = connected
 
     const shouldPoll = shouldUsePollingFallback({
       billingConnected: billingRealtimeConnectedRef.current,
@@ -392,12 +406,88 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
     }
   }, [addNotification, refreshComplaintViews, updateRealtimeHealth])
 
+  // Customer signup realtime subscription
+  useEffect(() => {
+    let channel: ReturnType<typeof supabase.channel> | null = null
+    let retryTimer: number | null = null
+    let retryAttempt = 0
+    let disposed = false
+
+    const connect = () => {
+      if (disposed) return
+      channel = supabase
+        .channel('dashboard-customer-signups')
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'customer_signup_requests' }, async payload => {
+          const row = payload.new as CustomerSignupRealtimeRow | null
+          if (!row?.id || row.status !== 'pending') return
+          refreshCustomerRequestViews()
+
+          const { data } = await supabase
+            .from('customer_signup_requests')
+            .select('id, full_name, house_id, created_at, area:areas(name), package:packages(name)')
+            .eq('id', row.id)
+            .maybeSingle()
+
+          const request = data as {
+            id: string
+            full_name: string
+            house_id: string
+            created_at: string
+            area?: { name?: string | null } | null
+            package?: { name?: string | null } | null
+          } | null
+
+          addNotification(buildCustomerSignupNotification({
+            requestId: row.id,
+            customerName: request?.full_name ?? row.full_name ?? 'New customer',
+            houseId: request?.house_id ?? row.house_id ?? 'unknown',
+            areaName: request?.area?.name,
+            packageName: request?.package?.name,
+            createdAt: request?.created_at ?? row.created_at,
+          }))
+        })
+        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'customer_signup_requests' }, () => {
+          refreshCustomerRequestViews()
+        })
+        .subscribe((status, error) => {
+          if (status === 'SUBSCRIBED') {
+            retryAttempt = 0
+            updateRealtimeHealth('customer_requests', true, 'customer requests channel subscribed')
+            return
+          }
+
+          if (!isUnhealthyRealtimeStatus(status)) return
+          updateRealtimeHealth('customer_requests', false, `customer requests channel ${status}`)
+          console.warn('Dashboard customer requests realtime channel is not healthy:', status, error)
+
+          if (retryAttempt >= MAX_REALTIME_RETRIES) return
+          const delay = getReconnectDelayMs(retryAttempt)
+          retryAttempt += 1
+          retryTimer = window.setTimeout(() => {
+            const current = channel
+            channel = null
+            if (current) void supabase.removeChannel(current)
+            connect()
+          }, delay)
+        })
+    }
+
+    connect()
+
+    return () => {
+      disposed = true
+      if (retryTimer) window.clearTimeout(retryTimer)
+      if (channel) void supabase.removeChannel(channel)
+    }
+  }, [addNotification, refreshCustomerRequestViews, updateRealtimeHealth])
+
   const value = useMemo<NotificationsContextValue>(() => ({
     items,
     toasts,
     unreadCount: items.filter(item => !item.read).length,
     billingVersion,
     complaintsVersion,
+    customerRequestsVersion,
     isInboxOpen,
     openInbox: () => setInboxOpen(true),
     closeInbox: () => setInboxOpen(false),
@@ -410,7 +500,7 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
       setItems([])
     },
     dismissToast,
-  }), [billingVersion, complaintsVersion, dismissToast, isInboxOpen, items, toasts])
+  }), [billingVersion, complaintsVersion, customerRequestsVersion, dismissToast, isInboxOpen, items, toasts])
 
   return (
     <NotificationsContext.Provider value={value}>

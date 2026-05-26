@@ -37,6 +37,37 @@ function SingleToast({ notification, onDismiss, onOpenNotification }: {
     onDismiss(notification.id)
   }
 
+  if (notification.kind === 'customer_signup') {
+    return (
+      <div
+        className="payment-toast payment-toast--partial"
+        role="button"
+        tabIndex={0}
+        aria-live="polite"
+        aria-label={`Open ${notification.title}`}
+        onClick={handleOpen}
+        onKeyDown={handleKeyDown}
+        style={{ borderLeft: '3px solid var(--color-primary)' }}
+      >
+        <div className="payment-toast__icon">
+          <Icon name="users" size={18} />
+        </div>
+        <div className="payment-toast__body">
+          <div className="payment-toast__title">{notification.title}</div>
+          <div className="payment-toast__message">{notification.message}</div>
+          <div className="payment-toast__meta">House ID: {notification.houseId}</div>
+        </div>
+        <button
+          className="payment-toast__close"
+          aria-label="Dismiss notification"
+          onClick={handleDismiss}
+        >
+          <Icon name="x" size={14} />
+        </button>
+      </div>
+    )
+  }
+
   // ── Complaint toast ─────────────────────────────────────────────────────────
   if (notification.kind === 'complaint') {
     const isResolved = notification.type === 'complaint_resolved'
