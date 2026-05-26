@@ -61,7 +61,7 @@ function StaffFormModal({ open, onClose, areas, onSaved, editTarget }: {
   const [saving, setSaving]   = useState(false);
   const [error, setError]     = useState<string | null>(null);
 
-  const set = (k: string, v: any) => setForm(f => ({ ...f, [k]: v }));
+  const set = (k: string, v: string | string[]) => setForm(f => ({ ...f, [k]: v }));
 
   const handleSubmit = async () => {
     if (!form.full_name.trim()) { setError('Name required'); return; }
@@ -72,7 +72,7 @@ function StaffFormModal({ open, onClose, areas, onSaved, editTarget }: {
     try {
       let saved: Staff;
       if (editTarget) {
-        const patch: Record<string, any> = {
+        const patch: Parameters<typeof updateStaff>[1] = {
           full_name: form.full_name.trim(),
           role:      form.role,
           phone:     form.phone || null,

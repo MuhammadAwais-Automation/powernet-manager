@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase'
-import type { Staff, StaffWithArea } from '@/types/database'
+import type { Staff, StaffWithArea, Area } from '@/types/database'
 
 const COLS = 'id, full_name, role, phone, area_id, area_ids, username, auth_user_id, is_active, created_at'
 let staffCache: { data: StaffWithArea[]; expiresAt: number } | null = null
@@ -25,13 +25,14 @@ export async function getStaff(): Promise<StaffWithArea[]> {
 
   const areasList = areasData || []
 
-  const staff = (staffData || []).map((s: any) => {
-    const sAreaIds = s.area_ids || []
+  const staff = (staffData || []).map((s: unknown) => {
+    const row = s as Staff & { area: Area | null }
+    const sAreaIds = row.area_ids || []
     const sAreas = areasList.filter(a => sAreaIds.includes(a.id))
     return {
-      ...s,
+      ...row,
       areas: sAreas,
-      area: s.area || sAreas[0] || null
+      area: row.area || sAreas[0] || null
     }
   }) as unknown as StaffWithArea[]
 
