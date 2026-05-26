@@ -53,7 +53,7 @@ function StaffFormModal({ open, onClose, areas, onSaved, editTarget }: {
     full_name: editTarget?.full_name ?? '',
     phone:     editTarget?.phone     ?? '',
     role:      editTarget?.role      ?? 'technician',
-    area_id:   editTarget?.area_id   ?? '',
+    area_ids:  editTarget?.area_ids  ?? (editTarget?.area_id ? [editTarget.area_id] : []),
     username:  editTarget?.username  ?? '',
     password:  '',
   });
@@ -61,7 +61,7 @@ function StaffFormModal({ open, onClose, areas, onSaved, editTarget }: {
   const [saving, setSaving]   = useState(false);
   const [error, setError]     = useState<string | null>(null);
 
-  const set = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }));
+  const set = (k: string, v: any) => setForm(f => ({ ...f, [k]: v }));
 
   const handleSubmit = async () => {
     if (!form.full_name.trim()) { setError('Name required'); return; }
@@ -72,11 +72,11 @@ function StaffFormModal({ open, onClose, areas, onSaved, editTarget }: {
     try {
       let saved: Staff;
       if (editTarget) {
-        const patch: Record<string, string | null> = {
+        const patch: Record<string, any> = {
           full_name: form.full_name.trim(),
           role:      form.role,
           phone:     form.phone || null,
-          area_id:   form.area_id || null,
+          area_ids:  form.area_ids,
         };
         if (form.username.trim()) patch.username = form.username.trim().toLowerCase();
         saved = await updateStaff(editTarget.id, patch);
@@ -91,7 +91,7 @@ function StaffFormModal({ open, onClose, areas, onSaved, editTarget }: {
               password:  form.password.trim(),
               full_name: form.full_name.trim(),
               phone:     form.phone || null,
-              area_id:   form.area_id || null,
+              area_ids:  form.area_ids,
               role:      form.role,
             }),
           });
@@ -110,7 +110,7 @@ function StaffFormModal({ open, onClose, areas, onSaved, editTarget }: {
               password:  form.password.trim(),
               full_name: form.full_name.trim(),
               phone:     form.phone || null,
-              area_id:   form.area_id || null,
+              area_ids:  form.area_ids,
               role:      form.role,
             }),
           });
@@ -147,7 +147,7 @@ function StaffFormModal({ open, onClose, areas, onSaved, editTarget }: {
 
       <div className="modal-body">
         {error && (
-          <div style={{ padding: '10px 14px', background: '#fef2f2', color: '#dc2626',
+          <div style={{ padding: '10px 14px', background: 'var(--red-50)', color: 'var(--red)',
                         borderRadius: 8, marginBottom: 14, fontSize: 13 }}>
             {error}
           </div>
@@ -164,7 +164,7 @@ function StaffFormModal({ open, onClose, areas, onSaved, editTarget }: {
             <input className="input" placeholder="0300-0000000"
               value={form.phone} onChange={e => set('phone', e.target.value)} />
           </div>
-          <div className="field">
+          <div className="field" style={{ gridColumn: 'span 2' }}>
             <label>Role *</label>
             <select className="select" value={form.role} onChange={e => set('role', e.target.value)}>
               {editTarget?.role === 'admin' && <option value="admin">Admin (fixed)</option>}
@@ -173,12 +173,45 @@ function StaffFormModal({ open, onClose, areas, onSaved, editTarget }: {
               ))}
             </select>
           </div>
-          <div className="field">
-            <label>Assigned Area</label>
-            <select className="select" value={form.area_id} onChange={e => set('area_id', e.target.value)}>
-              <option value="">— None —</option>
-              {areas.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
-            </select>
+        </div>
+
+        <div className="field" style={{ marginBottom: 16 }}>
+          <label style={{ display: 'block', marginBottom: 6, fontWeight: 500 }}>Assigned Areas (Multiple)</label>
+          <div style={{
+            border: '1px solid var(--border)',
+            borderRadius: 8,
+            maxHeight: 120,
+            overflowY: 'auto',
+            padding: '8px 12px',
+            background: 'var(--bg-muted)',
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr',
+            gap: '8px 12px'
+          }}>
+            {areas.map(a => {
+              const checked = form.area_ids.includes(a.id);
+              return (
+                <label key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer', userSelect: 'none' }}>
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    style={{
+                      accentColor: 'var(--brand)',
+                      cursor: 'pointer'
+                    }}
+                    onChange={() => {
+                      setForm(f => {
+                        const ids = f.area_ids.includes(a.id)
+                          ? f.area_ids.filter(id => id !== a.id)
+                          : [...f.area_ids, a.id];
+                        return { ...f, area_ids: ids };
+                      });
+                    }}
+                  />
+                  <span>{a.name}</span>
+                </label>
+              );
+            })}
           </div>
         </div>
 
@@ -311,7 +344,7 @@ function CredentialsModal({ staff, onClose, onPasswordReset }: {
         ) : (
           <div style={{ padding: '12px 14px', background: 'var(--bg-muted)', borderRadius: 10,
                         border: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {error && <div style={{ fontSize: 12, color: '#dc2626' }}>{error}</div>}
+            {error && <div style={{ fontSize: 12, color: 'var(--red)' }}>{error}</div>}
             <div className="field">
               <label>New Password</label>
               <div style={{ position: 'relative' }}>
@@ -373,7 +406,7 @@ function DeleteConfirmModal({ staff, onClose, onConfirm }: {
     <Modal open onClose={onClose} width={420}>
       <div className="modal-head">
         <div>
-          <div style={{ fontSize: 16, fontWeight: 600, color: '#dc2626' }}>Remove Staff Member</div>
+          <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--red)' }}>Remove Staff Member</div>
           <div className="muted" style={{ fontSize: 12, marginTop: 2 }}>This action cannot be undone</div>
         </div>
         <button className="icon-btn" onClick={onClose}><Icon name="close" size={16} /></button>
@@ -395,10 +428,11 @@ function DeleteConfirmModal({ staff, onClose, onConfirm }: {
             <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
               <span style={{
                 padding: '1px 7px', borderRadius: 99, fontSize: 11, fontWeight: 600,
-                background: roleColor === 'blue' ? '#dbeafe' : roleColor === 'amber' ? '#fef3c7' :
-                             roleColor === 'green' ? '#dcfce7' : roleColor === 'purple' ? '#f3e8ff' : '#f3f4f6',
-                color: roleColor === 'blue' ? '#1d4ed8' : roleColor === 'amber' ? '#d97706' :
-                        roleColor === 'green' ? '#16a34a' : roleColor === 'purple' ? '#7c3aed' : '#6b7280',
+                background: roleColor === 'blue' ? 'var(--blue-50)' : roleColor === 'amber' ? 'var(--amber-50)' :
+                             roleColor === 'green' ? 'var(--green-50)' : roleColor === 'purple' ? 'var(--purple-50)' : 'var(--bg-muted)',
+                color: roleColor === 'blue' ? 'var(--blue)' : roleColor === 'amber' ? 'var(--amber)' :
+                        roleColor === 'green' ? 'var(--green)' : roleColor === 'purple' ? 'var(--purple)' : 'var(--text-muted)',
+                border: '1px solid var(--border)',
               }}>{roleLabel}</span>
               {staff.username && (
                 <span className="mono" style={{ marginLeft: 8, color: 'var(--brand)' }}>@{staff.username}</span>
@@ -407,11 +441,10 @@ function DeleteConfirmModal({ staff, onClose, onConfirm }: {
           </div>
         </div>
 
-        {/* Warning */}
         <div style={{
           padding: '12px 14px', borderRadius: 8,
-          background: '#fef2f2', border: '1px solid #fecaca',
-          fontSize: 13, color: '#991b1b', lineHeight: 1.5,
+          background: 'var(--red-50)', border: '1px solid color-mix(in srgb, var(--red) 20%, transparent)',
+          fontSize: 13, color: 'var(--red)', lineHeight: 1.5,
         }}>
           <strong>Warning:</strong> Yeh staff member permanently delete ho jaye ga.
           {DASHBOARD_ROLES.has(staff.role) && (
@@ -422,7 +455,7 @@ function DeleteConfirmModal({ staff, onClose, onConfirm }: {
         {error && (
           <div style={{
             marginTop: 12, padding: '10px 14px',
-            background: '#fef2f2', color: '#dc2626',
+            background: 'var(--red-50)', color: 'var(--red)',
             borderRadius: 8, fontSize: 13,
           }}>
             {error}
@@ -435,7 +468,7 @@ function DeleteConfirmModal({ staff, onClose, onConfirm }: {
         <button
           className="btn"
           style={{
-            background: deleting ? '#fca5a5' : '#dc2626',
+            background: deleting ? 'color-mix(in srgb, var(--red) 50%, transparent)' : 'var(--red)',
             color: '#fff',
             borderColor: 'transparent',
             opacity: deleting ? 0.8 : 1,
@@ -483,7 +516,17 @@ function StaffCard({ s, onEdit, onViewCreds, onToggleActive, onDelete }: {
 
       <div className="row gap-sm" style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
         <Icon name="pin" size={13} />
-        <span>{s.area?.name ?? 'No area assigned'}</span>
+        <span style={{
+          textOverflow: 'ellipsis',
+          overflow: 'hidden',
+          whiteSpace: 'nowrap',
+          maxWidth: 180
+        }} title={s.areas && s.areas.length > 0 ? s.areas.map(a => a.name).join(', ') : (s.area?.name ?? 'No area assigned')}>
+          {s.areas && s.areas.length > 0
+            ? s.areas.map(a => a.name).join(', ')
+            : (s.area?.name ?? 'No area assigned')
+          }
+        </span>
         {s.phone && (
           <>
             <span style={{ margin: '0 4px' }}>·</span>
@@ -513,9 +556,9 @@ function StaffCard({ s, onEdit, onViewCreds, onToggleActive, onDelete }: {
             onClick={onDelete}
             title="Remove staff member"
             onMouseEnter={e => {
-              (e.currentTarget as HTMLButtonElement).style.background = '#fef2f2';
-              (e.currentTarget as HTMLButtonElement).style.color = '#dc2626';
-              (e.currentTarget as HTMLButtonElement).style.borderColor = '#fecaca';
+              (e.currentTarget as HTMLButtonElement).style.background = 'var(--red-50)';
+              (e.currentTarget as HTMLButtonElement).style.color = 'var(--red)';
+              (e.currentTarget as HTMLButtonElement).style.borderColor = 'color-mix(in srgb, var(--red) 30%, transparent)';
             }}
             onMouseLeave={e => {
               (e.currentTarget as HTMLButtonElement).style.background = '';
@@ -554,8 +597,10 @@ export default function StaffPage() {
   const visibleStaff = staff.filter(s => s.id !== currentStaff?.id);
 
   const handleSaved = (saved: Staff) => {
-    const area = areas.find(a => a.id === saved.area_id) ?? null;
-    const withArea: StaffWithArea = { ...saved, area };
+    const sAreaIds = saved.area_ids || [];
+    const sAreas = areas.filter(a => sAreaIds.includes(a.id));
+    const area = areas.find(a => a.id === saved.area_id) ?? sAreas[0] ?? null;
+    const withArea: StaffWithArea = { ...saved, area, areas: sAreas };
     setStaff(prev => {
       const idx = prev.findIndex(s => s.id === saved.id);
       if (idx >= 0) { const next = [...prev]; next[idx] = withArea; return next; }

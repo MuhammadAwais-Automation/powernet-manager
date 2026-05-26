@@ -1,0 +1,1705 @@
+{
+  "nodes": [
+    {
+      "id": "eslintrc_config",
+      "label": "ESLint Configuration",
+      "file_type": "code",
+      "source_file": ".eslintrc.json",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "tsconfig",
+      "label": "TypeScript Configuration (tsconfig.json)",
+      "file_type": "code",
+      "source_file": "tsconfig.json",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "path_alias_src",
+      "label": "@/* Path Alias (resolves to ./src/*)",
+      "file_type": "rationale",
+      "source_file": "tsconfig.json",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "sql_area_customer_counts_rpc",
+      "label": "get_area_customer_counts() RPC Function",
+      "file_type": "code",
+      "source_file": "scripts/sql/area_customer_counts_rpc.sql",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "db_table_customers",
+      "label": "customers Table",
+      "file_type": "rationale",
+      "source_file": "scripts/sql/area_customer_counts_rpc.sql",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "security_definer_pattern",
+      "label": "security definer RPC Pattern",
+      "file_type": "rationale",
+      "source_file": "scripts/sql/area_customer_counts_rpc.sql",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "sql_billing_payments_mvp",
+      "label": "Billing & Payments MVP Schema + RPCs",
+      "file_type": "code",
+      "source_file": "scripts/sql/billing_payments_mvp.sql",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "db_table_bills",
+      "label": "bills Table",
+      "file_type": "rationale",
+      "source_file": "scripts/sql/billing_payments_mvp.sql",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "db_table_payments",
+      "label": "payments Table",
+      "file_type": "rationale",
+      "source_file": "scripts/sql/billing_payments_mvp.sql",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "db_table_staff",
+      "label": "staff Table",
+      "file_type": "rationale",
+      "source_file": "scripts/sql/billing_payments_mvp.sql",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "db_table_packages",
+      "label": "packages Table",
+      "file_type": "rationale",
+      "source_file": "scripts/sql/billing_payments_mvp.sql",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "rpc_generate_monthly_bills",
+      "label": "generate_monthly_bills() RPC",
+      "file_type": "code",
+      "source_file": "scripts/sql/billing_payments_mvp.sql",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "rpc_record_bill_payment",
+      "label": "record_bill_payment() RPC",
+      "file_type": "code",
+      "source_file": "scripts/sql/billing_payments_mvp.sql",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "sql_dashboard_summary_rpc",
+      "label": "get_dashboard_summary() RPC Function",
+      "file_type": "code",
+      "source_file": "scripts/sql/dashboard_summary_rpc.sql",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "db_table_complaints",
+      "label": "complaints Table",
+      "file_type": "rationale",
+      "source_file": "scripts/sql/dashboard_summary_rpc.sql",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "sql_performance_indexes",
+      "label": "Performance Indexes (pg_trgm + B-tree)",
+      "file_type": "code",
+      "source_file": "scripts/sql/performance_indexes.sql",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "db_table_areas",
+      "label": "areas Table",
+      "file_type": "rationale",
+      "source_file": "scripts/sql/performance_indexes.sql",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "pg_trgm_search",
+      "label": "pg_trgm Trigram Search (GIN indexes)",
+      "file_type": "rationale",
+      "source_file": "scripts/sql/performance_indexes.sql",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "sql_reports_summary_rpc",
+      "label": "get_reports_summary() RPC Function",
+      "file_type": "code",
+      "source_file": "scripts/sql/reports_summary_rpc.sql",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "sql_rls_cleanup",
+      "label": "RLS Cleanup \u2014 Drop Anon Policies",
+      "file_type": "code",
+      "source_file": "scripts/sql/rls_cleanup.sql",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "rls_security_pattern",
+      "label": "Row-Level Security (RLS) Pattern",
+      "file_type": "rationale",
+      "source_file": "scripts/sql/rls_cleanup.sql",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "permissions_canAccessPage",
+      "label": "canAccessPage Function",
+      "file_type": "code",
+      "source_file": "src/lib/auth/permissions.ts",
+      "source_location": "line 29",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "permissions_NAV_BY_ROLE",
+      "label": "NAV_BY_ROLE Map",
+      "file_type": "code",
+      "source_file": "src/lib/auth/permissions.ts",
+      "source_location": "line 13",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "permissions_DEFAULT_PAGE_BY_ROLE",
+      "label": "DEFAULT_PAGE_BY_ROLE Map",
+      "file_type": "code",
+      "source_file": "src/lib/auth/permissions.ts",
+      "source_location": "line 21",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "permissions_isDashboardRole",
+      "label": "isDashboardRole Function",
+      "file_type": "code",
+      "source_file": "src/lib/auth/permissions.ts",
+      "source_location": "line 35",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "permissions_DASHBOARD_ROLES",
+      "label": "DASHBOARD_ROLES Constant",
+      "file_type": "code",
+      "source_file": "src/lib/auth/permissions.ts",
+      "source_location": "line 33",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "permissions_PageId",
+      "label": "PageId Type Union",
+      "file_type": "code",
+      "source_file": "src/lib/auth/permissions.ts",
+      "source_location": "line 3",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "permissions_VALID_PAGE_IDS",
+      "label": "VALID_PAGE_IDS Set",
+      "file_type": "code",
+      "source_file": "src/lib/auth/permissions.ts",
+      "source_location": "line 39",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "agents_PowerNetArchitecture",
+      "label": "PowerNet Manager Architecture (AGENTS.md)",
+      "file_type": "document",
+      "source_file": "AGENTS.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "react_state_routing",
+      "label": "React State Routing (SPA Pattern)",
+      "file_type": "rationale",
+      "source_file": "CLAUDE.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "claude_md",
+      "label": "CLAUDE.md \u2014 Claude Code Project Instructions",
+      "file_type": "document",
+      "source_file": "CLAUDE.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "css_custom_properties_theming",
+      "label": "CSS Custom Properties Theming (no Tailwind)",
+      "file_type": "rationale",
+      "source_file": "CLAUDE.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "supabase_admin_service_role",
+      "label": "supabaseAdmin (Service Role Client)",
+      "file_type": "rationale",
+      "source_file": "CLAUDE.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "powernet_manager_project",
+      "label": "PowerNet Manager",
+      "file_type": "document",
+      "source_file": "README.md",
+      "source_location": null,
+      "source_url": "https://github.com/MuhammadAwais-Automation/powernet-manager",
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "nextjs_framework",
+      "label": "Next.js 15 App Router",
+      "file_type": "rationale",
+      "source_file": "README.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "supabase_backend",
+      "label": "Supabase (PostgreSQL Backend)",
+      "file_type": "rationale",
+      "source_file": "README.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "readme_md",
+      "label": "README.md \u2014 Project Documentation",
+      "file_type": "document",
+      "source_file": "README.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "role_based_access",
+      "label": "Role-Based Access Control",
+      "file_type": "rationale",
+      "source_file": "README.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "caveman_CavemanStyle",
+      "label": "Caveman Response Style Rule",
+      "file_type": "document",
+      "source_file": ".clinerules/caveman.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "dashboard_auth_design_spec",
+      "label": "Dashboard Auth & Role-Based Access Design Spec",
+      "file_type": "document",
+      "source_file": "docs/superpowers/specs/2026-04-25-dashboard-auth-design.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": "2026-04-25",
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "dashboard_auth_supabase_auth",
+      "label": "Supabase Auth for Dashboard Login",
+      "file_type": "rationale",
+      "source_file": "docs/superpowers/specs/2026-04-25-dashboard-auth-design.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "dashboard_auth_auth_context",
+      "label": "AuthContext (AuthProvider + useAuth)",
+      "file_type": "rationale",
+      "source_file": "docs/superpowers/specs/2026-04-25-dashboard-auth-design.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "dashboard_auth_login_screen",
+      "label": "LoginScreen Component",
+      "file_type": "rationale",
+      "source_file": "docs/superpowers/specs/2026-04-25-dashboard-auth-design.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "dashboard_auth_rbac",
+      "label": "Role-Based Access Control (NAV_BY_ROLE)",
+      "file_type": "rationale",
+      "source_file": "docs/superpowers/specs/2026-04-25-dashboard-auth-design.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "dashboard_auth_admin_role",
+      "label": "Admin Role",
+      "file_type": "rationale",
+      "source_file": "docs/superpowers/specs/2026-04-25-dashboard-auth-design.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "dashboard_auth_complaint_manager_role",
+      "label": "Complaint Manager Role",
+      "file_type": "rationale",
+      "source_file": "docs/superpowers/specs/2026-04-25-dashboard-auth-design.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "dashboard_auth_email_username_trick",
+      "label": "Email-as-Username Mapping (@powernet.local)",
+      "file_type": "rationale",
+      "source_file": "docs/superpowers/specs/2026-04-25-dashboard-auth-design.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "dashboard_auth_staff_table",
+      "label": "Staff Table (auth_user_id column)",
+      "file_type": "rationale",
+      "source_file": "docs/superpowers/specs/2026-04-25-dashboard-auth-design.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "dashboard_auth_api_routes",
+      "label": "Admin API Routes (create-dashboard-user, reset-dashboard-password)",
+      "file_type": "rationale",
+      "source_file": "docs/superpowers/specs/2026-04-25-dashboard-auth-design.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "dashboard_auth_rls_phase2",
+      "label": "RLS Hardening (Phase 2, Deferred)",
+      "file_type": "rationale",
+      "source_file": "docs/superpowers/specs/2026-04-25-dashboard-auth-design.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "dashboard_auth_access_denied",
+      "label": "AccessDenied Component",
+      "file_type": "rationale",
+      "source_file": "docs/superpowers/specs/2026-04-25-dashboard-auth-design.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "staff_app_design_spec",
+      "label": "PowerNet Staff App (Flutter) Design Spec",
+      "file_type": "document",
+      "source_file": "docs/superpowers/specs/2026-04-25-powernet-staff-app-design.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": "2026-04-25",
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "staff_app_flutter_app",
+      "label": "PowerNet Staff Flutter App",
+      "file_type": "rationale",
+      "source_file": "docs/superpowers/specs/2026-04-25-powernet-staff-app-design.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "staff_app_verify_staff_login_rpc",
+      "label": "verify_staff_login RPC",
+      "file_type": "rationale",
+      "source_file": "docs/superpowers/specs/2026-04-25-powernet-staff-app-design.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "staff_app_auth_provider",
+      "label": "AuthProvider (Flutter ChangeNotifier)",
+      "file_type": "rationale",
+      "source_file": "docs/superpowers/specs/2026-04-25-powernet-staff-app-design.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "staff_app_shared_preferences",
+      "label": "SharedPreferences Session Persistence",
+      "file_type": "rationale",
+      "source_file": "docs/superpowers/specs/2026-04-25-powernet-staff-app-design.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "staff_app_splash_screen",
+      "label": "SplashScreen (Flutter)",
+      "file_type": "rationale",
+      "source_file": "docs/superpowers/specs/2026-04-25-powernet-staff-app-design.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "staff_app_home_screen",
+      "label": "HomeScreen (Flutter Welcome + Role Display)",
+      "file_type": "rationale",
+      "source_file": "docs/superpowers/specs/2026-04-25-powernet-staff-app-design.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "staff_app_staff_model",
+      "label": "Staff Model (Flutter Dart)",
+      "file_type": "rationale",
+      "source_file": "docs/superpowers/specs/2026-04-25-powernet-staff-app-design.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "scripts_requirements_txt",
+      "label": "Python Scripts requirements.txt",
+      "file_type": "code",
+      "source_file": "scripts/requirements.txt",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "scripts_openpyxl",
+      "label": "openpyxl (Python Excel Library)",
+      "file_type": "rationale",
+      "source_file": "scripts/requirements.txt",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "scripts_supabase_python",
+      "label": "supabase Python Client",
+      "file_type": "rationale",
+      "source_file": "scripts/requirements.txt",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "scripts_python_dotenv",
+      "label": "python-dotenv",
+      "file_type": "rationale",
+      "source_file": "scripts/requirements.txt",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    }
+  ],
+  "edges": [
+    {
+      "source": "tsconfig",
+      "target": "path_alias_src",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "tsconfig.json",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "sql_area_customer_counts_rpc",
+      "target": "db_table_customers",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "scripts/sql/area_customer_counts_rpc.sql",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "sql_area_customer_counts_rpc",
+      "target": "security_definer_pattern",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "scripts/sql/area_customer_counts_rpc.sql",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "db_table_customers",
+      "target": "db_table_areas",
+      "relation": "shares_data_with",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "scripts/sql/area_customer_counts_rpc.sql",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "sql_billing_payments_mvp",
+      "target": "db_table_bills",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "scripts/sql/billing_payments_mvp.sql",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "sql_billing_payments_mvp",
+      "target": "db_table_payments",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "scripts/sql/billing_payments_mvp.sql",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "sql_billing_payments_mvp",
+      "target": "rpc_generate_monthly_bills",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "scripts/sql/billing_payments_mvp.sql",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "sql_billing_payments_mvp",
+      "target": "rpc_record_bill_payment",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "scripts/sql/billing_payments_mvp.sql",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "rpc_generate_monthly_bills",
+      "target": "db_table_customers",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "scripts/sql/billing_payments_mvp.sql",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "rpc_generate_monthly_bills",
+      "target": "db_table_packages",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "scripts/sql/billing_payments_mvp.sql",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "rpc_generate_monthly_bills",
+      "target": "db_table_bills",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "scripts/sql/billing_payments_mvp.sql",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "rpc_record_bill_payment",
+      "target": "db_table_bills",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "scripts/sql/billing_payments_mvp.sql",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "rpc_record_bill_payment",
+      "target": "db_table_payments",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "scripts/sql/billing_payments_mvp.sql",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "rpc_record_bill_payment",
+      "target": "db_table_staff",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "scripts/sql/billing_payments_mvp.sql",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "db_table_payments",
+      "target": "db_table_bills",
+      "relation": "shares_data_with",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "scripts/sql/billing_payments_mvp.sql",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "db_table_customers",
+      "target": "db_table_bills",
+      "relation": "shares_data_with",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "scripts/sql/billing_payments_mvp.sql",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "db_table_customers",
+      "target": "db_table_packages",
+      "relation": "shares_data_with",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "scripts/sql/billing_payments_mvp.sql",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "sql_dashboard_summary_rpc",
+      "target": "db_table_customers",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "scripts/sql/dashboard_summary_rpc.sql",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "sql_dashboard_summary_rpc",
+      "target": "db_table_bills",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "scripts/sql/dashboard_summary_rpc.sql",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "sql_dashboard_summary_rpc",
+      "target": "db_table_complaints",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "scripts/sql/dashboard_summary_rpc.sql",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "sql_dashboard_summary_rpc",
+      "target": "db_table_staff",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "scripts/sql/dashboard_summary_rpc.sql",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "sql_performance_indexes",
+      "target": "db_table_customers",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "scripts/sql/performance_indexes.sql",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "sql_performance_indexes",
+      "target": "db_table_areas",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "scripts/sql/performance_indexes.sql",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "sql_performance_indexes",
+      "target": "db_table_packages",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "scripts/sql/performance_indexes.sql",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "sql_performance_indexes",
+      "target": "db_table_staff",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "scripts/sql/performance_indexes.sql",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "sql_performance_indexes",
+      "target": "db_table_bills",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "scripts/sql/performance_indexes.sql",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "sql_performance_indexes",
+      "target": "db_table_complaints",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "scripts/sql/performance_indexes.sql",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "sql_performance_indexes",
+      "target": "pg_trgm_search",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "scripts/sql/performance_indexes.sql",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "sql_reports_summary_rpc",
+      "target": "db_table_bills",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "scripts/sql/reports_summary_rpc.sql",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "sql_reports_summary_rpc",
+      "target": "db_table_payments",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "scripts/sql/reports_summary_rpc.sql",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "sql_reports_summary_rpc",
+      "target": "db_table_complaints",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "scripts/sql/reports_summary_rpc.sql",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "sql_reports_summary_rpc",
+      "target": "db_table_customers",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "scripts/sql/reports_summary_rpc.sql",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "sql_reports_summary_rpc",
+      "target": "db_table_staff",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "scripts/sql/reports_summary_rpc.sql",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "sql_reports_summary_rpc",
+      "target": "db_table_areas",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "scripts/sql/reports_summary_rpc.sql",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "db_table_staff",
+      "target": "db_table_areas",
+      "relation": "shares_data_with",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "scripts/sql/reports_summary_rpc.sql",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "sql_rls_cleanup",
+      "target": "rls_security_pattern",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "scripts/sql/rls_cleanup.sql",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "sql_rls_cleanup",
+      "target": "db_table_areas",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "scripts/sql/rls_cleanup.sql",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "sql_rls_cleanup",
+      "target": "db_table_bills",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "scripts/sql/rls_cleanup.sql",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "sql_rls_cleanup",
+      "target": "db_table_complaints",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "scripts/sql/rls_cleanup.sql",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "sql_rls_cleanup",
+      "target": "db_table_customers",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "scripts/sql/rls_cleanup.sql",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "sql_rls_cleanup",
+      "target": "db_table_packages",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "scripts/sql/rls_cleanup.sql",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "sql_rls_cleanup",
+      "target": "db_table_staff",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "scripts/sql/rls_cleanup.sql",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "permissions_isDashboardRole",
+      "target": "permissions_DASHBOARD_ROLES",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/lib/auth/permissions.ts",
+      "source_location": "line 35",
+      "weight": 1.0
+    },
+    {
+      "source": "permissions_canAccessPage",
+      "target": "permissions_NAV_BY_ROLE",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/lib/auth/permissions.ts",
+      "source_location": "line 30",
+      "weight": 1.0
+    },
+    {
+      "source": "agents_PowerNetArchitecture",
+      "target": "app_ReactStateSPA",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "AGENTS.md",
+      "source_location": "line 18",
+      "weight": 1.0
+    },
+    {
+      "source": "agents_PowerNetArchitecture",
+      "target": "app_AppComponent",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "AGENTS.md",
+      "source_location": "line 27",
+      "weight": 1.0
+    },
+    {
+      "source": "agents_PowerNetArchitecture",
+      "target": "customerlist_getCustomerList",
+      "relation": "references",
+      "confidence": "INFERRED",
+      "confidence_score": 0.75,
+      "source_file": "AGENTS.md",
+      "source_location": "line 34",
+      "weight": 1.0
+    },
+    {
+      "source": "powernet_manager_project",
+      "target": "react_state_routing",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "CLAUDE.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "powernet_manager_project",
+      "target": "css_custom_properties_theming",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "CLAUDE.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "claude_md",
+      "target": "agents_md",
+      "relation": "semantically_similar_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "CLAUDE.md",
+      "source_location": null,
+      "weight": 0.8
+    },
+    {
+      "source": "claude_md",
+      "target": "powernet_manager_project",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "CLAUDE.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "powernet_manager_project",
+      "target": "nextjs_framework",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "README.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "powernet_manager_project",
+      "target": "supabase_backend",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "README.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "powernet_manager_project",
+      "target": "role_based_access",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "README.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "readme_md",
+      "target": "powernet_manager_project",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "README.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "caveman_CavemanStyle",
+      "target": "agents_PowerNetArchitecture",
+      "relation": "conceptually_related_to",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": ".clinerules/caveman.md",
+      "source_location": null,
+      "weight": 0.5
+    },
+    {
+      "source": "dashboard_auth_design_spec",
+      "target": "dashboard_auth_supabase_auth",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/superpowers/specs/2026-04-25-dashboard-auth-design.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "dashboard_auth_design_spec",
+      "target": "dashboard_auth_auth_context",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/superpowers/specs/2026-04-25-dashboard-auth-design.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "dashboard_auth_design_spec",
+      "target": "dashboard_auth_login_screen",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/superpowers/specs/2026-04-25-dashboard-auth-design.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "dashboard_auth_design_spec",
+      "target": "dashboard_auth_rbac",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/superpowers/specs/2026-04-25-dashboard-auth-design.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "dashboard_auth_design_spec",
+      "target": "dashboard_auth_admin_role",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/superpowers/specs/2026-04-25-dashboard-auth-design.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "dashboard_auth_design_spec",
+      "target": "dashboard_auth_complaint_manager_role",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/superpowers/specs/2026-04-25-dashboard-auth-design.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "dashboard_auth_design_spec",
+      "target": "dashboard_auth_email_username_trick",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/superpowers/specs/2026-04-25-dashboard-auth-design.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "dashboard_auth_design_spec",
+      "target": "dashboard_auth_staff_table",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/superpowers/specs/2026-04-25-dashboard-auth-design.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "dashboard_auth_design_spec",
+      "target": "dashboard_auth_api_routes",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/superpowers/specs/2026-04-25-dashboard-auth-design.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "dashboard_auth_design_spec",
+      "target": "dashboard_auth_rls_phase2",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/superpowers/specs/2026-04-25-dashboard-auth-design.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "dashboard_auth_design_spec",
+      "target": "dashboard_auth_access_denied",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/superpowers/specs/2026-04-25-dashboard-auth-design.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "dashboard_auth_rbac",
+      "target": "dashboard_auth_admin_role",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/superpowers/specs/2026-04-25-dashboard-auth-design.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "dashboard_auth_rbac",
+      "target": "dashboard_auth_complaint_manager_role",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/superpowers/specs/2026-04-25-dashboard-auth-design.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "dashboard_auth_supabase_auth",
+      "target": "dashboard_auth_email_username_trick",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/superpowers/specs/2026-04-25-dashboard-auth-design.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "dashboard_auth_staff_table",
+      "target": "dashboard_auth_supabase_auth",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/superpowers/specs/2026-04-25-dashboard-auth-design.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "dashboard_auth_api_routes",
+      "target": "dashboard_auth_supabase_auth",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/superpowers/specs/2026-04-25-dashboard-auth-design.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "dashboard_auth_design_spec",
+      "target": "staff_app_verify_staff_login_rpc",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/superpowers/specs/2026-04-25-dashboard-auth-design.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "dashboard_auth_design_spec",
+      "target": "staff_app_design_spec",
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "docs/superpowers/specs/2026-04-25-dashboard-auth-design.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "staff_app_design_spec",
+      "target": "staff_app_flutter_app",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/superpowers/specs/2026-04-25-powernet-staff-app-design.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "staff_app_design_spec",
+      "target": "staff_app_verify_staff_login_rpc",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/superpowers/specs/2026-04-25-powernet-staff-app-design.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "staff_app_design_spec",
+      "target": "staff_app_auth_provider",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/superpowers/specs/2026-04-25-powernet-staff-app-design.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "staff_app_design_spec",
+      "target": "staff_app_shared_preferences",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/superpowers/specs/2026-04-25-powernet-staff-app-design.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "staff_app_design_spec",
+      "target": "staff_app_splash_screen",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/superpowers/specs/2026-04-25-powernet-staff-app-design.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "staff_app_design_spec",
+      "target": "staff_app_home_screen",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/superpowers/specs/2026-04-25-powernet-staff-app-design.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "staff_app_design_spec",
+      "target": "staff_app_staff_model",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/superpowers/specs/2026-04-25-powernet-staff-app-design.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "staff_app_auth_provider",
+      "target": "staff_app_shared_preferences",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/superpowers/specs/2026-04-25-powernet-staff-app-design.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "staff_app_auth_provider",
+      "target": "staff_app_verify_staff_login_rpc",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/superpowers/specs/2026-04-25-powernet-staff-app-design.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "staff_app_splash_screen",
+      "target": "staff_app_shared_preferences",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/superpowers/specs/2026-04-25-powernet-staff-app-design.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "staff_app_splash_screen",
+      "target": "staff_app_home_screen",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/superpowers/specs/2026-04-25-powernet-staff-app-design.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "staff_app_flutter_app",
+      "target": "dashboard_auth_staff_table",
+      "relation": "shares_data_with",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/superpowers/specs/2026-04-25-powernet-staff-app-design.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "staff_app_flutter_app",
+      "target": "staff_app_verify_staff_login_rpc",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/superpowers/specs/2026-04-25-powernet-staff-app-design.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "scripts_requirements_txt",
+      "target": "scripts_openpyxl",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "scripts/requirements.txt",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "scripts_requirements_txt",
+      "target": "scripts_supabase_python",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "scripts/requirements.txt",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "scripts_requirements_txt",
+      "target": "scripts_python_dotenv",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "scripts/requirements.txt",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "scripts_supabase_python",
+      "target": "dashboard_auth_supabase_auth",
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.75,
+      "source_file": "scripts/requirements.txt",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "scripts_openpyxl",
+      "target": "data_batch_inserts_batch_insert",
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.65,
+      "source_file": "scripts/requirements.txt",
+      "source_location": null,
+      "weight": 1.0
+    }
+  ],
+  "hyperedges": [
+    {
+      "id": "billing_rpc_functions",
+      "label": "Billing RPC Functions",
+      "nodes": [
+        "rpc_generate_monthly_bills",
+        "rpc_record_bill_payment"
+      ],
+      "relation": "implement",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "scripts/sql/billing_payments_mvp.sql"
+    },
+    {
+      "id": "powernet_core_db_tables",
+      "label": "PowerNet Core Database Tables",
+      "nodes": [
+        "db_table_customers",
+        "db_table_bills",
+        "db_table_payments",
+        "db_table_complaints",
+        "db_table_staff",
+        "db_table_areas",
+        "db_table_packages"
+      ],
+      "relation": "form",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "scripts/sql/performance_indexes.sql"
+    },
+    {
+      "id": "caveman_rule_shared",
+      "label": "Caveman Style Rule shared across IDE tools",
+      "nodes": [
+        "caveman_CavemanStyle"
+      ],
+      "relation": "participate_in",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": ".clinerules/caveman.md"
+    },
+    {
+      "id": "dashboard_auth_flow",
+      "label": "Dashboard Authentication Flow",
+      "nodes": [
+        "dashboard_auth_login_screen",
+        "dashboard_auth_supabase_auth",
+        "dashboard_auth_auth_context",
+        "dashboard_auth_email_username_trick",
+        "dashboard_auth_staff_table"
+      ],
+      "relation": "implement",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/superpowers/specs/2026-04-25-dashboard-auth-design.md"
+    },
+    {
+      "id": "staff_app_auth_flow",
+      "label": "Flutter Staff App Authentication Flow",
+      "nodes": [
+        "staff_app_splash_screen",
+        "staff_app_auth_provider",
+        "staff_app_verify_staff_login_rpc",
+        "staff_app_shared_preferences",
+        "staff_app_home_screen"
+      ],
+      "relation": "implement",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/superpowers/specs/2026-04-25-powernet-staff-app-design.md"
+    },
+    {
+      "id": "python_scripts_dependencies",
+      "label": "Python Scripts Dependency Stack",
+      "nodes": [
+        "scripts_requirements_txt",
+        "scripts_openpyxl",
+        "scripts_supabase_python",
+        "scripts_python_dotenv"
+      ],
+      "relation": "form",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "scripts/requirements.txt"
+    }
+  ]
+}

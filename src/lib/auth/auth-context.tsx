@@ -8,7 +8,7 @@ import { isDashboardRole } from './permissions'
 const USERNAME_DOMAIN = '@powernet.local'
 const AUTH_TIMEOUT_MS = 8_000
 
-const COLS = 'id, full_name, role, phone, area_id, username, auth_user_id, is_active, created_at'
+const COLS = 'id, full_name, role, phone, area_id, area_ids, username, auth_user_id, is_active, created_at'
 
 type AuthContextValue = {
   staff: Staff | null

@@ -197,7 +197,7 @@ export default function AreasPage() {
 
   const garrisonAreas  = areas.filter(a => a.type === 'garrison');
   const civilianAreas  = areas.filter(a => a.type === 'civilian');
-  const staffForArea   = (id: string) => staff.filter(s => s.area_id === id);
+  const staffForArea   = (id: string) => staff.filter(s => (s.area_ids && s.area_ids.includes(id)) || s.area_id === id);
   const totalCustomers = Object.values(counts).reduce((s, v) => s + v, 0);
 
   const handleAreaSaved = (saved: Area) => {

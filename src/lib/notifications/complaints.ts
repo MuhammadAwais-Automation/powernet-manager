@@ -1,4 +1,4 @@
-export type ComplaintNotificationType = 'complaint_in_progress' | 'complaint_resolved'
+export type ComplaintNotificationType = 'complaint_created' | 'complaint_in_progress' | 'complaint_resolved'
 
 // Shape of payload.old / payload.new from the Supabase realtime event
 export type ComplaintRealtimeRow = {
@@ -29,17 +29,17 @@ export type ComplaintNotification = {
   message: string
 }
 
-// Detect whether a complaint UPDATE warrants a notification
+// Detect whether a complaint realtime row warrants a notification.
 export function didComplaintStatusChange(
   oldRow?: ComplaintRealtimeRow | null,
   newRow?: ComplaintRealtimeRow | null,
 ): boolean {
   if (!newRow?.id) return false
   if (!newRow.status) return false
-  // If we have both old and new status, only notify if it changed
+  if (!oldRow && newRow.status === 'open') return true
   if (oldRow && oldRow.status && oldRow.status === newRow.status) return false
-  // Only notify on meaningful technician-driven transitions
   return (
+    newRow.status === 'open' ||
     newRow.status === 'in_progress' ||
     newRow.status === 'resolved'
   )
@@ -65,15 +65,19 @@ export function buildComplaintNotification(source: {
 
   let title = ''
   let message = ''
-  const type: ComplaintNotificationType =
-    source.status === 'resolved' ? 'complaint_resolved' : 'complaint_in_progress'
+  let type: ComplaintNotificationType = 'complaint_created'
 
-  if (source.status === 'in_progress') {
+  if (source.status === 'open') {
+    title = 'New Customer Complaint'
+    message = `${source.complaintCode} - ${source.customerName} - Awaiting assignment`
+  } else if (source.status === 'in_progress') {
+    type = 'complaint_in_progress'
     title = 'Complaint In Progress'
-    message = `${source.complaintCode} — ${source.customerName} — technician on-site${tech}`
+    message = `${source.complaintCode} - ${source.customerName} - technician on-site${tech}`
   } else {
+    type = 'complaint_resolved'
     title = 'Complaint Resolved'
-    message = `${source.complaintCode} — ${source.customerName} — resolved${tech}`
+    message = `${source.complaintCode} - ${source.customerName} - resolved${tech}`
   }
 
   const dedupeKey = buildComplaintNotificationDedupeKey({

@@ -274,7 +274,7 @@ export default function BillingPage({ refreshToken = 0, focusBillId = null, focu
         </div>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 20, opacity: loading ? 0.6 : 1, transition: 'opacity 0.15s' }}>
+      <div className="grid-responsive-4" style={{ marginBottom: 20, opacity: loading ? 0.6 : 1, transition: 'opacity 0.15s' }}>
         {kpiCards.map((s, i) => (
           <div key={i} className="card card-pad" style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
             <IconBadge name={s.icon} color={s.color} size={40} />
@@ -419,7 +419,7 @@ export default function BillingPage({ refreshToken = 0, focusBillId = null, focu
                 <div className="sub">Selected cycle · Rs. in thousands</div>
               </div>
               <div className="legend">
-                <div className="item"><span className="sw" style={{ background: '#3B82F6' }} />Collected</div>
+                <div className="item"><span className="sw" style={{ background: 'var(--brand)' }} />Collected</div>
               </div>
             </div>
             <div className="card-pad" style={{ paddingTop: 8 }}>
@@ -428,7 +428,7 @@ export default function BillingPage({ refreshToken = 0, focusBillId = null, focu
                   No collections recorded for {billingMonth}
                 </div>
               ) : (
-                <BarChart data={summary?.dailyCollections ?? []} accent="#3B82F6" labelKey="d" />
+                <BarChart data={summary?.dailyCollections ?? []} accent="var(--brand)" labelKey="d" />
               )}
             </div>
           </div>
@@ -447,7 +447,7 @@ export default function BillingPage({ refreshToken = 0, focusBillId = null, focu
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 20 }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div className="grid-responsive-2" style={{ gap: 12 }}>
                 <div className="card card-pad" style={{ padding: '10px 14px' }}>
                   <div className="muted" style={{ fontSize: 11, textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.05em' }}>Customer</div>
                   <div style={{ fontWeight: 600, fontSize: 13, marginTop: 4 }}>{detailBill.customer?.full_name ?? '—'}</div>
@@ -461,7 +461,7 @@ export default function BillingPage({ refreshToken = 0, focusBillId = null, focu
                   <div style={{ fontWeight: 600, fontSize: 13, marginTop: 4 }}>{detailBill.month}</div>
                 </div>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
+              <div className="grid-responsive-4" style={{ gap: 12 }}>
                 <div className="card card-pad" style={{ padding: '10px 14px' }}>
                   <div className="muted" style={{ fontSize: 11, textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.05em' }}>Amount</div>
                   <div className="num" style={{ fontWeight: 700, fontSize: 15, marginTop: 4 }}>{fmt(detailBill.amount)}</div>
@@ -488,7 +488,7 @@ export default function BillingPage({ refreshToken = 0, focusBillId = null, focu
                 </div>
               )}
               {(detailBill.payment_method || detailBill.collector) && (
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div className="grid-responsive-2" style={{ gap: 12 }}>
                   {detailBill.payment_method && (
                     <div className="card card-pad" style={{ padding: '10px 14px' }}>
                       <div className="muted" style={{ fontSize: 11, textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.05em' }}>

@@ -66,11 +66,13 @@ function Sidebar({ active, setActive, allowedNav, staffName, staffRole, onLogout
   const showSettings = allowedNav.includes('settings');
   return (
     <aside className="sidebar">
-      <div className="sidebar-brand">
-        <span className="bolt"><Icon name="zap" size={16} stroke={2.25} /></span>
+      <div className="sidebar-brand" style={{ paddingLeft: 4 }}>
         <div>
-          PowerNet Manager
-          <span className="title-sub">ISP Operations</span>
+          <div style={{ fontSize: 24, lineHeight: 1.1 }}>
+            <span style={{ fontWeight: 900, color: 'var(--text)', letterSpacing: '-0.03em' }}>POWER</span>
+            <span style={{ fontWeight: 900, color: 'var(--brand)', letterSpacing: '-0.03em' }}>NET</span>
+          </div>
+          <span className="title-sub" style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', color: 'var(--text-muted)', textTransform: 'uppercase', marginTop: 3, display: 'block' }}>ISP Solution</span>
         </div>
       </div>
 

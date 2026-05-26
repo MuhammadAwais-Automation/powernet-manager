@@ -69,7 +69,7 @@ export default function DashboardPage({ refreshToken = 0 }: { refreshToken?: num
       key: 'customers', label: 'Total Customers',
       value: s.totalCustomers.toLocaleString(),
       sub: `${s.activeCustomers.toLocaleString()} active`,
-      icon: 'users', accent: '#F05A2B',
+      icon: 'users', accent: '#F5A623',
       spark: [
         Math.max(0, s.totalCustomers - 60), Math.max(0, s.totalCustomers - 48),
         Math.max(0, s.totalCustomers - 36), Math.max(0, s.totalCustomers - 24),
@@ -101,7 +101,7 @@ export default function DashboardPage({ refreshToken = 0 }: { refreshToken?: num
       key: 'revenue', label: 'Monthly Revenue',
       value: fmt(s.monthlyRevenue),
       sub: 'this month (paid)',
-      icon: 'dollar', accent: '#F05A2B',
+      icon: 'dollar', accent: '#F5A623',
       spark: s.revenueByMonth.map(r => r.v),
     },
   ];
@@ -125,9 +125,9 @@ export default function DashboardPage({ refreshToken = 0 }: { refreshToken?: num
   ];
 
   const donutSegs = [
-    { label: 'Open',        value: s.complaintsByStatus.open,        color: '#F05A2B' },
-    { label: 'In Progress', value: s.complaintsByStatus.in_progress, color: '#1A1A1A' },
-    { label: 'Resolved',    value: s.complaintsByStatus.resolved,    color: '#F7825A' },
+    { label: 'Open',        value: s.complaintsByStatus.open,        color: '#EF4444' },
+    { label: 'In Progress', value: s.complaintsByStatus.in_progress, color: '#F59E0B' },
+    { label: 'Resolved',    value: s.complaintsByStatus.resolved,    color: '#22C55E' },
   ];
   const totalComplaints = donutSegs.reduce((a, b) => a + b.value, 0);
 
@@ -147,7 +147,7 @@ export default function DashboardPage({ refreshToken = 0 }: { refreshToken?: num
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 16, marginBottom: 16 }}>
+      <div className="grid-responsive-4" style={{ marginBottom: 16 }}>
         {statCards.map((c, i) => (
           <div key={i} className="stat-v2" style={{ '--stat-accent': c.accent } as React.CSSProperties}>
             <div className="stat-v2-glow" />
@@ -166,7 +166,7 @@ export default function DashboardPage({ refreshToken = 0 }: { refreshToken?: num
         ))}
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 16, marginBottom: 20 }}>
+      <div className="grid-responsive-2" style={{ marginBottom: 20 }}>
         {wideCards.map((c, i) => (
           <div key={i} className="stat-v2 stat-v2-wide" style={{ '--stat-accent': c.accent } as React.CSSProperties}>
             <div className="stat-v2-glow" />
@@ -185,7 +185,7 @@ export default function DashboardPage({ refreshToken = 0 }: { refreshToken?: num
         ))}
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1.6fr 1fr', gap: 16, marginBottom: 20 }}>
+      <div className="grid-dashboard-main" style={{ marginBottom: 20 }}>
         <div className="card">
           <div className="card-head">
             <div>

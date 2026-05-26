@@ -47,7 +47,7 @@ function SingleToast({ notification, onDismiss, onOpenNotification }: {
         aria-label={`Open ${notification.title}`}
         onClick={handleOpen}
         onKeyDown={handleKeyDown}
-        style={{ borderLeft: '3px solid var(--color-primary)' }}
+        style={{ borderLeft: '3px solid var(--brand)' }}
       >
         <div className="payment-toast__icon">
           <Icon name="users" size={18} />
@@ -68,9 +68,9 @@ function SingleToast({ notification, onDismiss, onOpenNotification }: {
     )
   }
 
-  // ── Complaint toast ─────────────────────────────────────────────────────────
   if (notification.kind === 'complaint') {
     const isResolved = notification.type === 'complaint_resolved'
+    const isCreated = notification.type === 'complaint_created'
     return (
       <div
         className={`payment-toast payment-toast--${isResolved ? 'full' : 'partial'}`}
@@ -80,19 +80,18 @@ function SingleToast({ notification, onDismiss, onOpenNotification }: {
         aria-label={`Open ${notification.title}`}
         onClick={handleOpen}
         onKeyDown={handleKeyDown}
-        style={{ borderLeft: `3px solid ${isResolved ? 'var(--green)' : 'var(--amber)'}` }}
+        style={{ borderLeft: `3px solid ${isCreated ? 'var(--brand)' : isResolved ? 'var(--green)' : 'var(--amber)'}` }}
       >
         <div className="payment-toast__icon">
-          <Icon name={isResolved ? 'check' : 'wrench'} size={18} />
+          <Icon name={isCreated ? 'users' : isResolved ? 'check' : 'wrench'} size={18} />
         </div>
         <div className="payment-toast__body">
           <div className="payment-toast__title">{notification.title}</div>
           <div className="payment-toast__message">{notification.message}</div>
-          {notification.technicianName && (
-            <div className="payment-toast__meta">
-              Technician: {notification.technicianName} · {notification.complaintCode}
-            </div>
-          )}
+          <div className="payment-toast__meta">
+            {notification.technicianName ? `Technician: ${notification.technicianName} - ` : ''}
+            {notification.complaintCode}
+          </div>
         </div>
         <button
           className="payment-toast__close"
@@ -105,7 +104,6 @@ function SingleToast({ notification, onDismiss, onOpenNotification }: {
     )
   }
 
-  // ── Billing toast (existing behavior) ──────────────────────────────────────
   const isFull = notification.type === 'payment_full'
   return (
     <div

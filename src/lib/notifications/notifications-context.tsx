@@ -217,7 +217,9 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
           technicianName: complaint.technician?.full_name ?? null,
           priority: complaint.priority,
           status: complaint.status,
-          updatedAt: complaint.resolved_at ?? new Date().toISOString(),
+          updatedAt: complaint.status === 'open'
+            ? complaint.opened_at
+            : complaint.resolved_at ?? new Date().toISOString(),
         })
 
         addNotification(notification)
@@ -351,7 +353,7 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
           // Always clear cache so the complaints page refreshes
           refreshComplaintViews()
 
-          // Only show a notification on meaningful technician-driven status changes
+          // Show intake notifications for new open complaints and technician status updates.
           if (!didComplaintStatusChange(oldRow, newRow) || !newRow?.id) return
 
           try {
@@ -365,7 +367,9 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
               technicianName: complaint.technician?.full_name ?? null,
               priority: complaint.priority,
               status: complaint.status,
-              updatedAt: new Date().toISOString(),
+              updatedAt: complaint.status === 'open'
+                ? complaint.opened_at
+                : complaint.resolved_at ?? new Date().toISOString(),
             })
 
             addNotification(notification)

@@ -73,7 +73,7 @@ function LogComplaintModal({ onClose, staff, onSaved }: {
       </div>
       <div className="modal-body">
         {error && (
-          <div style={{ padding: '10px 14px', background: '#fef2f2', color: '#dc2626',
+          <div style={{ padding: '10px 14px', background: 'var(--red-50)', color: 'var(--red)',
                         borderRadius: 8, marginBottom: 14, fontSize: 13 }}>
             {error}
           </div>
@@ -123,7 +123,7 @@ function LogComplaintModal({ onClose, staff, onSaved }: {
             value={form.issue} onChange={e => setForm(f => ({ ...f, issue: e.target.value }))} />
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
+        <div className="grid-responsive-2" style={{ marginBottom: 14 }}>
           <div className="field">
             <label>Type</label>
             <select className="select" value={form.type}
@@ -218,12 +218,12 @@ function ComplaintModal({ complaint, onClose, staff, onSaved }: {
       </div>
       <div className="modal-body">
         {error && (
-          <div style={{ color: '#EF4444', background: '#FEF2F2', padding: 10, borderRadius: 6, fontSize: 13, marginBottom: 14, border: '1px solid #FCA5A5' }}>
+          <div style={{ color: 'var(--red)', background: 'var(--red-50)', padding: 10, borderRadius: 6, fontSize: 13, marginBottom: 14, border: '1px solid color-mix(in srgb, var(--red) 30%, transparent)' }}>
             {error}
           </div>
         )}
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 18 }}>
+        <div className="grid-responsive-2" style={{ marginBottom: 18 }}>
           {[
             { label: 'Customer', content: <div className="row gap-sm"><Avatar name={complaint.customer?.full_name ?? '?'} size={24} /><span style={{ fontSize: 13, fontWeight: 500 }}>{complaint.customer?.full_name ?? '—'}</span></div> },
             { label: 'Issue Type', content: <Badge color="blue">{complaint.type}</Badge> },
@@ -398,9 +398,9 @@ export default function ComplaintsPage({ refreshToken = 0, focusComplaintId = nu
 
       <div className="kpi-row" style={{ marginBottom: 16 }}>
         {[
-          { key: 'open',        label: 'Open',        color: '#EF4444', bg: '#FEF2F2', trend: 'needs attention', value: byStatus.open.length },
-          { key: 'in_progress', label: 'In Progress', color: '#F59E0B', bg: '#FFFBEB', trend: 'being handled',   value: byStatus.in_progress.length },
-          { key: 'resolved',    label: 'Resolved',    color: '#22C55E', bg: '#F0FDF4', trend: 'completed',        value: byStatus.resolved.length },
+          { key: 'open',        label: 'Open',        color: 'var(--red)', bg: 'var(--red-50)', trend: 'needs attention', value: byStatus.open.length },
+          { key: 'in_progress', label: 'In Progress', color: 'var(--amber)', bg: 'var(--amber-50)', trend: 'being handled',   value: byStatus.in_progress.length },
+          { key: 'resolved',    label: 'Resolved',    color: 'var(--green)', bg: 'var(--green-50)', trend: 'completed',        value: byStatus.resolved.length },
         ].map(k => (
           <div key={k.key} className="kpi-card" style={{ '--kpi-color': k.color, '--kpi-bg': k.bg } as React.CSSProperties}>
             <div className="kpi-glow" />

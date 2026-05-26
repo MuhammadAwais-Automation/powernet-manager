@@ -20,7 +20,7 @@ function formatTime(value: string): string {
 function notificationIcon(item: AppNotification): 'checkCircle' | 'mapPin' | 'cash' | 'wrench' | 'check' | 'users' {
   if (item.kind === 'customer_signup') return 'users'
   if (item.kind === 'complaint') {
-    return item.type === 'complaint_resolved' ? 'check' : 'wrench'
+    return item.type === 'complaint_created' ? 'users' : item.type === 'complaint_resolved' ? 'check' : 'wrench'
   }
   return item.type === 'payment_full' ? 'checkCircle' : item.type === 'visit' ? 'mapPin' : 'cash'
 }
@@ -28,7 +28,7 @@ function notificationIcon(item: AppNotification): 'checkCircle' | 'mapPin' | 'ca
 function notificationBadgeColor(item: AppNotification): 'green' | 'amber' | 'blue' | 'purple' {
   if (item.kind === 'customer_signup') return 'purple'
   if (item.kind === 'complaint') {
-    return item.type === 'complaint_resolved' ? 'green' : 'amber'
+    return item.type === 'complaint_created' ? 'blue' : item.type === 'complaint_resolved' ? 'green' : 'amber'
   }
   return item.type === 'payment_full' ? 'green' : item.type === 'visit' ? 'blue' : 'amber'
 }
@@ -36,7 +36,7 @@ function notificationBadgeColor(item: AppNotification): 'green' | 'amber' | 'blu
 function notificationBadgeLabel(item: AppNotification): string {
   if (item.kind === 'customer_signup') return 'signup'
   if (item.kind === 'complaint') {
-    return item.type === 'complaint_resolved' ? 'resolved' : 'in progress'
+    return item.type === 'complaint_created' ? 'new' : item.type === 'complaint_resolved' ? 'resolved' : 'in progress'
   }
   return item.type === 'payment_full' ? 'paid' : item.type === 'visit' ? 'visited' : 'partial'
 }
