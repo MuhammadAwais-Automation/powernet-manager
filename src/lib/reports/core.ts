@@ -74,6 +74,27 @@ export function toChartThousands(value: number): number {
   return Math.round(value / 1000);
 }
 
+export function normalizeCurrencyChartForThousands(
+  data: ReportChartPoint[],
+  rawTotal: number,
+): ReportChartPoint[] {
+  if (data.length === 0) return [];
+
+  const maxValue = Math.max(...data.map((point) => point.v));
+  
+  // Safe heuristic: if max value is > 0.5% of raw total, or > 100k when raw total is 0,
+  // it is raw Rupees and needs to be scaled down to thousands.
+  const looksLikeRawRupees =
+    rawTotal > 0 ? maxValue > rawTotal * 0.005 : maxValue >= 100_000;
+
+  if (!looksLikeRawRupees) return data;
+
+  return data.map((point) => ({
+    ...point,
+    v: toChartThousands(point.v),
+  }));
+}
+
 export function normalizeAreaFilter(value?: string | null): string | undefined {
   const normalized = value?.trim();
   if (!normalized || normalized === "all") return undefined;

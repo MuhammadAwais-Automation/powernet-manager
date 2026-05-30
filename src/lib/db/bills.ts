@@ -564,6 +564,7 @@ function emptyBillingSummary(month: string): BillingSummary {
   };
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function withCustomerFilter(query: any, customerIds?: string[]) {
   return customerIds ? query.in("customer_id", customerIds) : query;
 }

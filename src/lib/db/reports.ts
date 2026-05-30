@@ -1,6 +1,11 @@
 import { supabase } from "@/lib/supabase";
 import type { ReportChartPoint } from "@/lib/reports/core";
-import { normalizeAreaFilter, normalizeReportMonth } from "@/lib/reports/core";
+import {
+  normalizeAreaFilter,
+  normalizeCurrencyChartForThousands,
+  normalizeReportMonth,
+  toChartThousands,
+} from "@/lib/reports/core";
 
 export type ReportCards = {
   revenue: number;
@@ -110,6 +115,13 @@ async function getReportsSummaryFallback(
       customer.status === "disconnected" && getMonth(customer.created_at) === reportMonth,
   ).length;
 
+  const revenueMonths = months.map((month) => ({
+    d: monthLabel(month),
+    v: billRows
+      .filter((bill) => bill.month === month && (!areaId || bill.customer?.area_id === areaId))
+      .reduce((sum, bill) => sum + toNumber(bill.amount), 0),
+  }));
+
   return {
     month: reportMonth,
     cards: {
@@ -120,13 +132,14 @@ async function getReportsSummaryFallback(
       customers,
       growth: newCustomers - disconnectedCustomers,
     },
-    revenueMonths: months.map((month) => ({
-      d: monthLabel(month),
-      v: billRows
-        .filter((bill) => bill.month === month && (!areaId || bill.customer?.area_id === areaId))
-        .reduce((sum, bill) => sum + toNumber(bill.amount), 0),
+    revenueMonths: revenueMonths.map((point) => ({
+      ...point,
+      v: toChartThousands(point.v),
     })),
-    dailyCollections: buildDailyCollections(scopedBills),
+    dailyCollections: buildDailyCollections(scopedBills).map((point) => ({
+      ...point,
+      v: toChartThousands(point.v),
+    })),
     complaintsMonths: months.map((month) => ({
       d: monthLabel(month),
       v: complaintRows.filter(
@@ -167,12 +180,19 @@ function normalizeReportsSummary(
   fallbackMonth: string,
 ): ReportsSummary {
   const raw = (value ?? {}) as Partial<ReportsSummary>;
+  const cards = normalizeCards(raw.cards);
 
   return {
     month: typeof raw.month === "string" ? raw.month : fallbackMonth,
-    cards: normalizeCards(raw.cards),
-    revenueMonths: normalizeChart(raw.revenueMonths),
-    dailyCollections: normalizeChart(raw.dailyCollections),
+    cards,
+    revenueMonths: normalizeCurrencyChartForThousands(
+      normalizeChart(raw.revenueMonths),
+      cards.revenue,
+    ),
+    dailyCollections: normalizeCurrencyChartForThousands(
+      normalizeChart(raw.dailyCollections),
+      cards.collections,
+    ),
     complaintsMonths: normalizeChart(raw.complaintsMonths),
     customersMonths: normalizeChart(raw.customersMonths),
     customerGrowthMonths: normalizeChart(raw.customerGrowthMonths),
@@ -272,7 +292,7 @@ async function fetchAllRows<T extends Record<string, unknown>>(
 function buildDailyCollections(bills: BillReportRow[]): ReportChartPoint[] {
   const byDay = new Map<string, number>();
   bills.forEach((bill) => {
-    if (bill.status !== "paid" || !bill.paid_at) return;
+    if (toNumber(bill.paid_amount) <= 0 || !bill.paid_at) return;
     const date = new Date(bill.paid_at);
     if (Number.isNaN(date.getTime())) return;
     const day = String(date.getDate()).padStart(2, "0");

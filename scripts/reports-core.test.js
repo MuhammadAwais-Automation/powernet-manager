@@ -36,6 +36,14 @@ assert.throws(() => core.normalizeReportMonth('Apr 2026'), /YYYY-MM/)
 assert.strictEqual(core.toChartThousands(0), 0)
 assert.strictEqual(core.toChartThousands(1499), 1)
 assert.strictEqual(core.toChartThousands(1500), 2)
+assert.deepStrictEqual(
+  core.normalizeCurrencyChartForThousands([{ d: '17', v: 39500 }], 138750),
+  [{ d: '17', v: 40 }],
+)
+assert.deepStrictEqual(
+  core.normalizeCurrencyChartForThousands([{ d: 'May', v: 6387 }], 6386580),
+  [{ d: 'May', v: 6387 }],
+)
 
 const summary = {
   revenueMonths: [{ d: 'Mar', v: 420 }, { d: 'Apr', v: 485 }],
