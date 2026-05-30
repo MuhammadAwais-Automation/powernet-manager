@@ -1108,6 +1108,7 @@ export default function ComplaintsPage({
 
       {/* Fully Functional State-Driven Filter Bar */}
       <div className="filter-bar">
+        <input type="text" className="input" placeholder="Search complaint #, phone, name, issue..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} style={{ width: "260px", marginRight: "8px" }} />
         <select
           className="select"
           style={{ width: "auto" }}
