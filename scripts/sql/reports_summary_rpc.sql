@@ -1,4 +1,7 @@
-create or replace function public.get_reports_summary(p_month text)
+create or replace function public.get_reports_summary(
+  p_month text,
+  p_area_id uuid default null
+)
 returns jsonb
 language plpgsql
 stable
@@ -28,20 +31,43 @@ begin
       to_char(month_start, 'Mon') as label
     from month_series
   ),
+  scoped_bills as (
+    select bills.*
+    from public.bills
+    join public.customers on customers.id = bills.customer_id
+    where p_area_id is null or customers.area_id = p_area_id
+  ),
+  scoped_payments as (
+    select payments.*
+    from public.payments
+    join public.customers on customers.id = payments.customer_id
+    where p_area_id is null or customers.area_id = p_area_id
+  ),
+  scoped_complaints as (
+    select complaints.*
+    from public.complaints
+    left join public.customers on customers.id = complaints.customer_id
+    where p_area_id is null or customers.area_id = p_area_id
+  ),
+  scoped_customers as (
+    select customers.*
+    from public.customers
+    where p_area_id is null or customers.area_id = p_area_id
+  ),
   revenue_months as (
     select
       month_keys.month_start,
       month_keys.label,
-      coalesce(sum(bills.amount), 0)::integer as total
+      coalesce(sum(scoped_bills.amount), 0)::integer as total
     from month_keys
-    left join public.bills on bills.month = month_keys.month_key
+    left join scoped_bills on scoped_bills.month = month_keys.month_key
     group by month_keys.month_start, month_keys.label
   ),
   daily_collection as (
     select
       days.sort_order,
       days.label,
-      coalesce(sum(payments.amount), 0)::integer as total
+      coalesce(sum(scoped_payments.amount), 0)::integer as total
     from (values
       (1, 'Mon'),
       (2, 'Tue'),
@@ -51,51 +77,79 @@ begin
       (6, 'Sat'),
       (7, 'Sun')
     ) as days(sort_order, label)
-    left join public.payments
-      on extract(isodow from payments.paid_at)::integer = days.sort_order
-     and payments.paid_at >= v_month_start
-     and payments.paid_at < v_next_month
+    left join scoped_payments
+      on extract(isodow from scoped_payments.paid_at)::integer = days.sort_order
+     and scoped_payments.paid_at >= v_month_start
+     and scoped_payments.paid_at < v_next_month
     group by days.sort_order, days.label
   ),
   complaints_months as (
     select
       month_keys.month_start,
       month_keys.label,
-      count(complaints.id)::integer as total
+      count(scoped_complaints.id)::integer as total
     from month_keys
-    left join public.complaints
-      on complaints.opened_at >= month_keys.month_start
-     and complaints.opened_at < month_keys.month_start + interval '1 month'
+    left join scoped_complaints
+      on scoped_complaints.opened_at >= month_keys.month_start
+     and scoped_complaints.opened_at < month_keys.month_start + interval '1 month'
     group by month_keys.month_start, month_keys.label
   ),
   customers_months as (
     select
       month_keys.month_start,
       month_keys.label,
-      count(customers.id)::integer as total
+      count(scoped_customers.id) filter (
+        where scoped_customers.created_at < month_keys.month_start + interval '1 month'
+          and (
+            scoped_customers.disconnected_date is null
+            or scoped_customers.disconnected_date >= month_keys.month_start + interval '1 month'
+            or scoped_customers.reconnected_date < month_keys.month_start + interval '1 month'
+          )
+      )::integer as total
     from month_keys
-    left join public.customers
-      on customers.created_at < month_keys.month_start + interval '1 month'
+    left join scoped_customers on scoped_customers.created_at < month_keys.month_start + interval '1 month'
+    group by month_keys.month_start, month_keys.label
+  ),
+  customer_growth_months as (
+    select
+      month_keys.month_start,
+      month_keys.label,
+      (
+        count(scoped_customers.id) filter (
+          where scoped_customers.created_at >= month_keys.month_start
+            and scoped_customers.created_at < month_keys.month_start + interval '1 month'
+        )
+        - count(scoped_customers.id) filter (
+          where scoped_customers.disconnected_date >= month_keys.month_start
+            and scoped_customers.disconnected_date < month_keys.month_start + interval '1 month'
+        )
+        + count(scoped_customers.id) filter (
+          where scoped_customers.reconnected_date >= month_keys.month_start
+            and scoped_customers.reconnected_date < month_keys.month_start + interval '1 month'
+        )
+      )::integer as total
+    from month_keys
+    left join scoped_customers on true
     group by month_keys.month_start, month_keys.label
   ),
   payment_totals as (
     select
-      payments.collected_by as staff_id,
-      count(payments.id)::integer as payments_count,
-      coalesce(sum(payments.amount), 0)::integer as collected
-    from public.payments
-    where payments.paid_at >= v_month_start
-      and payments.paid_at < v_next_month
-    group by payments.collected_by
+      scoped_payments.collected_by as staff_id,
+      count(scoped_payments.id)::integer as payments_count,
+      coalesce(sum(scoped_payments.amount), 0)::integer as collected
+    from scoped_payments
+    where scoped_payments.paid_at >= v_month_start
+      and scoped_payments.paid_at < v_next_month
+    group by scoped_payments.collected_by
   ),
   pending_totals as (
     select
-      bills.collected_by as staff_id,
-      coalesce(sum(greatest(bills.amount - coalesce(bills.paid_amount, 0), 0)), 0)::integer as pending
-    from public.bills
-    where bills.month = v_month
-      and bills.status <> 'paid'
-    group by bills.collected_by
+      scoped_bills.collected_by as staff_id,
+      coalesce(sum(greatest(scoped_bills.amount - coalesce(scoped_bills.paid_amount, 0), 0)), 0)::integer as pending
+    from scoped_bills
+    where scoped_bills.month = v_month
+      and scoped_bills.status <> 'paid'
+    group by scoped_bills.collected_by
   ),
   agent_base as (
     select
@@ -106,6 +160,7 @@ begin
     left join public.areas on areas.id = staff.area_id
     where staff.is_active is true
       and staff.role in ('recovery_agent', 'admin', 'complaint_manager')
+      and (p_area_id is null or staff.area_id = p_area_id or p_area_id = any(coalesce(staff.area_ids, '{}')::uuid[]))
     union all
     select
       null::uuid as staff_id,
@@ -138,30 +193,42 @@ begin
   ),
   cards as (
     select
-      coalesce((select sum(amount) from public.bills where month = v_month), 0)::integer as revenue,
+      coalesce((select sum(amount) from scoped_bills where month = v_month), 0)::integer as revenue,
       coalesce((
         select sum(amount)
-        from public.payments
+        from scoped_payments
         where paid_at >= v_month_start
           and paid_at < v_next_month
       ), 0)::integer as collections,
       coalesce((
         select sum(greatest(amount - coalesce(paid_amount, 0), 0))
-        from public.bills
+        from scoped_bills
         where month = v_month
           and status <> 'paid'
       ), 0)::integer as pending,
       coalesce((
         select count(*)
-        from public.complaints
+        from scoped_complaints
         where opened_at >= v_month_start
           and opened_at < v_next_month
       ), 0)::integer as complaints,
       coalesce((
         select count(*)
-        from public.customers
+        from scoped_customers
         where created_at < v_next_month
-      ), 0)::integer as customers
+          and (
+            disconnected_date is null
+            or disconnected_date >= v_next_month
+            or reconnected_date < v_next_month
+          )
+      ), 0)::integer as customers,
+      coalesce((
+        select
+          count(*) filter (where created_at >= v_month_start and created_at < v_next_month)
+          - count(*) filter (where disconnected_date >= v_month_start and disconnected_date < v_next_month)
+          + count(*) filter (where reconnected_date >= v_month_start and reconnected_date < v_next_month)
+        from scoped_customers
+      ), 0)::integer as growth
   )
   select jsonb_build_object(
     'month', v_month,
@@ -170,7 +237,8 @@ begin
       'collections', cards.collections,
       'pending', cards.pending,
       'complaints', cards.complaints,
-      'customers', cards.customers
+      'customers', cards.customers,
+      'growth', cards.growth
     ),
     'revenueMonths', coalesce((
       select jsonb_agg(jsonb_build_object('d', label, 'v', round(total::numeric / 1000)::integer) order by month_start)
@@ -187,6 +255,10 @@ begin
     'customersMonths', coalesce((
       select jsonb_agg(jsonb_build_object('d', label, 'v', total) order by month_start)
       from customers_months
+    ), '[]'::jsonb),
+    'customerGrowthMonths', coalesce((
+      select jsonb_agg(jsonb_build_object('d', label, 'v', total) order by month_start)
+      from customer_growth_months
     ), '[]'::jsonb),
     'agentCollections', coalesce((
       select jsonb_agg(jsonb_build_object(
@@ -209,5 +281,7 @@ $$;
 
 revoke all on function public.get_reports_summary(text) from public;
 revoke execute on function public.get_reports_summary(text) from anon;
-grant execute on function public.get_reports_summary(text) to authenticated;
-grant execute on function public.get_reports_summary(text) to service_role;
+revoke all on function public.get_reports_summary(text, uuid) from public;
+revoke execute on function public.get_reports_summary(text, uuid) from anon;
+grant execute on function public.get_reports_summary(text, uuid) to authenticated;
+grant execute on function public.get_reports_summary(text, uuid) to service_role;

@@ -48,5 +48,13 @@ assert.strictEqual(
   query.buildBillsPageCacheKey({ month: '2026-04', page: 0, pageSize: 50, status: 'unpaid', search: ' Awais  Khan ' }),
   '{"month":"2026-04","page":0,"pageSize":50,"status":"unpaid","search":"Awais Khan","from":0,"to":49}'
 )
+assert.strictEqual(
+  query.buildBillingSummaryCacheKey({ month: '2026-04', areaId: 'area-1' }),
+  '{"month":"2026-04","areaId":"area-1"}'
+)
+assert.strictEqual(
+  query.buildBillingSummaryCacheKey({ month: '2026-04', areaId: '' }),
+  '{"month":"2026-04"}'
+)
 
 console.log('billing-query tests passed')

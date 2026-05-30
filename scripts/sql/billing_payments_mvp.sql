@@ -2,6 +2,7 @@ alter table public.bills
   add column if not exists paid_amount integer not null default 0,
   add column if not exists receipt_no text,
   add column if not exists payment_method text,
+  add column if not exists payment_source text not null default 'manual',
   add column if not exists payment_note text;
 
 create unique index if not exists bills_customer_month_key
@@ -17,6 +18,7 @@ create table if not exists public.payments (
   amount integer not null check (amount > 0),
   collected_by uuid references public.staff(id),
   method text not null default 'cash' check (method in ('cash', 'bank', 'easypaisa', 'jazzcash', 'other')),
+  source text not null default 'agent' check (source in ('office', 'agent', 'customer', 'manual')),
   note text,
   receipt_no text not null unique,
   paid_at timestamp with time zone not null default now(),
@@ -26,12 +28,59 @@ create table if not exists public.payments (
 alter table public.payments enable row level security;
 
 drop policy if exists payments_auth_all on public.payments;
-create policy payments_auth_all
+drop policy if exists payments_staff_select on public.payments;
+drop policy if exists payments_customer_select_own on public.payments;
+drop policy if exists payments_staff_write on public.payments;
+
+create policy payments_staff_select
+  on public.payments
+  for select
+  to authenticated
+  using (
+    exists (
+      select 1
+      from public.staff
+      where staff.auth_user_id = auth.uid()
+        and staff.is_active = true
+        and staff.role in ('admin', 'complaint_manager', 'recovery_agent')
+    )
+  );
+
+create policy payments_customer_select_own
+  on public.payments
+  for select
+  to authenticated
+  using (
+    exists (
+      select 1
+      from public.customers
+      where customers.id = payments.customer_id
+        and customers.auth_user_id = auth.uid()
+    )
+  );
+
+create policy payments_staff_write
   on public.payments
   for all
   to authenticated
-  using (true)
-  with check (true);
+  using (
+    exists (
+      select 1
+      from public.staff
+      where staff.auth_user_id = auth.uid()
+        and staff.is_active = true
+        and staff.role in ('admin', 'complaint_manager', 'recovery_agent')
+    )
+  )
+  with check (
+    exists (
+      select 1
+      from public.staff
+      where staff.auth_user_id = auth.uid()
+        and staff.is_active = true
+        and staff.role in ('admin', 'complaint_manager', 'recovery_agent')
+    )
+  );
 
 create index if not exists payments_bill_id_idx on public.payments (bill_id);
 create index if not exists payments_customer_id_idx on public.payments (customer_id);
@@ -108,6 +157,8 @@ create or replace function public.record_bill_payment(
   p_amount integer,
   p_collected_by uuid default null,
   p_method text default 'cash',
+  p_source text default 'agent',
+  p_paid_at timestamp with time zone default null,
   p_note text default null
 )
 returns jsonb
@@ -129,6 +180,10 @@ begin
 
   if p_method not in ('cash', 'bank', 'easypaisa', 'jazzcash', 'other') then
     raise exception 'Invalid payment method';
+  end if;
+
+  if p_source not in ('office', 'agent', 'customer', 'manual') then
+    raise exception 'Invalid payment source';
   end if;
 
   select * into v_bill
@@ -161,8 +216,10 @@ begin
     amount,
     collected_by,
     method,
+    source,
     note,
-    receipt_no
+    receipt_no,
+    paid_at
   )
   values (
     v_bill.id,
@@ -170,8 +227,10 @@ begin
     p_amount,
     p_collected_by,
     p_method,
+    p_source,
     nullif(trim(coalesce(p_note, '')), ''),
-    v_receipt
+    v_receipt,
+    coalesce(p_paid_at, now())
   );
 
   update public.bills
@@ -179,9 +238,10 @@ begin
     paid_amount = v_new_paid,
     status = v_new_status,
     collected_by = coalesce(p_collected_by, collected_by),
-    paid_at = case when v_new_status = 'paid' then current_date else paid_at end,
+    paid_at = case when v_new_status = 'paid' then coalesce(p_paid_at, now()) else paid_at end,
     receipt_no = case when v_new_status = 'paid' then v_receipt else receipt_no end,
     payment_method = p_method,
+    payment_source = p_source,
     payment_note = nullif(trim(coalesce(p_note, '')), '')
   where id = v_bill.id;
 
@@ -192,7 +252,8 @@ begin
     'paidAmount', v_new_paid,
     'remainingAmount', greatest(v_bill.amount - v_new_paid, 0),
     'status', v_new_status,
-    'receiptNo', v_receipt
+    'receiptNo', v_receipt,
+    'paidAt', coalesce(p_paid_at, now())
   );
 end;
 $$;
@@ -204,5 +265,7 @@ grant execute on function public.generate_monthly_bills(text) to service_role;
 
 revoke all on function public.record_bill_payment(uuid, integer, uuid, text, text) from public;
 revoke execute on function public.record_bill_payment(uuid, integer, uuid, text, text) from anon;
-grant execute on function public.record_bill_payment(uuid, integer, uuid, text, text) to authenticated;
-grant execute on function public.record_bill_payment(uuid, integer, uuid, text, text) to service_role;
+revoke all on function public.record_bill_payment(uuid, integer, uuid, text, text, timestamp with time zone, text) from public;
+revoke execute on function public.record_bill_payment(uuid, integer, uuid, text, text, timestamp with time zone, text) from anon;
+grant execute on function public.record_bill_payment(uuid, integer, uuid, text, text, timestamp with time zone, text) to authenticated;
+grant execute on function public.record_bill_payment(uuid, integer, uuid, text, text, timestamp with time zone, text) to service_role;

@@ -12,11 +12,24 @@ as $$
       (select count(*) from public.complaints where status = 'open') as open_complaints,
       (select count(*) from public.staff where is_active = true) as active_staff,
       coalesce((
+        select sum(coalesce(customers.due_amount, packages.default_price, 0))
+        from public.customers
+        left join public.packages on packages.id = customers.package_id
+        where customers.status = 'active'
+          and coalesce(customers.due_amount, packages.default_price, 0) > 0
+      ), 0) as expected_revenue,
+      coalesce((
         select sum(amount)
         from public.bills
         where status = 'paid'
           and month like to_char(now(), 'YYYY-MM') || '%'
-      ), 0) as monthly_revenue
+      ), 0) as monthly_revenue,
+      coalesce((
+        select sum(greatest(amount - coalesce(paid_amount, 0), 0))
+        from public.bills
+        where status <> 'paid'
+          and month like to_char(now(), 'YYYY-MM') || '%'
+      ), 0) as pending_revenue
   ),
   complaint_stats as (
     select
@@ -49,6 +62,8 @@ as $$
     'unpaidBills', stats.unpaid_bills,
     'openComplaints', stats.open_complaints,
     'monthlyRevenue', stats.monthly_revenue,
+    'expectedRevenue', stats.expected_revenue,
+    'pendingRevenue', stats.pending_revenue,
     'activeStaff', stats.active_staff,
     'complaintsByStatus', jsonb_build_object(
       'open', complaint_stats.open,

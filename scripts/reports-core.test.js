@@ -42,12 +42,20 @@ const summary = {
   dailyCollections: [{ d: 'Mon', v: 62 }],
   complaintsMonths: [{ d: 'Apr', v: 12 }],
   customersMonths: [{ d: 'Apr', v: 1248 }],
+  customerGrowthMonths: [{ d: 'Apr', v: 42 }],
 }
 
 assert.deepStrictEqual(core.getReportChart(summary, 'Revenue').data, summary.revenueMonths)
 assert.deepStrictEqual(core.getReportChart(summary, 'Collections').data, summary.dailyCollections)
 assert.strictEqual(core.getReportChart(summary, 'Complaints').unit, '')
-assert.strictEqual(core.getReportChart(summary, 'Customers').label, 'Total Customers at month-end')
+assert.strictEqual(core.getReportChart(summary, 'Customers').label, 'Net Customer Growth')
+assert.deepStrictEqual(core.getReportChart(summary, 'Customers').data, summary.customerGrowthMonths)
+
+assert.deepStrictEqual(core.normalizeAreaFilter(''), undefined)
+assert.deepStrictEqual(core.normalizeAreaFilter('all'), undefined)
+assert.deepStrictEqual(core.normalizeAreaFilter(' area-1 '), 'area-1')
+assert.strictEqual(core.getAreaScopeLabel(undefined), 'All Areas')
+assert.strictEqual(core.getAreaScopeLabel('area-1', 'Army Area'), 'Army Area')
 
 const csv = core.buildCsv([
   ['Agent', 'Collected'],

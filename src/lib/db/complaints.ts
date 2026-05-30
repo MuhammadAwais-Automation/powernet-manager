@@ -4,7 +4,18 @@ import type { Complaint, ComplaintWithRelations } from '@/types/database'
 
 const COMPLAINT_SELECT = `
   *,
-  customer:customers(id, full_name, area_id),
+  customer:customers(
+    id,
+    full_name,
+    area_id,
+    phone,
+    house_id,
+    address_value,
+    address_type,
+    whatsapp,
+    email,
+    area:areas(id, name, code)
+  ),
   technician:staff(id, full_name)
 `
 
@@ -69,7 +80,7 @@ export async function getRecentComplaintStatusEvents(limit = 25): Promise<Compla
 
 export async function updateComplaint(
   id: string,
-  input: Partial<Pick<Complaint, 'status' | 'assigned_to' | 'resolved_at'>>,
+  input: Partial<Pick<Complaint, 'status' | 'assigned_to' | 'assigned_at' | 'in_progress_at' | 'resolved_at' | 'priority'>>,
 ): Promise<Complaint> {
   const { data, error } = await supabase
     .from('complaints')

@@ -242,6 +242,7 @@ function ShellContent({ staff, logout }: {
               {canAccessPage(staff.role, 'billing') && (
                 <div style={{ display: active === 'billing' ? 'contents' : 'none' }}>
                   <BillingPage
+                    staff={staff}
                     refreshToken={billingVersion}
                     focusBillId={notificationFocus?.page === 'billing' ? notificationFocus.id : null}
                     focusToken={notificationFocus?.page === 'billing' ? notificationFocus.requestId : 0}

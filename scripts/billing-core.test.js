@@ -33,9 +33,32 @@ assert.throws(() => core.normalizeBillingMonth('Apr 2026'), /YYYY-MM/)
 assert.strictEqual(core.isBillableCustomerStatus('active'), true)
 assert.strictEqual(core.isBillableCustomerStatus('free'), false)
 assert.strictEqual(core.isBillableCustomerStatus('disconnected'), false)
+assert.strictEqual(core.isBillableCustomerStatus('shifted'), false)
+assert.strictEqual(core.isBillableCustomerStatus('tdc'), false)
 
 assert.strictEqual(core.getCustomerBillAmount({ due_amount: 1500, package: { default_price: 2000 } }), 1500)
 assert.strictEqual(core.getCustomerBillAmount({ due_amount: null, package: { default_price: 2000 } }), 2000)
 assert.strictEqual(core.getCustomerBillAmount({ due_amount: null, package: null }), 0)
+assert.strictEqual(core.getCustomerBillAmount({ due_amount: 0, package: { default_price: 2000 } }), 0)
+
+assert.strictEqual(
+  core.getCustomerSecondaryId({ username: 'a027', customer_code: 'C-123', house_id: 'H-9' }),
+  'a027'
+)
+assert.strictEqual(
+  core.getCustomerSecondaryId({ username: null, customer_code: 'C-123', house_id: 'H-9' }),
+  'H-9'
+)
+assert.strictEqual(
+  core.getCustomerSecondaryId({ username: null, customer_code: 'C-123', house_id: null }),
+  undefined
+)
+
+assert.strictEqual(core.getBillCollectionStatus({ amount: 1700, paid_amount: 0, status: 'pending' }), 'pending')
+assert.strictEqual(core.getBillCollectionStatus({ amount: 1700, paid_amount: 700, status: 'pending' }), 'partial')
+assert.strictEqual(core.getBillCollectionStatus({ amount: 1700, paid_amount: 1700, status: 'pending' }), 'paid')
+assert.strictEqual(core.getBillCollectionStatus({ amount: 1700, paid_amount: 0, status: 'overdue' }), 'overdue')
+assert.strictEqual(core.getPaymentSourceLabel('office'), 'Paid in Office')
+assert.strictEqual(core.getPaymentSourceLabel('agent'), 'Collected by Agent')
 
 console.log('billing-core tests passed')

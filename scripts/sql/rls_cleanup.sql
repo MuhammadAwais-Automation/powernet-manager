@@ -10,8 +10,14 @@ drop policy if exists anon_write on public.areas;
 drop policy if exists anon_read on public.bills;
 drop policy if exists anon_write on public.bills;
 
+drop policy if exists anon_read on public.payments;
+drop policy if exists anon_write on public.payments;
+
 drop policy if exists anon_read on public.complaints;
 drop policy if exists anon_write on public.complaints;
+
+drop policy if exists anon_read on public.complaint_events;
+drop policy if exists anon_write on public.complaint_events;
 
 drop policy if exists anon_read on public.customers;
 drop policy if exists anon_write on public.customers;

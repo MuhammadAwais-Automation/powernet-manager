@@ -179,7 +179,7 @@ export default function CustomerRequestsPage({ refreshToken = 0, focusRequestId 
   focusToken?: number
 }) {
   const [requests, setRequests] = useState<CustomerSignupRequestWithRelations[]>([])
-  const [status, setStatus] = useState<CustomerSignupStatus | 'all'>('pending')
+  const [status, setStatus] = useState<CustomerSignupStatus | 'all'>('all')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [selected, setSelected] = useState<CustomerSignupRequestWithRelations | null>(null)
@@ -187,13 +187,13 @@ export default function CustomerRequestsPage({ refreshToken = 0, focusRequestId 
   const load = () => {
     setLoading(true)
     setError(null)
-    getCustomerSignupRequests(status === 'all' ? undefined : status)
+    getCustomerSignupRequests()
       .then(setRequests)
       .catch(e => setError(e instanceof Error ? e.message : 'Could not load customer requests'))
       .finally(() => setLoading(false))
   }
 
-  useEffect(load, [status, refreshToken])
+  useEffect(load, [refreshToken])
 
   useEffect(() => {
     if (!focusRequestId || focusToken === 0) return
@@ -207,6 +207,11 @@ export default function CustomerRequestsPage({ refreshToken = 0, focusRequestId 
     approved: requests.filter(r => r.status === 'approved').length,
     rejected: requests.filter(r => r.status === 'rejected').length,
   }), [requests])
+
+  const visibleRequests = useMemo(
+    () => status === 'all' ? requests : requests.filter(request => request.status === status),
+    [requests, status],
+  )
 
   const updateRequest = (updated: CustomerSignupRequestWithRelations) => {
     setRequests(current => current.map(item => item.id === updated.id ? updated : item))
@@ -257,7 +262,7 @@ export default function CustomerRequestsPage({ refreshToken = 0, focusRequestId 
             </tr>
           </thead>
           <tbody>
-            {loading && requests.length === 0 ? (
+            {loading && visibleRequests.length === 0 ? (
               Array.from({ length: 6 }).map((_, i) => (
                 <tr key={i}>
                   {Array.from({ length: 8 }).map((__, j) => (
@@ -265,9 +270,9 @@ export default function CustomerRequestsPage({ refreshToken = 0, focusRequestId 
                   ))}
                 </tr>
               ))
-            ) : requests.length === 0 ? (
+            ) : visibleRequests.length === 0 ? (
               <tr><td colSpan={8} style={{ textAlign: 'center', padding: 32, color: 'var(--text-muted)' }}>No customer requests found</td></tr>
-            ) : requests.map(request => {
+            ) : visibleRequests.map(request => {
               const meta = STATUS_META[request.status]
               return (
                 <tr key={request.id} className="clickable" onClick={() => setSelected(request)}>

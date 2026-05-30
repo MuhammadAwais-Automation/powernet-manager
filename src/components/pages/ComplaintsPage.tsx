@@ -1,33 +1,55 @@
-'use client';
-import React, { useState, useEffect } from 'react';
-import Icon from '../Icon';
-import { Badge, Avatar, Modal, Tabs } from '../ui';
-import { getComplaintById, getComplaints, createComplaint, updateComplaint } from '@/lib/db/complaints';
-import { getAreas } from '@/lib/db/areas';
-import { getStaff } from '@/lib/db/staff';
-import { searchCustomers, type CustomerSearchResult } from '@/lib/db/customers';
-import type { ComplaintWithRelations, Area, StaffWithArea, ComplaintType, ComplaintPriority, ComplaintStatus } from '@/types/database';
+"use client";
+import React, { useState, useEffect } from "react";
+import Icon from "../Icon";
+import { Badge, Avatar, Modal, Tabs } from "../ui";
+import {
+  getComplaintById,
+  getComplaints,
+  createComplaint,
+  updateComplaint,
+} from "@/lib/db/complaints";
+import { getAreas } from "@/lib/db/areas";
+import { getStaff } from "@/lib/db/staff";
+import { searchCustomers, type CustomerSearchResult } from "@/lib/db/customers";
+import type {
+  ComplaintWithRelations,
+  Area,
+  StaffWithArea,
+  ComplaintType,
+  ComplaintPriority,
+  ComplaintStatus,
+} from "@/types/database";
 
-function LogComplaintModal({ onClose, staff, onSaved }: {
+function LogComplaintModal({
+  onClose,
+  staff,
+  onSaved,
+}: {
   onClose: () => void;
   staff: StaffWithArea[];
   onSaved: (c: ComplaintWithRelations) => void;
 }) {
-  const [customerSearch, setCustomerSearch]     = useState('');
-  const [customerResults, setCustomerResults]   = useState<CustomerSearchResult[]>([]);
-  const [selectedCustomer, setSelectedCustomer] = useState<CustomerSearchResult | null>(null);
+  const [customerSearch, setCustomerSearch] = useState("");
+  const [customerResults, setCustomerResults] = useState<
+    CustomerSearchResult[]
+  >([]);
+  const [selectedCustomer, setSelectedCustomer] =
+    useState<CustomerSearchResult | null>(null);
   const [form, setForm] = useState({
-    issue:       '',
-    type:        'connectivity' as ComplaintType,
-    priority:    'medium'       as ComplaintPriority,
-    assigned_to: '',
-    status:      'open'         as ComplaintStatus,
+    issue: "",
+    type: "connectivity" as ComplaintType,
+    priority: "medium" as ComplaintPriority,
+    assigned_to: "",
+    status: "open" as ComplaintStatus,
   });
   const [saving, setSaving] = useState(false);
-  const [error, setError]   = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (customerSearch.length < 2) { setCustomerResults([]); return; }
+    if (customerSearch.length < 2) {
+      setCustomerResults([]);
+      return;
+    }
     const t = setTimeout(() => {
       searchCustomers(customerSearch, 8).then(setCustomerResults);
     }, 300);
@@ -35,28 +57,55 @@ function LogComplaintModal({ onClose, staff, onSaved }: {
   }, [customerSearch]);
 
   const handleSubmit = async () => {
-    if (!selectedCustomer) { setError('Select a customer'); return; }
-    if (!form.issue.trim()) { setError('Issue description required'); return; }
+    if (!selectedCustomer) {
+      setError("Select a customer");
+      return;
+    }
+    if (!form.issue.trim()) {
+      setError("Issue description required");
+      return;
+    }
     setSaving(true);
     setError(null);
     try {
       const created = await createComplaint({
         customer_id: selectedCustomer.id,
-        issue:       form.issue.trim(),
-        type:        form.type,
-        priority:    form.priority,
-        status:      form.status,
+        issue: form.issue.trim(),
+        type: form.type,
+        priority: form.priority,
+        status: form.status,
         assigned_to: form.assigned_to || null,
+        assigned_at: form.assigned_to ? new Date().toISOString() : null,
+        in_progress_at: null,
       });
       const withRelations: ComplaintWithRelations = {
         ...created,
-        customer:   { id: selectedCustomer.id, full_name: selectedCustomer.full_name, area_id: selectedCustomer.area_id },
-        technician: form.assigned_to ? (staff.find(s => s.id === form.assigned_to) ?? null) : null,
+        customer: {
+          id: selectedCustomer.id,
+          full_name: selectedCustomer.full_name,
+          area_id: selectedCustomer.area_id,
+          phone: selectedCustomer.phone,
+          house_id: selectedCustomer.house_id,
+          address_value: selectedCustomer.address_value,
+          address_type: "text",
+          whatsapp: null,
+          email: null,
+          area: selectedCustomer.area
+            ? {
+                id: selectedCustomer.area.id,
+                name: selectedCustomer.area.name,
+                code: "",
+              }
+            : null,
+        },
+        technician: form.assigned_to
+          ? (staff.find((s) => s.id === form.assigned_to) ?? null)
+          : null,
       };
       onSaved(withRelations);
       onClose();
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Failed to log complaint');
+      setError(e instanceof Error ? e.message : "Failed to log complaint");
     } finally {
       setSaving(false);
     }
@@ -66,49 +115,128 @@ function LogComplaintModal({ onClose, staff, onSaved }: {
     <Modal open onClose={onClose} width={520}>
       <div className="modal-head">
         <div>
-          <div style={{ fontSize: 17, fontWeight: 600, letterSpacing: '-0.01em' }}>Log Complaint</div>
-          <div className="muted" style={{ fontSize: 12, marginTop: 2 }}>Register a new customer complaint</div>
+          <div
+            style={{ fontSize: 17, fontWeight: 600, letterSpacing: "-0.01em" }}
+          >
+            Log Complaint
+          </div>
+          <div className="muted" style={{ fontSize: 12, marginTop: 2 }}>
+            Search registered phone first, verify customer, then log complaint
+          </div>
         </div>
-        <button className="icon-btn" onClick={onClose}><Icon name="close" size={16} /></button>
+        <button className="icon-btn" onClick={onClose}>
+          <Icon name="close" size={16} />
+        </button>
       </div>
       <div className="modal-body">
         {error && (
-          <div style={{ padding: '10px 14px', background: 'var(--red-50)', color: 'var(--red)',
-                        borderRadius: 8, marginBottom: 14, fontSize: 13 }}>
+          <div
+            style={{
+              padding: "10px 14px",
+              background: "var(--red-50)",
+              color: "var(--red)",
+              borderRadius: 8,
+              marginBottom: 14,
+              fontSize: 13,
+            }}
+          >
             {error}
           </div>
         )}
 
-        <div className="field" style={{ marginBottom: 14, position: 'relative' }}>
+        <div
+          className="field"
+          style={{ marginBottom: 14, position: "relative" }}
+        >
           <label>Customer *</label>
           {selectedCustomer ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px',
-                          background: 'var(--bg-muted)', borderRadius: 8, border: '1px solid var(--border)' }}>
-              <span style={{ flex: 1, fontSize: 13, fontWeight: 500 }}>{selectedCustomer.full_name}</span>
-              <span className="mono muted" style={{ fontSize: 11 }}>{selectedCustomer.customer_code}</span>
-              <button className="icon-btn" style={{ width: 22, height: 22 }}
-                onClick={() => { setSelectedCustomer(null); setCustomerSearch(''); }}>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+                padding: "8px 12px",
+                background: "var(--bg-muted)",
+                borderRadius: 8,
+                border: "1px solid var(--border)",
+              }}
+            >
+              <span style={{ flex: 1, fontSize: 13, fontWeight: 500 }}>
+                {selectedCustomer.full_name}
+              </span>
+              <span className="mono muted" style={{ fontSize: 11 }}>
+                {selectedCustomer.username ||
+                  selectedCustomer.house_id ||
+                  selectedCustomer.customer_code}
+              </span>
+              <button
+                className="icon-btn"
+                style={{ width: 22, height: 22 }}
+                onClick={() => {
+                  setSelectedCustomer(null);
+                  setCustomerSearch("");
+                }}
+              >
                 <Icon name="close" size={12} />
               </button>
             </div>
           ) : (
             <>
-              <input className="input" placeholder="Search by name or customer code…"
-                value={customerSearch} onChange={e => setCustomerSearch(e.target.value)} autoFocus />
+              <input
+                className="input"
+                placeholder="Search registered phone, name, or config ID"
+                value={customerSearch}
+                onChange={(e) => setCustomerSearch(e.target.value)}
+                autoFocus
+              />
               {customerResults.length > 0 && (
-                <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 50,
-                              background: 'var(--bg-elev)', border: '1px solid var(--border)',
-                              borderRadius: 8, boxShadow: '0 8px 24px rgba(0,0,0,0.12)', overflow: 'hidden' }}>
-                  {customerResults.map(c => (
-                    <div key={c.id}
-                      style={{ padding: '8px 14px', cursor: 'pointer', fontSize: 13,
-                               borderBottom: '1px solid var(--border)' }}
-                      onClick={() => { setSelectedCustomer(c); setCustomerResults([]); }}
-                      onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-muted)')}
-                      onMouseLeave={e => (e.currentTarget.style.background = '')}>
+                <div
+                  style={{
+                    position: "absolute",
+                    top: "100%",
+                    left: 0,
+                    right: 0,
+                    zIndex: 50,
+                    background: "var(--bg-elev)",
+                    border: "1px solid var(--border)",
+                    borderRadius: 8,
+                    boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
+                    overflow: "hidden",
+                  }}
+                >
+                  {customerResults.map((c) => (
+                    <div
+                      key={c.id}
+                      style={{
+                        padding: "8px 14px",
+                        cursor: "pointer",
+                        fontSize: 13,
+                        borderBottom: "1px solid var(--border)",
+                      }}
+                      onClick={() => {
+                        setSelectedCustomer(c);
+                        setCustomerResults([]);
+                      }}
+                      onMouseEnter={(e) =>
+                        (e.currentTarget.style.background = "var(--bg-muted)")
+                      }
+                      onMouseLeave={(e) =>
+                        (e.currentTarget.style.background = "")
+                      }
+                    >
                       <span style={{ fontWeight: 500 }}>{c.full_name}</span>
-                      <span className="mono muted" style={{ fontSize: 11, marginLeft: 8 }}>{c.customer_code}</span>
-                      <span className="muted" style={{ fontSize: 11, marginLeft: 8 }}>{c.area?.name ?? '—'}</span>
+                      <span
+                        className="mono muted"
+                        style={{ fontSize: 11, marginLeft: 8 }}
+                      >
+                        {c.phone ?? c.username ?? c.house_id ?? c.customer_code}
+                      </span>
+                      <span
+                        className="muted"
+                        style={{ fontSize: 11, marginLeft: 8 }}
+                      >
+                        {c.area?.name ?? "—"}
+                      </span>
                     </div>
                   ))}
                 </div>
@@ -117,17 +245,107 @@ function LogComplaintModal({ onClose, staff, onSaved }: {
           )}
         </div>
 
+        {selectedCustomer && (
+          <div
+            style={{
+              padding: 12,
+              background: "var(--bg-muted)",
+              border: "1px solid var(--border)",
+              borderRadius: 8,
+              marginBottom: 14,
+            }}
+          >
+            <div
+              className="muted"
+              style={{
+                fontSize: 10,
+                textTransform: "uppercase",
+                letterSpacing: "0.06em",
+                fontWeight: 700,
+                marginBottom: 8,
+              }}
+            >
+              Call Verification Details
+            </div>
+            <div className="grid-responsive-2" style={{ gap: 10 }}>
+              <div>
+                <div className="muted" style={{ fontSize: 11 }}>
+                  Phone
+                </div>
+                <div className="mono" style={{ fontSize: 13, fontWeight: 600 }}>
+                  {selectedCustomer.phone ?? "—"}
+                </div>
+              </div>
+              <div>
+                <div className="muted" style={{ fontSize: 11 }}>
+                  Config / House ID
+                </div>
+                <div className="mono" style={{ fontSize: 13, fontWeight: 600 }}>
+                  {selectedCustomer.username ||
+                    selectedCustomer.house_id ||
+                    "—"}
+                </div>
+              </div>
+              <div>
+                <div className="muted" style={{ fontSize: 11 }}>
+                  Area
+                </div>
+                <div style={{ fontSize: 13, fontWeight: 600 }}>
+                  {selectedCustomer.area?.name ?? "—"}
+                </div>
+              </div>
+              <div>
+                <div className="muted" style={{ fontSize: 11 }}>
+                  Package / Status
+                </div>
+                <div style={{ fontSize: 13, fontWeight: 600 }}>
+                  {selectedCustomer.package?.name ?? "—"} ·{" "}
+                  {selectedCustomer.status}
+                </div>
+              </div>
+              <div>
+                <div className="muted" style={{ fontSize: 11 }}>
+                  CNIC
+                </div>
+                <div className="mono" style={{ fontSize: 13, fontWeight: 600 }}>
+                  {selectedCustomer.cnic ?? "—"}
+                </div>
+              </div>
+              <div>
+                <div className="muted" style={{ fontSize: 11 }}>
+                  Address
+                </div>
+                <div style={{ fontSize: 13, fontWeight: 600 }}>
+                  {selectedCustomer.address_value ?? "—"}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="field" style={{ marginBottom: 14 }}>
           <label>Issue Description *</label>
-          <input className="input" placeholder="e.g. Frequent disconnections, slow speed at night…"
-            value={form.issue} onChange={e => setForm(f => ({ ...f, issue: e.target.value }))} />
+          <input
+            className="input"
+            placeholder="e.g. Frequent disconnections, slow speed at night…"
+            value={form.issue}
+            onChange={(e) => setForm((f) => ({ ...f, issue: e.target.value }))}
+          />
         </div>
 
         <div className="grid-responsive-2" style={{ marginBottom: 14 }}>
           <div className="field">
             <label>Type</label>
-            <select className="select" value={form.type}
-              onChange={e => setForm(f => ({ ...f, type: e.target.value as ComplaintType }))}>
+            <select
+              className="select"
+              value={form.type}
+              onChange={(e) =>
+                setForm((f) => ({
+                  ...f,
+                  type: e.target.value as ComplaintType,
+                }))
+              }
+            >
               <option value="connectivity">Connectivity</option>
               <option value="speed">Speed</option>
               <option value="hardware">Hardware</option>
@@ -138,8 +356,16 @@ function LogComplaintModal({ onClose, staff, onSaved }: {
           </div>
           <div className="field">
             <label>Priority</label>
-            <select className="select" value={form.priority}
-              onChange={e => setForm(f => ({ ...f, priority: e.target.value as ComplaintPriority }))}>
+            <select
+              className="select"
+              value={form.priority}
+              onChange={(e) =>
+                setForm((f) => ({
+                  ...f,
+                  priority: e.target.value as ComplaintPriority,
+                }))
+              }
+            >
               <option value="low">Low</option>
               <option value="medium">Medium</option>
               <option value="high">High</option>
@@ -149,54 +375,132 @@ function LogComplaintModal({ onClose, staff, onSaved }: {
 
         <div className="field" style={{ marginBottom: 14 }}>
           <label>Assign to Technician (optional)</label>
-          <select className="select" value={form.assigned_to}
-            onChange={e => setForm(f => ({ ...f, assigned_to: e.target.value }))}>
+          <select
+            className="select"
+            value={form.assigned_to}
+            onChange={(e) =>
+              setForm((f) => ({ ...f, assigned_to: e.target.value }))
+            }
+          >
             <option value="">— Unassigned —</option>
-            {staff.filter(s => s.role === 'technician').map(s => (
-              <option key={s.id} value={s.id}>{s.full_name}</option>
-            ))}
+            {staff
+              .filter((s) => s.role === "technician")
+              .map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.full_name}
+                </option>
+              ))}
           </select>
         </div>
       </div>
       <div className="modal-foot">
-        <button className="btn btn-ghost" onClick={onClose}>Cancel</button>
-        <button className="btn btn-primary" onClick={handleSubmit} disabled={saving}>
-          {saving ? 'Saving…' : <><Icon name="plus" size={14} />Log Complaint</>}
+        <button className="btn btn-ghost" onClick={onClose}>
+          Cancel
+        </button>
+        <button
+          className="btn btn-primary"
+          onClick={handleSubmit}
+          disabled={saving}
+        >
+          {saving ? (
+            "Saving…"
+          ) : (
+            <>
+              <Icon name="plus" size={14} />
+              Log Complaint
+            </>
+          )}
         </button>
       </div>
     </Modal>
   );
 }
 
-function ComplaintModal({ complaint, onClose, staff, onSaved }: {
+function formatDateTime(isoString: string | null | undefined): string {
+  if (!isoString) return "—";
+  try {
+    const date = new Date(isoString);
+    if (isNaN(date.getTime())) return "—";
+    return date.toLocaleString("en-PK", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true,
+    });
+  } catch {
+    return "—";
+  }
+}
+
+function ComplaintModal({
+  complaint,
+  onClose,
+  staff,
+  onSaved,
+}: {
   complaint: ComplaintWithRelations;
   onClose: () => void;
   staff: StaffWithArea[];
   onSaved: () => void;
 }) {
-  const [assignedTo, setAssignedTo] = useState(complaint.assigned_to ?? '');
+  const [assignedTo, setAssignedTo] = useState(complaint.assigned_to ?? "");
   const [status, setStatus] = useState(complaint.status);
+  const [priority, setPriority] = useState<ComplaintPriority>(
+    complaint.priority,
+  );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const priLabel: Record<string, string> = { high: 'High', medium: 'Medium', low: 'Low' };
-  const statusColor = (s: string) => s === 'open' ? 'red' : s === 'in_progress' ? 'amber' : 'green';
-  const statusLabel = (s: string) => s === 'open' ? 'Open' : s === 'in_progress' ? 'In Progress' : 'Resolved';
+  const isAlreadyAssigned = !!complaint.assigned_to;
+  const priLabel: Record<string, string> = {
+    high: "High",
+    medium: "Medium",
+    low: "Low",
+  };
+  const statusColor = (s: string) =>
+    s === "open" ? "red" : s === "in_progress" ? "amber" : "green";
+  const statusLabel = (s: string) =>
+    s === "open" ? "Open" : s === "in_progress" ? "In Progress" : "Resolved";
 
   const handleSave = async () => {
     setSaving(true);
     setError(null);
     try {
-      const resolvedAt = status === 'resolved' ? new Date().toISOString() : (status === 'open' ? null : complaint.resolved_at);
+      const assignedAt =
+        assignedTo && !complaint.assigned_to
+          ? new Date().toISOString()
+          : !assignedTo
+            ? null
+            : complaint.assigned_at;
+
+      const inProgressAt =
+        status === "in_progress" && complaint.status !== "in_progress"
+          ? new Date().toISOString()
+          : status === "open"
+            ? null
+            : complaint.in_progress_at;
+
+      const resolvedAt =
+        status === "resolved" && complaint.status !== "resolved"
+          ? new Date().toISOString()
+          : status !== "resolved"
+            ? null
+            : complaint.resolved_at;
+
       await updateComplaint(complaint.id, {
         assigned_to: assignedTo || null,
+        assigned_at: assignedAt,
+        in_progress_at: inProgressAt,
         status,
+        priority,
         resolved_at: resolvedAt,
       });
       onSaved();
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save changes');
+      setError(err instanceof Error ? err.message : "Failed to save changes");
     } finally {
       setSaving(false);
     }
@@ -207,51 +511,255 @@ function ComplaintModal({ complaint, onClose, staff, onSaved }: {
       <div className="modal-head">
         <div>
           <div className="row gap-sm" style={{ marginBottom: 4 }}>
-            <span className="mono muted" style={{ fontSize: 12 }}>{complaint.complaint_code}</span>
-            <Badge color={statusColor(status)} dot>{statusLabel(status)}</Badge>
-            <span className={`pri-dot ${complaint.priority}`} />
-            <span className="muted" style={{ fontSize: 12 }}>{priLabel[complaint.priority]} priority</span>
+            <span className="mono muted" style={{ fontSize: 12 }}>
+              {complaint.complaint_code}
+            </span>
+            <Badge color={statusColor(status)} dot>
+              {statusLabel(status)}
+            </Badge>
+            <span className={`pri-dot ${priority}`} />
+            <span className="muted" style={{ fontSize: 12 }}>
+              {priLabel[priority]} priority
+            </span>
           </div>
-          <div style={{ fontSize: 17, fontWeight: 600, letterSpacing: '-0.01em' }}>{complaint.issue}</div>
+          <div
+            style={{ fontSize: 17, fontWeight: 600, letterSpacing: "-0.01em" }}
+          >
+            {complaint.issue}
+          </div>
         </div>
-        <button className="icon-btn" onClick={onClose} disabled={saving}><Icon name="close" size={16} /></button>
+        <button className="icon-btn" onClick={onClose} disabled={saving}>
+          <Icon name="close" size={16} />
+        </button>
       </div>
       <div className="modal-body">
         {error && (
-          <div style={{ color: 'var(--red)', background: 'var(--red-50)', padding: 10, borderRadius: 6, fontSize: 13, marginBottom: 14, border: '1px solid color-mix(in srgb, var(--red) 30%, transparent)' }}>
+          <div
+            style={{
+              color: "var(--red)",
+              background: "var(--red-50)",
+              padding: 10,
+              borderRadius: 6,
+              fontSize: 13,
+              marginBottom: 14,
+              border:
+                "1px solid color-mix(in srgb, var(--red) 30%, transparent)",
+            }}
+          >
             {error}
           </div>
         )}
 
-        <div className="grid-responsive-2" style={{ marginBottom: 18 }}>
-          {[
-            { label: 'Customer', content: <div className="row gap-sm"><Avatar name={complaint.customer?.full_name ?? '?'} size={24} /><span style={{ fontSize: 13, fontWeight: 500 }}>{complaint.customer?.full_name ?? '—'}</span></div> },
-            { label: 'Issue Type', content: <Badge color="blue">{complaint.type}</Badge> },
-            { label: 'Opened', content: <div style={{ fontSize: 13 }}>{new Date(complaint.opened_at).toLocaleDateString('en-PK')}</div> },
-            { label: 'Priority', content: <span className={`pri-dot ${complaint.priority}`} style={{ marginRight: 6 }} /> },
-          ].map((item, i) => (
-            <div key={i} style={{ padding: 12, background: 'var(--bg-muted)', borderRadius: 8 }}>
-              <div className="muted" style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600, marginBottom: 6 }}>{item.label}</div>
-              {item.content}
+        {/* 1. Extended Customer Details Block */}
+        <div
+          style={{
+            padding: 14,
+            background: "var(--bg-muted)",
+            borderRadius: 8,
+            marginBottom: 18,
+            border: "1px solid var(--border)",
+          }}
+        >
+          <div
+            style={{
+              fontSize: 10,
+              textTransform: "uppercase",
+              letterSpacing: "0.06em",
+              fontWeight: 600,
+              color: "var(--text-muted)",
+              marginBottom: 8,
+            }}
+          >
+            Customer Contact & Location Details
+          </div>
+          <div className="grid-responsive-2" style={{ gap: 12 }}>
+            <div>
+              <div style={{ fontSize: 11, color: "var(--text-muted)" }}>
+                Customer Name
+              </div>
+              <div
+                style={{
+                  fontSize: 13,
+                  fontWeight: 500,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                  marginTop: 2,
+                }}
+              >
+                <Avatar name={complaint.customer?.full_name ?? "?"} size={18} />
+                <span>{complaint.customer?.full_name ?? "—"}</span>
+              </div>
             </div>
-          ))}
+            <div>
+              <div style={{ fontSize: 11, color: "var(--text-muted)" }}>
+                Area / Location Code
+              </div>
+              <div style={{ fontSize: 13, fontWeight: 500, marginTop: 2 }}>
+                {complaint.customer?.area?.name
+                  ? `${complaint.customer.area.name} (${complaint.customer.area.code ?? "—"})`
+                  : "—"}
+              </div>
+            </div>
+            <div>
+              <div style={{ fontSize: 11, color: "var(--text-muted)" }}>
+                Phone & WhatsApp
+              </div>
+              <div
+                style={{
+                  fontSize: 13,
+                  fontWeight: 500,
+                  display: "flex",
+                  gap: 10,
+                  marginTop: 2,
+                }}
+              >
+                {complaint.customer?.phone ? (
+                  <a
+                    href={`tel:${complaint.customer.phone}`}
+                    className="row gap-xs hover-underline"
+                    style={{ color: "var(--color-primary)" }}
+                  >
+                    <Icon name="phone" size={12} /> {complaint.customer.phone}
+                  </a>
+                ) : (
+                  <span className="muted">—</span>
+                )}
+                {complaint.customer?.whatsapp && (
+                  <a
+                    href={`https://wa.me/${complaint.customer.whatsapp.replace(/[^0-9]/g, "")}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="row gap-xs hover-underline"
+                    style={{ color: "#25D366" }}
+                  >
+                    <Icon name="zap" size={12} /> WhatsApp
+                  </a>
+                )}
+              </div>
+            </div>
+            <div>
+              <div style={{ fontSize: 11, color: "var(--text-muted)" }}>
+                Email Address
+              </div>
+              <div style={{ fontSize: 13, fontWeight: 500, marginTop: 2 }}>
+                {complaint.customer?.email ? (
+                  <a
+                    href={`mailto:${complaint.customer.email}`}
+                    className="hover-underline"
+                    style={{ color: "var(--color-primary)" }}
+                  >
+                    {complaint.customer.email}
+                  </a>
+                ) : (
+                  <span className="muted">—</span>
+                )}
+              </div>
+            </div>
+            {complaint.customer?.address_value && (
+              <div style={{ gridColumn: "span 2" }}>
+                <div style={{ fontSize: 11, color: "var(--text-muted)" }}>
+                  House ID & Address (
+                  {complaint.customer.address_type === "id_number"
+                    ? "ID Number"
+                    : "Free Text"}
+                  )
+                </div>
+                <div
+                  style={{
+                    fontSize: 13,
+                    fontWeight: 500,
+                    marginTop: 2,
+                    display: "flex",
+                    gap: 6,
+                  }}
+                >
+                  {complaint.customer.house_id && (
+                    <span
+                      className="mono"
+                      style={{
+                        background: "var(--bg-elev)",
+                        border: "1px solid var(--border)",
+                        padding: "2px 6px",
+                        borderRadius: 4,
+                        fontSize: 11,
+                      }}
+                    >
+                      {complaint.customer.house_id}
+                    </span>
+                  )}
+                  <span>{complaint.customer.address_value}</span>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
-        <div className="field" style={{ marginBottom: 14 }}>
-          <label>Assign to Technician</label>
-          <select className="select" value={assignedTo} onChange={e => setAssignedTo(e.target.value)} disabled={saving}>
-            <option value="">— Unassigned —</option>
-            {staff.filter(s => s.role === 'technician').map(s => <option key={s.id} value={s.id}>{s.full_name}</option>)}
-          </select>
+        {/* 2. Lock Alert Banner */}
+        {isAlreadyAssigned && (
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              padding: "8px 12px",
+              background: "var(--bg-muted)",
+              border: "1px dashed var(--border)",
+              borderRadius: 6,
+              marginBottom: 14,
+              fontSize: 12,
+              color: "var(--text-muted)",
+            }}
+          >
+            <Icon name="key" size={14} />
+            <span>
+              Complaint is assigned to active board. Priority and Technician
+              fields are now locked.
+            </span>
+          </div>
+        )}
+
+        <div className="grid-responsive-2" style={{ marginBottom: 14 }}>
+          <div className="field">
+            <label>Priority</label>
+            <select
+              className="select"
+              value={priority}
+              onChange={(e) => setPriority(e.target.value as ComplaintPriority)}
+              disabled={isAlreadyAssigned || saving}
+            >
+              <option value="low">Low</option>
+              <option value="medium">Medium</option>
+              <option value="high">High</option>
+            </select>
+          </div>
+          <div className="field">
+            <label>Assign to Technician</label>
+            <select
+              className="select"
+              value={assignedTo}
+              onChange={(e) => setAssignedTo(e.target.value)}
+              disabled={isAlreadyAssigned || saving}
+            >
+              <option value="">— Unassigned —</option>
+              {staff
+                .filter((s) => s.role === "technician")
+                .map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.full_name}
+                  </option>
+                ))}
+            </select>
+          </div>
         </div>
 
         <div className="field" style={{ marginBottom: 18 }}>
           <label>Status</label>
           <div className="row gap-sm">
-            {(['open', 'in_progress', 'resolved'] as const).map(s => (
+            {(["open", "in_progress", "resolved"] as const).map((s) => (
               <button
                 key={s}
-                className={`btn ${status === s ? 'btn-primary' : 'btn-secondary'} btn-sm`}
+                className={`btn ${status === s ? "btn-primary" : "btn-secondary"} btn-sm`}
                 style={{ flex: 1 }}
                 onClick={() => setStatus(s)}
                 disabled={saving}
@@ -262,38 +770,77 @@ function ComplaintModal({ complaint, onClose, staff, onSaved }: {
           </div>
         </div>
 
-        <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 10 }}>Timeline</div>
+        <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 10 }}>
+          Timeline
+        </div>
         <div className="timeline">
           <div className="tl-item done">
             <div className="ttl">Opened by customer</div>
-            <div className="sub">{complaint.customer?.full_name ?? '—'} · {new Date(complaint.opened_at).toLocaleDateString('en-PK')}</div>
+            <div className="sub">
+              {complaint.customer?.full_name ?? "—"} ·{" "}
+              {formatDateTime(complaint.opened_at)}
+            </div>
           </div>
-          <div className={`tl-item ${assignedTo ? 'done' : ''}`}>
-            <div className="ttl">{assignedTo ? `Assigned to ${staff.find(s => s.id === assignedTo)?.full_name ?? 'Technician'}` : 'Awaiting assignment'}</div>
-            <div className="sub">{assignedTo ? 'Technician notified via SMS' : 'No technician selected yet'}</div>
+          <div className={`tl-item ${assignedTo ? "done" : ""}`}>
+            <div className="ttl">
+              {assignedTo
+                ? `Assigned to ${staff.find((s) => s.id === assignedTo)?.full_name ?? "Technician"}`
+                : "Awaiting assignment"}
+            </div>
+            <div className="sub">
+              {assignedTo
+                ? `Technician notified via SMS · ${complaint.assigned_to === assignedTo && complaint.assigned_at ? formatDateTime(complaint.assigned_at) : "Just now (unsaved)"}`
+                : "No technician selected yet"}
+            </div>
           </div>
-          <div className={`tl-item ${status === 'in_progress' ? 'active' : status === 'resolved' ? 'done' : ''}`}>
+          <div
+            className={`tl-item ${status === "in_progress" ? "active" : status === "resolved" ? "done" : ""}`}
+          >
             <div className="ttl">In progress</div>
-            <div className="sub">{status === 'resolved' ? 'Work completed on-site' : status === 'in_progress' ? 'Technician on-site investigating' : '—'}</div>
+            <div className="sub">
+              {status === "resolved"
+                ? `Work completed on-site · ${complaint.in_progress_at ? formatDateTime(complaint.in_progress_at) : ""}`
+                : status === "in_progress"
+                  ? `Technician on-site investigating · ${complaint.status === "in_progress" && complaint.in_progress_at ? formatDateTime(complaint.in_progress_at) : "Just now (unsaved)"}`
+                  : "—"}
+            </div>
           </div>
-          <div className={`tl-item ${status === 'resolved' ? 'done' : ''}`}>
+          <div className={`tl-item ${status === "resolved" ? "done" : ""}`}>
             <div className="ttl">Resolved</div>
-            <div className="sub">{status === 'resolved' ? 'Customer confirmation received' : '—'}</div>
+            <div className="sub">
+              {status === "resolved"
+                ? `Customer confirmation received · ${complaint.status === "resolved" && complaint.resolved_at ? formatDateTime(complaint.resolved_at) : "Just now (unsaved)"}`
+                : "—"}
+            </div>
           </div>
         </div>
       </div>
       <div className="modal-foot">
-        <button className="btn btn-ghost" onClick={onClose} disabled={saving}>Close</button>
-        <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
-          <Icon name={saving ? 'refresh' : 'check'} size={14} style={{ marginRight: 6 }} />
-          {saving ? 'Saving...' : 'Save changes'}
+        <button className="btn btn-ghost" onClick={onClose} disabled={saving}>
+          Close
+        </button>
+        <button
+          className="btn btn-primary"
+          onClick={handleSave}
+          disabled={saving}
+        >
+          <Icon
+            name={saving ? "refresh" : "check"}
+            size={14}
+            style={{ marginRight: 6 }}
+          />
+          {saving ? "Saving..." : "Save changes"}
         </button>
       </div>
     </Modal>
   );
 }
 
-export default function ComplaintsPage({ refreshToken = 0, focusComplaintId = null, focusToken = 0 }: {
+export default function ComplaintsPage({
+  refreshToken = 0,
+  focusComplaintId = null,
+  focusToken = 0,
+}: {
   refreshToken?: number;
   focusComplaintId?: string | null;
   focusToken?: number;
@@ -303,27 +850,39 @@ export default function ComplaintsPage({ refreshToken = 0, focusComplaintId = nu
   const [staff, setStaff] = useState<StaffWithArea[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [view, setView] = useState('kanban');
+  const [view, setView] = useState("kanban");
   const [open, setOpen] = useState<ComplaintWithRelations | null>(null);
   const [logOpen, setLogOpen] = useState(false);
+  const [savedComplaintCode, setSavedComplaintCode] = useState<string | null>(
+    null,
+  );
+
+  // Dynamic filter states
+  const [filterArea, setFilterArea] = useState<string>("all");
+  const [filterType, setFilterType] = useState<string>("all");
+  const [filterPriority, setFilterPriority] = useState<string>("all");
 
   const prevRefreshRef = React.useRef(refreshToken);
 
   useEffect(() => {
-    // Initial load
     Promise.all([getComplaints(), getAreas(), getStaff()])
-      .then(([c, a, s]) => { setComplaints(c); setAreas(a); setStaff(s); })
-      .catch((e: unknown) => setError(e instanceof Error ? e.message : 'Could not load complaints'))
+      .then(([c, a, s]) => {
+        setComplaints(c);
+        setAreas(a);
+        setStaff(s);
+      })
+      .catch((e: unknown) =>
+        setError(e instanceof Error ? e.message : "Could not load complaints"),
+      )
       .finally(() => setLoading(false));
   }, []);
 
-  // Re-fetch when a realtime complaint update comes in (refreshToken bumped by context)
   useEffect(() => {
     if (prevRefreshRef.current === refreshToken) return;
     prevRefreshRef.current = refreshToken;
     getComplaints()
-      .then(c => setComplaints(c))
-      .catch(() => { /* silent — existing data stays */ });
+      .then((c) => setComplaints(c))
+      .catch(() => {});
   }, [refreshToken]);
 
   useEffect(() => {
@@ -331,19 +890,23 @@ export default function ComplaintsPage({ refreshToken = 0, focusComplaintId = nu
 
     let cancelled = false;
     getComplaintById(focusComplaintId)
-      .then(complaint => {
+      .then((complaint) => {
         if (cancelled || !complaint) return;
-        setComplaints(prev => {
-          const exists = prev.some(item => item.id === complaint.id);
+        setComplaints((prev) => {
+          const exists = prev.some((item) => item.id === complaint.id);
           return exists
-            ? prev.map(item => item.id === complaint.id ? complaint : item)
+            ? prev.map((item) => (item.id === complaint.id ? complaint : item))
             : [complaint, ...prev];
         });
         setOpen(complaint);
       })
       .catch((e: unknown) => {
         if (cancelled) return;
-        setError(e instanceof Error ? e.message : 'Could not open complaint from notification');
+        setError(
+          e instanceof Error
+            ? e.message
+            : "Could not open complaint from notification",
+        );
       });
 
     return () => {
@@ -352,117 +915,471 @@ export default function ComplaintsPage({ refreshToken = 0, focusComplaintId = nu
   }, [focusComplaintId, focusToken]);
 
   const handleComplaintSaved = (c: ComplaintWithRelations) => {
-    setComplaints(prev => [c, ...prev]);
+    setComplaints((prev) => [c, ...prev]);
+    setSavedComplaintCode(c.complaint_code);
   };
 
-  if (loading) return (
-    <div className="page" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 300 }}>
-      <div className="muted">Loading complaints…</div>
-    </div>
-  );
-
-  if (error) return (
-    <div className="page">
-      <div className="card" style={{ padding: 24 }}>
-        <div style={{ fontWeight: 600, marginBottom: 6 }}>Data load failed</div>
-        <div className="muted" style={{ fontSize: 13, marginBottom: 14 }}>{error}</div>
-        <button className="btn btn-primary" onClick={() => window.location.reload()}>
-          <Icon name="refresh" size={14} />Retry
-        </button>
+  if (loading)
+    return (
+      <div
+        className="page"
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          minHeight: 300,
+        }}
+      >
+        <div className="muted">Loading complaints…</div>
       </div>
-    </div>
+    );
+
+  if (error)
+    return (
+      <div className="page">
+        <div className="card" style={{ padding: 24 }}>
+          <div style={{ fontWeight: 600, marginBottom: 6 }}>
+            Data load failed
+          </div>
+          <div className="muted" style={{ fontSize: 13, marginBottom: 14 }}>
+            {error}
+          </div>
+          <button
+            className="btn btn-primary"
+            onClick={() => window.location.reload()}
+          >
+            <Icon name="refresh" size={14} />
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+
+  // Apply state filters
+  const filteredComplaints = complaints.filter((c) => {
+    if (filterArea !== "all" && c.customer?.area_id !== filterArea)
+      return false;
+    if (filterType !== "all" && c.type !== filterType) return false;
+    if (filterPriority !== "all" && c.priority !== filterPriority) return false;
+    return true;
+  });
+
+  const unassignedComplaints = filteredComplaints.filter(
+    (c) => c.assigned_to === null || c.assigned_to === "",
+  );
+  const assignedComplaints = filteredComplaints.filter(
+    (c) => c.assigned_to !== null && c.assigned_to !== "",
   );
 
   const byStatus = {
-    open:        complaints.filter(c => c.status === 'open'),
-    in_progress: complaints.filter(c => c.status === 'in_progress'),
-    resolved:    complaints.filter(c => c.status === 'resolved'),
+    open: assignedComplaints.filter((c) => c.status === "open"),
+    in_progress: assignedComplaints.filter((c) => c.status === "in_progress"),
+    resolved: assignedComplaints.filter((c) => c.status === "resolved"),
   };
 
-  const priLabel: Record<string, string> = { high: 'High', medium: 'Med', low: 'Low' };
-  const statusColor = (s: string) => s === 'open' ? 'red' : s === 'in_progress' ? 'amber' : 'green';
-  const statusLabel = (s: string) => s === 'open' ? 'Open' : s === 'in_progress' ? 'In Progress' : 'Resolved';
+  const priLabel: Record<string, string> = {
+    high: "High",
+    medium: "Med",
+    low: "Low",
+  };
+  const statusColor = (s: string) =>
+    s === "open" ? "red" : s === "in_progress" ? "amber" : "green";
+  const statusLabel = (s: string) =>
+    s === "open" ? "Open" : s === "in_progress" ? "In Progress" : "Resolved";
 
   return (
     <div className="page">
       <div className="page-header">
         <div>
           <h1>Complaint Management</h1>
-          <p>{complaints.length} total · {byStatus.open.length} open · {complaints.filter(c => !c.assigned_to).length} unassigned</p>
+          <p>
+            {filteredComplaints.length} total ·{" "}
+            {filteredComplaints.filter((c) => c.status === "open").length} open
+            · {unassignedComplaints.length} unassigned
+          </p>
         </div>
         <div className="row gap-sm">
-          <Tabs value={view} onChange={setView} items={[{ value: 'kanban', label: 'Board' }, { value: 'list', label: 'List' }]} />
-          <button className="btn btn-primary" onClick={() => setLogOpen(true)}><Icon name="plus" size={14} />Log Complaint</button>
+          <Tabs
+            value={view}
+            onChange={setView}
+            items={[
+              { value: "kanban", label: "Board" },
+              { value: "list", label: "List" },
+            ]}
+          />
+          <button className="btn btn-primary" onClick={() => setLogOpen(true)}>
+            <Icon name="plus" size={14} />
+            Log Complaint
+          </button>
         </div>
       </div>
 
+      {savedComplaintCode && (
+        <div
+          style={{
+            padding: "12px 16px",
+            borderRadius: 8,
+            background: "var(--green-50)",
+            color: "var(--green)",
+            marginBottom: 14,
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            fontWeight: 700,
+          }}
+        >
+          <Icon name="checkCircle" size={16} />
+          <span>
+            Complaint registered. Tell caller complaint number:{" "}
+            <span className="mono">{savedComplaintCode}</span>
+          </span>
+          <button
+            className="btn btn-ghost btn-sm"
+            style={{ marginLeft: "auto" }}
+            onClick={() => setSavedComplaintCode(null)}
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+
       <div className="kpi-row" style={{ marginBottom: 16 }}>
         {[
-          { key: 'open',        label: 'Open',        color: 'var(--red)', bg: 'var(--red-50)', trend: 'needs attention', value: byStatus.open.length },
-          { key: 'in_progress', label: 'In Progress', color: 'var(--amber)', bg: 'var(--amber-50)', trend: 'being handled',   value: byStatus.in_progress.length },
-          { key: 'resolved',    label: 'Resolved',    color: 'var(--green)', bg: 'var(--green-50)', trend: 'completed',        value: byStatus.resolved.length },
-        ].map(k => (
-          <div key={k.key} className="kpi-card" style={{ '--kpi-color': k.color, '--kpi-bg': k.bg } as React.CSSProperties}>
+          {
+            key: "open",
+            label: "Open",
+            color: "var(--red)",
+            bg: "var(--red-50)",
+            trend: "needs attention",
+            value: filteredComplaints.filter((c) => c.status === "open").length,
+          },
+          {
+            key: "in_progress",
+            label: "In Progress",
+            color: "var(--amber)",
+            bg: "var(--amber-50)",
+            trend: "being handled",
+            value: filteredComplaints.filter((c) => c.status === "in_progress")
+              .length,
+          },
+          {
+            key: "resolved",
+            label: "Resolved",
+            color: "var(--green)",
+            bg: "var(--green-50)",
+            trend: "completed",
+            value: filteredComplaints.filter((c) => c.status === "resolved")
+              .length,
+          },
+        ].map((k) => (
+          <div
+            key={k.key}
+            className="kpi-card"
+            style={
+              {
+                "--kpi-color": k.color,
+                "--kpi-bg": k.bg,
+              } as React.CSSProperties
+            }
+          >
             <div className="kpi-glow" />
-            <div className="kpi-head"><span className="kpi-label">{k.label}</span><span className="kpi-bolt" style={{ background: k.color }} /></div>
+            <div className="kpi-head">
+              <span className="kpi-label">{k.label}</span>
+              <span className="kpi-bolt" style={{ background: k.color }} />
+            </div>
             <div className="kpi-value num">{k.value}</div>
-            <div className="kpi-foot"><span className="kpi-trend">{k.trend}</span></div>
+            <div className="kpi-foot">
+              <span className="kpi-trend">{k.trend}</span>
+            </div>
           </div>
         ))}
       </div>
 
+      {/* Fully Functional State-Driven Filter Bar */}
       <div className="filter-bar">
-        <select className="select" style={{ width: 'auto' }}>
-          <option>All areas</option>
-          {areas.map(a => <option key={a.id}>{a.name}</option>)}
+        <select
+          className="select"
+          style={{ width: "auto" }}
+          value={filterArea}
+          onChange={(e) => setFilterArea(e.target.value)}
+        >
+          <option value="all">All areas</option>
+          {areas.map((a) => (
+            <option key={a.id} value={a.id}>
+              {a.name}
+            </option>
+          ))}
         </select>
-        <select className="select" style={{ width: 'auto' }}>
-          <option>All types</option><option>Connectivity</option><option>Speed</option><option>Hardware</option><option>Billing</option>
+        <select
+          className="select"
+          style={{ width: "auto" }}
+          value={filterType}
+          onChange={(e) => setFilterType(e.target.value)}
+        >
+          <option value="all">All types</option>
+          <option value="connectivity">Connectivity</option>
+          <option value="speed">Speed</option>
+          <option value="hardware">Hardware</option>
+          <option value="billing">Billing</option>
+          <option value="upgrade">Upgrade</option>
+          <option value="other">Other</option>
         </select>
-        <select className="select" style={{ width: 'auto' }}>
-          <option>All priorities</option><option>High</option><option>Medium</option><option>Low</option>
+        <select
+          className="select"
+          style={{ width: "auto" }}
+          value={filterPriority}
+          onChange={(e) => setFilterPriority(e.target.value)}
+        >
+          <option value="all">All priorities</option>
+          <option value="high">High</option>
+          <option value="medium">Medium</option>
+          <option value="low">Low</option>
         </select>
         <div className="spacer" />
-        <button className="btn btn-ghost btn-sm"><Icon name="refresh" size={14} />Refresh</button>
+        <button
+          className="btn btn-ghost btn-sm"
+          onClick={() => {
+            setFilterArea("all");
+            setFilterType("all");
+            setFilterPriority("all");
+            getComplaints()
+              .then(setComplaints)
+              .catch(() => {});
+          }}
+        >
+          <Icon name="refresh" size={14} />
+          Reset Filters
+        </button>
       </div>
 
       {complaints.length === 0 ? (
-        <div className="card" style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)' }}>
+        <div
+          className="card"
+          style={{
+            padding: 40,
+            textAlign: "center",
+            color: "var(--text-muted)",
+          }}
+        >
           <div style={{ fontSize: 14 }}>No complaints logged yet</div>
         </div>
-      ) : view === 'kanban' ? (
-        <div className="kanban">
-          {(['open', 'in_progress', 'resolved'] as const).map(col => {
-            const color = col === 'open' ? '#EF4444' : col === 'in_progress' ? '#F59E0B' : '#22C55E';
+      ) : view === "kanban" ? (
+        // Grid template overridden to display 4 columns dynamically
+        <div
+          className="kanban"
+          style={{ gridTemplateColumns: "repeat(4, 1fr)" }}
+        >
+          {/* New Column: Incoming Queue for Unassigned Complaints */}
+          <div
+            className="kanban-col"
+            style={{
+              background: "var(--bg-muted)",
+              border: "1px dashed var(--border)",
+            }}
+          >
+            <div className="kanban-col-head">
+              <span
+                style={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: 2,
+                  background: "var(--text-muted)",
+                  display: "inline-block",
+                }}
+              />
+              <span className="title" style={{ fontWeight: 700 }}>
+                Incoming (Unassigned)
+              </span>
+              <span className="cnt">{unassignedComplaints.length}</span>
+            </div>
+            <div className="kanban-col-cards">
+              {unassignedComplaints.length === 0 ? (
+                <div
+                  style={{
+                    padding: "24px 12px",
+                    textAlign: "center",
+                    color: "var(--text-muted)",
+                    fontSize: 12,
+                    fontStyle: "italic",
+                  }}
+                >
+                  No unassigned complaints
+                </div>
+              ) : (
+                unassignedComplaints.map((c) => (
+                  <div
+                    key={c.id}
+                    className="kanban-card"
+                    onClick={() => setOpen(c)}
+                    style={{ borderLeft: "3px solid var(--border)" }}
+                  >
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                      }}
+                    >
+                      <span className="id">{c.complaint_code}</span>
+                      <div className="row gap-sm">
+                        <span className={`pri-dot ${c.priority}`} />
+                        <span
+                          style={{
+                            fontSize: 10,
+                            fontWeight: 600,
+                            color: "var(--text-muted)",
+                            textTransform: "uppercase",
+                            letterSpacing: "0.06em",
+                          }}
+                        >
+                          {priLabel[c.priority]}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="issue">{c.issue}</div>
+                    <div
+                      className="row gap-sm"
+                      style={{ fontSize: 12, color: "var(--text-muted)" }}
+                    >
+                      <Icon name="user" size={12} />
+                      {c.customer?.full_name ?? "—"}
+                    </div>
+                    {c.customer?.area?.name && (
+                      <div
+                        className="row gap-sm"
+                        style={{
+                          fontSize: 11,
+                          color: "var(--text-muted)",
+                          marginTop: 2,
+                        }}
+                      >
+                        <Icon name="mapPin" size={11} />
+                        {c.customer.area.name}
+                      </div>
+                    )}
+                    <div
+                      style={{
+                        borderTop: "1px solid var(--border)",
+                        marginTop: 4,
+                        paddingTop: 10,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                      }}
+                    >
+                      <span
+                        style={{
+                          fontSize: 11,
+                          color: "var(--color-primary)",
+                          fontStyle: "italic",
+                          fontWeight: 500,
+                        }}
+                      >
+                        Click to assign
+                      </span>
+                      <span
+                        style={{ fontSize: 11, color: "var(--text-muted)" }}
+                        className="row gap-sm"
+                      >
+                        <Icon name="clock" size={11} />
+                        {new Date(c.opened_at).toLocaleDateString("en-PK")}
+                      </span>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
+          {/* Active Board Columns (Assigned Complaints only) */}
+          {(["open", "in_progress", "resolved"] as const).map((col) => {
+            const color =
+              col === "open"
+                ? "#EF4444"
+                : col === "in_progress"
+                  ? "#F59E0B"
+                  : "#22C55E";
             return (
               <div key={col} className="kanban-col">
                 <div className="kanban-col-head">
-                  <span style={{ width: 8, height: 8, borderRadius: 2, background: color, display: 'inline-block' }} />
+                  <span
+                    style={{
+                      width: 8,
+                      height: 8,
+                      borderRadius: 2,
+                      background: color,
+                      display: "inline-block",
+                    }}
+                  />
                   <span className="title">{statusLabel(col)}</span>
                   <span className="cnt">{byStatus[col].length}</span>
                 </div>
                 <div className="kanban-col-cards">
-                  {byStatus[col].map(c => (
-                    <div key={c.id} className="kanban-card" onClick={() => setOpen(c)}>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  {byStatus[col].map((c) => (
+                    <div
+                      key={c.id}
+                      className="kanban-card"
+                      onClick={() => setOpen(c)}
+                    >
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                        }}
+                      >
                         <span className="id">{c.complaint_code}</span>
                         <div className="row gap-sm">
                           <span className={`pri-dot ${c.priority}`} />
-                          <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{priLabel[c.priority]}</span>
+                          <span
+                            style={{
+                              fontSize: 10,
+                              fontWeight: 600,
+                              color: "var(--text-muted)",
+                              textTransform: "uppercase",
+                              letterSpacing: "0.06em",
+                            }}
+                          >
+                            {priLabel[c.priority]}
+                          </span>
                         </div>
                       </div>
                       <div className="issue">{c.issue}</div>
-                      <div className="row gap-sm" style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-                        <Icon name="user" size={12} />{c.customer?.full_name ?? '—'}
+                      <div
+                        className="row gap-sm"
+                        style={{ fontSize: 12, color: "var(--text-muted)" }}
+                      >
+                        <Icon name="user" size={12} />
+                        {c.customer?.full_name ?? "—"}
                       </div>
-                      <div style={{ borderTop: '1px solid var(--border)', marginTop: 4, paddingTop: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <div
+                        style={{
+                          borderTop: "1px solid var(--border)",
+                          marginTop: 4,
+                          paddingTop: 10,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                        }}
+                      >
                         <div className="assignee">
-                          {c.technician
-                            ? <><Avatar name={c.technician.full_name} size={20} /><span>{c.technician.full_name}</span></>
-                            : <span style={{ fontStyle: 'italic' }}>Unassigned</span>}
+                          {c.technician ? (
+                            <>
+                              <Avatar name={c.technician.full_name} size={20} />
+                              <span>{c.technician.full_name}</span>
+                            </>
+                          ) : (
+                            <span style={{ fontStyle: "italic" }}>
+                              Unassigned
+                            </span>
+                          )}
                         </div>
-                        <span style={{ fontSize: 11, color: 'var(--text-muted)' }} className="row gap-sm">
-                          <Icon name="clock" size={11} />{new Date(c.opened_at).toLocaleDateString('en-PK')}
+                        <span
+                          style={{ fontSize: 11, color: "var(--text-muted)" }}
+                          className="row gap-sm"
+                        >
+                          <Icon name="clock" size={11} />
+                          {new Date(c.opened_at).toLocaleDateString("en-PK")}
                         </span>
                       </div>
                     </div>
@@ -473,19 +1390,50 @@ export default function ComplaintsPage({ refreshToken = 0, focusComplaintId = nu
           })}
         </div>
       ) : (
+        // List table displays all filtered complaints (both assigned and unassigned)
         <div className="table-wrap">
           <table className="data">
-            <thead><tr><th>ID</th><th>Issue</th><th>Customer</th><th>Priority</th><th>Technician</th><th>Status</th><th>Opened</th></tr></thead>
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Issue</th>
+                <th>Customer</th>
+                <th>Priority</th>
+                <th>Technician</th>
+                <th>Status</th>
+                <th>Opened</th>
+              </tr>
+            </thead>
             <tbody>
-              {complaints.map(c => (
+              {filteredComplaints.map((c) => (
                 <tr key={c.id} className="clickable" onClick={() => setOpen(c)}>
-                  <td className="mono" style={{ fontSize: 12 }}>{c.complaint_code}</td>
+                  <td className="mono" style={{ fontSize: 12 }}>
+                    {c.complaint_code}
+                  </td>
                   <td style={{ fontWeight: 500 }}>{c.issue}</td>
-                  <td>{c.customer?.full_name ?? '—'}</td>
-                  <td><span className={`pri-dot ${c.priority}`} style={{ marginRight: 6 }} /><span style={{ fontSize: 12 }}>{priLabel[c.priority]}</span></td>
-                  <td>{c.technician?.full_name ?? <span className="muted" style={{ fontStyle: 'italic' }}>Unassigned</span>}</td>
-                  <td><Badge color={statusColor(c.status)} dot>{statusLabel(c.status)}</Badge></td>
-                  <td className="muted" style={{ fontSize: 12 }}>{new Date(c.opened_at).toLocaleDateString('en-PK')}</td>
+                  <td>{c.customer?.full_name ?? "—"}</td>
+                  <td>
+                    <span
+                      className={`pri-dot ${c.priority}`}
+                      style={{ marginRight: 6 }}
+                    />
+                    <span style={{ fontSize: 12 }}>{priLabel[c.priority]}</span>
+                  </td>
+                  <td>
+                    {c.technician?.full_name ?? (
+                      <span className="muted" style={{ fontStyle: "italic" }}>
+                        Unassigned
+                      </span>
+                    )}
+                  </td>
+                  <td>
+                    <Badge color={statusColor(c.status)} dot>
+                      {statusLabel(c.status)}
+                    </Badge>
+                  </td>
+                  <td className="muted" style={{ fontSize: 12 }}>
+                    {new Date(c.opened_at).toLocaleDateString("en-PK")}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -500,7 +1448,7 @@ export default function ComplaintsPage({ refreshToken = 0, focusComplaintId = nu
           staff={staff}
           onSaved={() => {
             getComplaints()
-              .then(c => setComplaints(c))
+              .then((c) => setComplaints(c))
               .catch(() => {});
           }}
         />

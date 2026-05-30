@@ -86,16 +86,21 @@ set search_path = public
 as $$
 declare
   v_customer public.customers%rowtype;
+  v_norm_ident text;
 begin
+  -- Normalize user input for robust alphanumeric matching (matching TS email formatting)
+  v_norm_ident := trim(both '_' from regexp_replace(lower(trim(p_identifier)), '[^a-z0-9]+', '_', 'g'));
+
   select *
     into v_customer
     from public.customers
    where auth_user_id is not null
      and status = 'active'
      and (
-       lower(coalesce(house_id, '')) = lower(trim(p_identifier))
-       or lower(coalesce(username, '')) = lower(trim(p_identifier))
-       or lower(coalesce(address_value, '')) = lower(trim(p_identifier))
+       trim(both '_' from regexp_replace(lower(coalesce(nullif(trim(house_id), ''), '')), '[^a-z0-9]+', '_', 'g')) = v_norm_ident
+       or trim(both '_' from regexp_replace(lower(coalesce(nullif(trim(username), ''), '')), '[^a-z0-9]+', '_', 'g')) = v_norm_ident
+       or trim(both '_' from regexp_replace(lower(coalesce(nullif(trim(address_value), ''), '')), '[^a-z0-9]+', '_', 'g')) = v_norm_ident
+       or trim(both '_' from regexp_replace(lower(coalesce(nullif(trim(customer_code), ''), '')), '[^a-z0-9]+', '_', 'g')) = v_norm_ident
        or regexp_replace(coalesce(phone, ''), '[^0-9]', '', 'g') =
           regexp_replace(coalesce(p_identifier, ''), '[^0-9]', '', 'g')
      )
@@ -110,7 +115,12 @@ begin
     'success', true,
     'email', 'customer_' ||
       trim(both '_' from regexp_replace(
-        lower(coalesce(v_customer.house_id, v_customer.username, v_customer.address_value, v_customer.customer_code)),
+        lower(coalesce(
+          nullif(trim(v_customer.house_id), ''),
+          nullif(trim(v_customer.username), ''),
+          nullif(trim(v_customer.address_value), ''),
+          nullif(trim(v_customer.customer_code), '')
+        )),
         '[^a-z0-9]+',
         '_',
         'g'

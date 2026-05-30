@@ -104,6 +104,13 @@ export default function DashboardPage({ refreshToken = 0 }: { refreshToken?: num
       icon: 'dollar', accent: '#F5A623',
       spark: s.revenueByMonth.map(r => r.v),
     },
+    {
+      key: 'expected', label: 'Expected Revenue',
+      value: fmt(s.expectedRevenue),
+      sub: `${fmt(s.pendingRevenue)} pending`,
+      icon: 'fileText', accent: '#3B82F6',
+      spark: s.revenueByMonth.map(r => r.v),
+    },
   ];
 
   const wideCards: StatCard[] = [
