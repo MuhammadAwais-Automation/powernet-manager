@@ -328,7 +328,7 @@ function ShellContent({ staff, logout }: {
                     <div className="card card-pad" style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)' }}>
                       <Icon name="settings" size={32} style={{ color: 'var(--text-faint)', marginBottom: 12 }} />
                       <NotificationPreferences />
-                      <div style={{ fontSize: 13 }}>Configure organization details, tax rates, payment gateways and SMS templates here.</div>
+                      
                     </div>
                   </div>
                 </div>
