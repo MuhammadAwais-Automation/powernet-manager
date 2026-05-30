@@ -9,6 +9,7 @@ import ComplaintsPage from './pages/ComplaintsPage';
 import StaffPage from './pages/StaffPage';
 import AreasPage from './pages/AreasPage';
 import ReportsPage from './pages/ReportsPage';
+import NotificationPreferences from './NotificationPreferences';
 import { Switch } from './ui';
 import LoginScreen from './auth/LoginScreen';
 import AccessDenied from './auth/AccessDenied';
@@ -326,7 +327,7 @@ function ShellContent({ staff, logout }: {
                     </div>
                     <div className="card card-pad" style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)' }}>
                       <Icon name="settings" size={32} style={{ color: 'var(--text-faint)', marginBottom: 12 }} />
-                      <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text)', marginBottom: 4 }}>Settings coming soon</div>
+                      <NotificationPreferences />
                       <div style={{ fontSize: 13 }}>Configure organization details, tax rates, payment gateways and SMS templates here.</div>
                     </div>
                   </div>
