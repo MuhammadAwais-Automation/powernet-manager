@@ -861,6 +861,7 @@ export default function ComplaintsPage({
   const [filterArea, setFilterArea] = useState<string>("all");
   const [filterType, setFilterType] = useState<string>("all");
   const [filterPriority, setFilterPriority] = useState<string>("all");
+  const [searchTerm, setSearchTerm] = useState("");
 
   const prevRefreshRef = React.useRef(refreshToken);
 
@@ -961,6 +962,16 @@ export default function ComplaintsPage({
       return false;
     if (filterType !== "all" && c.type !== filterType) return false;
     if (filterPriority !== "all" && c.priority !== filterPriority) return false;
+    if (searchTerm.trim()) {
+      const term = searchTerm.toLowerCase().trim();
+      const codeMatch = c.complaint_code?.toLowerCase().includes(term);
+      const phoneMatch = c.customer?.phone?.toLowerCase().includes(term);
+      const nameMatch = c.customer?.full_name?.toLowerCase().includes(term);
+      const issueMatch = c.issue?.toLowerCase().includes(term);
+      const houseMatch = c.customer?.house_id?.toLowerCase().includes(term);
+      if (!codeMatch && !phoneMatch && !nameMatch && !issueMatch && !houseMatch)
+        return false;
+    }
     return true;
   });
 
