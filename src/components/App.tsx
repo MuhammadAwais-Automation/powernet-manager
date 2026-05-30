@@ -9,6 +9,7 @@ import ComplaintsPage from './pages/ComplaintsPage';
 import StaffPage from './pages/StaffPage';
 import AreasPage from './pages/AreasPage';
 import ReportsPage from './pages/ReportsPage';
+import { Switch } from './ui';
 import LoginScreen from './auth/LoginScreen';
 import AccessDenied from './auth/AccessDenied';
 import { NotificationBell, NotificationDrawer } from './notifications/NotificationCenter'
@@ -167,6 +168,50 @@ function ShellContent({ staff, logout }: {
   const [isDark, setIsDark] = useState(false);
   const [notificationFocus, setNotificationFocus] = useState<NotificationFocus | null>(null);
   const { billingVersion, complaintsVersion, customerRequestsVersion } = useNotifications();
+
+  // Notification preferences (local state + localStorage, migrate to Supabase later)
+  type NotificationPrefKey =
+    | 'payment_full'
+    | 'payment_partial'
+    | 'visit'
+    | 'complaint_created'
+    | 'complaint_in_progress'
+    | 'complaint_resolved'
+    | 'customer_signup';
+
+  const NOTIF_LABELS: Record<NotificationPrefKey, string> = {
+    payment_full: 'Full payments received',
+    payment_partial: 'Partial payments received',
+    visit: 'Customer visits logged',
+    complaint_created: 'New complaints',
+    complaint_in_progress: 'Complaints moved to in-progress',
+    complaint_resolved: 'Complaints resolved',
+    customer_signup: 'New customer signups',
+  };
+
+  const [notifPrefs, setNotifPrefs] = useState<Record<NotificationPrefKey, boolean>>(() => {
+    try {
+      const saved = localStorage.getItem('powernet_notification_prefs');
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return {
+      payment_full: true,
+      payment_partial: true,
+      visit: true,
+      complaint_created: true,
+      complaint_in_progress: true,
+      complaint_resolved: true,
+      customer_signup: true,
+    };
+  });
+
+  const toggleNotifPref = (key: NotificationPrefKey) => {
+    setNotifPrefs(prev => {
+      const next = { ...prev, [key]: !prev[key] };
+      try { localStorage.setItem('powernet_notification_prefs', JSON.stringify(next)); } catch {}
+      return next;
+    });
+  };
 
   const handlePageChange = useCallback((page: PageId) => {
     setActive(page);
