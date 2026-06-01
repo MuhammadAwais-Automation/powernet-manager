@@ -67,6 +67,7 @@ export type BillsPageParams = {
   status?: BillStatusFilter;
   search?: string;
   areaId?: string;
+  source?: string;
 };
 
 export type BillsPageResult = {
@@ -249,6 +250,7 @@ export async function getBillsPage(
     else if (params.status === "visited")
       query = query.eq("payment_method", "visit");
     else if (params.status) query = query.eq("status", params.status);
+    if (params.source) query = query.eq("payment_source", params.source);
     if (customerIds) query = query.in("customer_id", customerIds);
     return query;
   });
@@ -689,10 +691,10 @@ export type PaymentVerificationWithRelations = {
   bill_id: string;
   customer_id: string;
   amount: number;
-  method: 'bank' | 'easypaisa' | 'jazzcash' | 'other';
+  method: string;
   receipt_url: string;
   customer_remarks: string | null;
-  status: 'pending' | 'approved' | 'rejected';
+  status: string;
   review_note: string | null;
   reviewed_by: string | null;
   reviewed_at: string | null;
@@ -707,9 +709,19 @@ export type PaymentVerificationWithRelations = {
     amount: number;
     paid_amount: number;
   } | null;
+  reviewer?: {
+    id: string;
+    full_name: string;
+  } | null;
 };
 
 export async function getPendingPaymentVerifications(): Promise<PaymentVerificationWithRelations[]> {
+  return getPaymentVerifications("pending");
+}
+
+export async function getPaymentVerifications(
+  status: "pending" | "approved" | "rejected",
+): Promise<PaymentVerificationWithRelations[]> {
   const { data, error } = await supabase
     .from("payment_verifications")
     .select(`
@@ -726,9 +738,10 @@ export async function getPendingPaymentVerifications(): Promise<PaymentVerificat
       reviewed_at,
       created_at,
       customer:customers(customer_code, full_name, phone),
-      bill:bills(month, amount, paid_amount)
+      bill:bills(month, amount, paid_amount),
+      reviewer:staff!reviewed_by(id, full_name)
     `)
-    .eq("status", "pending")
+    .eq("status", status)
     .order("created_at", { ascending: false });
 
   if (error) throw error;

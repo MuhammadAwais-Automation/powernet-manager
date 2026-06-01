@@ -1,9 +1,9 @@
 'use client';
 import React, { useEffect, useState } from 'react';
 import Icon from '../Icon';
-import { Avatar, Badge, Drawer } from '../ui';
+import { Avatar, Badge, Drawer, Tabs } from '../ui';
 import {
-  getPendingPaymentVerifications,
+  getPaymentVerifications,
   approvePaymentVerification,
   rejectPaymentVerification,
   type PaymentVerificationWithRelations,
@@ -30,11 +30,13 @@ function ApprovalDrawer({
   onClose,
   onProcessed,
   staffId,
+  staffRole,
 }: {
   verification: PaymentVerificationWithRelations | null;
   onClose: () => void;
   onProcessed: () => void;
   staffId: string;
+  staffRole: string;
 }) {
   const [reviewNote, setReviewNote] = useState('');
   const [busy, setBusy] = useState(false);
@@ -43,7 +45,7 @@ function ApprovalDrawer({
 
   useEffect(() => {
     if (!verification) return;
-    setReviewNote('');
+    setReviewNote(verification.review_note || '');
     setError(null);
     setZoom(false);
   }, [verification]);
@@ -79,6 +81,7 @@ function ApprovalDrawer({
   };
 
   const methodMeta = METHOD_META[verification.method] || { label: verification.method, color: 'muted' };
+  const isReadOnly = verification.status !== 'pending' || staffRole !== 'admin';
 
   return (
     <>
@@ -94,9 +97,78 @@ function ApprovalDrawer({
       </div>
 
       <div className="drawer-body">
+        {staffRole !== 'admin' && verification.status === 'pending' && (
+          <div style={{ 
+            padding: '12px 14px', 
+            borderRadius: 8, 
+            background: 'var(--amber-bg, #fef3c7)', 
+            color: 'var(--amber, #d97706)', 
+            border: '1px solid rgba(217, 119, 6, 0.25)',
+            marginBottom: 14, 
+            fontSize: 13, 
+            display: 'flex', 
+            alignItems: 'flex-start', 
+            gap: 10 
+          }}>
+            <Icon name="alertTri" size={16} style={{ marginTop: 2 }} />
+            <div>
+              <div style={{ fontWeight: 700 }}>Admin Review Only</div>
+              <div style={{ fontSize: 11, opacity: 0.85, marginTop: 2 }}>
+                Reviewing and verifying customer receipts is restricted strictly to Administrators.
+              </div>
+            </div>
+          </div>
+        )}
         {error && (
           <div style={{ padding: '10px 14px', borderRadius: 8, background: '#fef2f2', color: '#dc2626', marginBottom: 12, fontSize: 13 }}>
             {error}
+          </div>
+        )}
+
+        {/* Status Audit Banner */}
+        {verification.status === 'approved' && (
+          <div style={{ 
+            padding: '12px 14px', 
+            borderRadius: 8, 
+            background: 'var(--green-bg, #f0fdf4)', 
+            color: 'var(--green, #15803d)', 
+            border: '1px solid rgba(21, 128, 61, 0.25)',
+            marginBottom: 14, 
+            fontSize: 13, 
+            display: 'flex', 
+            alignItems: 'flex-start', 
+            gap: 10 
+          }}>
+            <Icon name="checkCircle" size={16} style={{ marginTop: 2 }} />
+            <div>
+              <div style={{ fontWeight: 700 }}>Receipt Approved & Verified</div>
+              <div style={{ fontSize: 11, opacity: 0.85, marginTop: 2 }}>
+                Reviewed by {verification.reviewer?.full_name ?? 'Administrator'} on {new Date(verification.reviewed_at!).toLocaleString()}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {verification.status === 'rejected' && (
+          <div style={{ 
+            padding: '12px 14px', 
+            borderRadius: 8, 
+            background: 'var(--red-bg, #fef2f2)', 
+            color: 'var(--red, #b91c1c)', 
+            border: '1px solid rgba(185, 28, 28, 0.25)',
+            marginBottom: 14, 
+            fontSize: 13, 
+            display: 'flex', 
+            alignItems: 'flex-start', 
+            gap: 10 
+          }}>
+            <Icon name="ban" size={16} style={{ marginTop: 2 }} />
+            <div>
+              <div style={{ fontWeight: 700 }}>Receipt Rejected</div>
+              <div style={{ fontSize: 11, opacity: 0.85, marginTop: 2 }}>
+                Reviewed by {verification.reviewer?.full_name ?? 'Administrator'} on {new Date(verification.reviewed_at!).toLocaleString()}
+              </div>
+            </div>
           </div>
         )}
 
@@ -175,25 +247,34 @@ function ApprovalDrawer({
 
         {/* Administrative Review Remarks */}
         <div className="card card-pad" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <strong style={{ fontSize: 14 }}>Review Notes</strong>
+          <strong style={{ fontSize: 14 }}>{isReadOnly ? 'Reviewer Notes' : 'Review Notes'}</strong>
           <textarea
             className="select"
             rows={3}
             value={reviewNote}
+            disabled={isReadOnly}
             onChange={e => setReviewNote(e.target.value)}
-            placeholder="Enter a note or remarks for the customer..."
-            style={{ resize: 'none' }}
+            placeholder={isReadOnly ? 'No review notes provided' : 'Enter a note or remarks for the customer...'}
+            style={{ resize: 'none', background: isReadOnly ? 'var(--bg-muted, #f8fafc)' : undefined }}
           />
         </div>
       </div>
 
       <div className="drawer-foot">
-        <button className="btn btn-secondary" onClick={handleReject} disabled={busy}>
-          <Icon name="ban" size={14} /> Reject
-        </button>
-        <button className="btn btn-primary" onClick={handleApprove} disabled={busy}>
-          <Icon name="check" size={14} /> {busy ? 'Processing...' : 'Verify & Approve'}
-        </button>
+        {isReadOnly ? (
+          <button className="btn btn-secondary" onClick={onClose} style={{ marginLeft: 'auto' }}>
+            Close
+          </button>
+        ) : (
+          <>
+            <button className="btn btn-secondary" onClick={handleReject} disabled={busy}>
+              <Icon name="ban" size={14} /> Reject
+            </button>
+            <button className="btn btn-primary" onClick={handleApprove} disabled={busy}>
+              <Icon name="check" size={14} /> {busy ? 'Processing...' : 'Verify & Approve'}
+            </button>
+          </>
+        )}
       </div>
     </>
   );
@@ -201,31 +282,46 @@ function ApprovalDrawer({
 
 export default function PaymentApprovalsPage({
   staffId,
+  staffRole,
   onVerificationsCountChange,
 }: {
   staffId: string;
+  staffRole: string;
   onVerificationsCountChange?: (count: number) => void;
 }) {
   const [verifications, setVerifications] = useState<PaymentVerificationWithRelations[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<PaymentVerificationWithRelations | null>(null);
+  const [activeTab, setActiveTab] = useState<'pending' | 'approved' | 'rejected'>('pending');
 
   const load = () => {
     setLoading(true);
     setError(null);
-    getPendingPaymentVerifications()
+    getPaymentVerifications(activeTab)
       .then((data) => {
         setVerifications(data);
-        if (onVerificationsCountChange) {
-          onVerificationsCountChange(data.length);
-        }
       })
       .catch((e) => setError(e instanceof Error ? e.message : 'Could not load payment approvals queue'))
       .finally(() => setLoading(false));
   };
 
-  useEffect(load, []);
+  // Reload when tab changes
+  useEffect(() => {
+    load();
+    setSelected(null);
+  }, [activeTab]);
+
+  // Synchronize the global pending approvals count badge in the sidebar
+  useEffect(() => {
+    getPaymentVerifications('pending')
+      .then((data) => {
+        if (onVerificationsCountChange) {
+          onVerificationsCountChange(data.length);
+        }
+      })
+      .catch((e) => console.error('Error fetching pending approvals count for badge:', e));
+  }, [verifications, activeTab, onVerificationsCountChange]);
 
   const updateList = () => {
     load();
@@ -237,7 +333,11 @@ export default function PaymentApprovalsPage({
       <div className="page-header">
         <div>
           <h1>Payment Approvals</h1>
-          <p>{verifications.length} customer-uploaded payment receipts awaiting review</p>
+          <p>
+            {activeTab === 'pending' && `${verifications.length} customer-uploaded receipts awaiting review`}
+            {activeTab === 'approved' && `${verifications.length} historically approved receipts`}
+            {activeTab === 'rejected' && `${verifications.length} historically rejected receipts`}
+          </p>
         </div>
         <button className="btn btn-secondary" onClick={load} disabled={loading}>
           <Icon name="refresh" size={14} /> Refresh
@@ -250,6 +350,28 @@ export default function PaymentApprovalsPage({
         </div>
       )}
 
+      {/* Premium Tab Bar Selector */}
+      <div style={{ marginBottom: 18 }}>
+        <Tabs
+          value={activeTab}
+          onChange={(value) => setActiveTab(value as 'pending' | 'approved' | 'rejected')}
+          items={[
+            {
+              value: 'pending',
+              label: 'Pending Reviews',
+            },
+            {
+              value: 'approved',
+              label: 'Approved History',
+            },
+            {
+              value: 'rejected',
+              label: 'Rejected History',
+            },
+          ]}
+        />
+      </div>
+
       <div className="table-wrap" style={{ opacity: loading ? 0.55 : 1 }}>
         <table className="data">
           <thead>
@@ -259,7 +381,7 @@ export default function PaymentApprovalsPage({
               <th>Method</th>
               <th>Amount Submitted</th>
               <th>Remarks / Ref ID</th>
-              <th>Submitted At</th>
+              <th>{activeTab === 'pending' ? 'Submitted At' : 'Reviewed At'}</th>
               <th style={{ textAlign: 'right' }}>Actions</th>
             </tr>
           </thead>
@@ -275,8 +397,10 @@ export default function PaymentApprovalsPage({
             ) : verifications.length === 0 ? (
               <tr>
                 <td colSpan={7} style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>
-                  <Icon name="check" size={24} style={{ color: 'var(--green)', opacity: 0.5, marginBottom: 8, display: 'block', marginLeft: 'auto', marginRight: 'auto' }} />
-                  No pending payment receipts to review. Great job!
+                  <Icon name="checkCircle" size={24} style={{ color: 'var(--green)', opacity: 0.5, marginBottom: 8, display: 'block', marginLeft: 'auto', marginRight: 'auto' }} />
+                  {activeTab === 'pending' && 'No pending payment receipts to review. Great job!'}
+                  {activeTab === 'approved' && 'No approved payments found.'}
+                  {activeTab === 'rejected' && 'No rejected payments found.'}
                 </td>
               </tr>
             ) : verifications.map((item) => {
@@ -296,9 +420,20 @@ export default function PaymentApprovalsPage({
                   <td><Badge color={methodMeta.color} dot>{methodMeta.label}</Badge></td>
                   <td style={{ fontWeight: 600 }}>Rs. {item.amount.toLocaleString()}</td>
                   <td className="mono" style={{ fontSize: 12 }}>{item.customer_remarks || '—'}</td>
-                  <td className="muted" style={{ fontSize: 12 }}>{new Date(item.created_at).toLocaleString()}</td>
+                  <td className="muted" style={{ fontSize: 12 }}>
+                    {activeTab === 'pending' 
+                      ? new Date(item.created_at).toLocaleString() 
+                      : item.reviewed_at ? new Date(item.reviewed_at).toLocaleString() : '—'
+                    }
+                  </td>
                   <td style={{ textAlign: 'right' }} onClick={(e) => e.stopPropagation()}>
-                    <button className="icon-btn" onClick={() => setSelected(item)}><Icon name="eye" size={14} /></button>
+                    <button 
+                      className="icon-btn" 
+                      onClick={() => setSelected(item)} 
+                      title={activeTab === 'pending' ? 'Review request' : 'View audit details'}
+                    >
+                      <Icon name={activeTab === 'pending' ? 'eye' : 'fileText'} size={14} />
+                    </button>
                   </td>
                 </tr>
               );
@@ -313,6 +448,7 @@ export default function PaymentApprovalsPage({
           onClose={() => setSelected(null)} 
           onProcessed={updateList} 
           staffId={staffId} 
+          staffRole={staffRole}
         />
       </Drawer>
     </div>

@@ -228,6 +228,7 @@ export default function BillingPage({
   const [totalBills, setTotalBills] = useState(0);
   const [areas, setAreas] = useState<Area[]>([]);
   const [areaFilter, setAreaFilter] = useState("");
+  const [sourceFilter, setSourceFilter] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -264,8 +265,9 @@ export default function BillingPage({
     tab,
     debouncedSearch,
     areaFilter,
+    sourceFilter,
   });
-  latestRef.current = { billingMonth, page, tab, debouncedSearch, areaFilter };
+  latestRef.current = { billingMonth, page, tab, debouncedSearch, areaFilter, sourceFilter };
 
   // ── Reset page + bump loadKey when any filter changes ───────────────────────
   // We keep page reset here; if page was already 0, setPage(0) is a no-op, but
@@ -273,7 +275,7 @@ export default function BillingPage({
   useEffect(() => {
     setPage(0);
     setLoadKey((k) => k + 1);
-  }, [billingMonth, tab, debouncedSearch, areaFilter]);
+  }, [billingMonth, tab, debouncedSearch, areaFilter, sourceFilter]);
 
   // ── Bump loadKey when page changes (pagination clicks) ───────────────────────
   // Note: page change triggered by the filter-reset above will have already been
@@ -295,6 +297,7 @@ export default function BillingPage({
       tab: tab0,
       debouncedSearch: search0,
       areaFilter: area0,
+      sourceFilter: source0,
     } = latestRef.current;
     setLoading(true);
     setBills([]); // Clear previous results immediately — prevents stale skeleton
@@ -310,6 +313,7 @@ export default function BillingPage({
           status: normalizeBillStatusFilter(tab0),
           search: search0,
           areaId: area0 || undefined,
+          source: source0 || undefined,
         }),
         getBillingSummary(month, area0 || undefined),
         getAreas(),
@@ -700,6 +704,18 @@ export default function BillingPage({
                   </option>
                 ))}
               </select>
+              <select
+                className="select"
+                value={sourceFilter}
+                onChange={(e) => setSourceFilter(e.target.value)}
+                style={{ height: 36, fontSize: 13, minWidth: 160 }}
+              >
+                <option value="">All Channels</option>
+                <option value="customer">🌐 Online Approval</option>
+                <option value="office">🏢 Office Cash</option>
+                <option value="agent">🛵 Field Recovery</option>
+                <option value="manual">✍️ Manual Entry</option>
+              </select>
               <div className="billing-search">
                 <Icon name="search" size={14} />
                 <input
@@ -781,6 +797,7 @@ export default function BillingPage({
                     <th>Paid</th>
                     <th>Remaining</th>
                     <th>Status</th>
+                    <th>Channel</th>
                     <th>Receipt</th>
                     <th style={{ textAlign: "right" }}>Actions</th>
                   </tr>
@@ -828,6 +845,23 @@ export default function BillingPage({
                         <Badge color={statusColor(statusLabel(b))} dot>
                           {statusLabel(b)}
                         </Badge>
+                      </td>
+                      <td>
+                        {b.status === 'paid' || (b.paid_amount ?? 0) > 0 ? (
+                          b.payment_source === 'customer' ? (
+                            <Badge color="green">🌐 Online</Badge>
+                          ) : b.payment_source === 'office' ? (
+                            <Badge color="blue">🏢 Office</Badge>
+                          ) : b.payment_source === 'agent' ? (
+                            <Badge color="purple">🛵 Field</Badge>
+                          ) : b.payment_source === 'manual' ? (
+                            <Badge color="amber">✍️ Manual</Badge>
+                          ) : (
+                            <span className="muted" style={{ fontSize: 11 }}>—</span>
+                          )
+                        ) : (
+                          <span className="muted" style={{ fontSize: 11 }}>—</span>
+                        )}
                       </td>
                       <td className="mono" style={{ fontSize: 11 }}>
                         {b.receipt_no ?? "-"}
@@ -1214,12 +1248,17 @@ export default function BillingPage({
                       >
                         {detailBill.payment_method === "visit"
                           ? "Visited By"
+                          : detailBill.payment_source === "customer"
+                          ? "Approved By"
                           : "Collected By"}
                       </div>
                       <div
                         style={{ fontWeight: 600, fontSize: 13, marginTop: 4 }}
                       >
                         {detailBill.collector.full_name}
+                        {detailBill.payment_source === "customer" && " (Online Receipt Approval)"}
+                        {detailBill.payment_source === "office" && " (Office)"}
+                        {detailBill.payment_source === "agent" && " (Field Recovery)"}
                       </div>
                     </div>
                   )}

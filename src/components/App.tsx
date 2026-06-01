@@ -244,14 +244,15 @@ function ShellContent({ staff, logout }: {
                     focusToken={notificationFocus?.page === 'customer_requests' ? notificationFocus.requestId : 0}
                   />
                 </div>
-              )}
-              {canAccessPage(staff.role, 'payment_approvals') && (
+              )}              {canAccessPage(staff.role, 'payment_approvals') && (
                 <div style={{ display: active === 'payment_approvals' ? 'contents' : 'none' }}>
                   <PaymentApprovalsPage
                     staffId={staff.id}
+                    staffRole={staff.role}
                   />
                 </div>
               )}
+
               {canAccessPage(staff.role, 'billing') && (
                 <div style={{ display: active === 'billing' ? 'contents' : 'none' }}>
                   <BillingPage
