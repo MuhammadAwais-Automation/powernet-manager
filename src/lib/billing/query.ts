@@ -19,6 +19,7 @@ export type BillsPageQuery = {
   status?: BillStatusFilter;
   search?: string;
   areaId?: string;
+  source?: string;
 };
 
 export type BillingSummaryQuery = {
@@ -62,6 +63,7 @@ export function buildBillsPageCacheKey(params: BillsPageQuery): string {
     status: params.status,
     search: normalizeBillingSearch(params.search),
     areaId: params.areaId,
+    source: params.source,
     from,
     to,
   });

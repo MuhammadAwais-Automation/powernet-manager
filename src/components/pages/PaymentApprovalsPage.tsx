@@ -6,6 +6,7 @@ import {
   getPaymentVerifications,
   approvePaymentVerification,
   rejectPaymentVerification,
+  getPaymentVerificationCounts,
   type PaymentVerificationWithRelations,
 } from '@/lib/db/bills';
 
@@ -294,13 +295,22 @@ export default function PaymentApprovalsPage({
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<PaymentVerificationWithRelations | null>(null);
   const [activeTab, setActiveTab] = useState<'pending' | 'approved' | 'rejected'>('pending');
+  const [counts, setCounts] = useState<{ pending: number; approved: number; rejected: number }>({
+    pending: 0,
+    approved: 0,
+    rejected: 0,
+  });
 
   const load = () => {
     setLoading(true);
     setError(null);
-    getPaymentVerifications(activeTab)
-      .then((data) => {
+    Promise.all([
+      getPaymentVerifications(activeTab),
+      getPaymentVerificationCounts(),
+    ])
+      .then(([data, cnts]) => {
         setVerifications(data);
+        setCounts(cnts);
       })
       .catch((e) => setError(e instanceof Error ? e.message : 'Could not load payment approvals queue'))
       .finally(() => setLoading(false));
@@ -314,14 +324,10 @@ export default function PaymentApprovalsPage({
 
   // Synchronize the global pending approvals count badge in the sidebar
   useEffect(() => {
-    getPaymentVerifications('pending')
-      .then((data) => {
-        if (onVerificationsCountChange) {
-          onVerificationsCountChange(data.length);
-        }
-      })
-      .catch((e) => console.error('Error fetching pending approvals count for badge:', e));
-  }, [verifications, activeTab, onVerificationsCountChange]);
+    if (onVerificationsCountChange) {
+      onVerificationsCountChange(counts.pending);
+    }
+  }, [counts.pending, onVerificationsCountChange]);
 
   const updateList = () => {
     load();
@@ -358,15 +364,15 @@ export default function PaymentApprovalsPage({
           items={[
             {
               value: 'pending',
-              label: 'Pending Reviews',
+              label: `Pending Reviews (${counts.pending})`,
             },
             {
               value: 'approved',
-              label: 'Approved History',
+              label: `Approved History (${counts.approved})`,
             },
             {
               value: 'rejected',
-              label: 'Rejected History',
+              label: `Rejected History (${counts.rejected})`,
             },
           ]}
         />

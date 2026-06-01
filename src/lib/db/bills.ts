@@ -819,3 +819,24 @@ export async function rejectPaymentVerification(
 
   if (error) throw error;
 }
+
+export async function getPaymentVerificationCounts(): Promise<{
+  pending: number;
+  approved: number;
+  rejected: number;
+}> {
+  const { data, error } = await supabase
+    .from("payment_verifications")
+    .select("status");
+
+  if (error) throw error;
+  
+  const counts = { pending: 0, approved: 0, rejected: 0 };
+  (data ?? []).forEach((row) => {
+    const r = row as { status: string };
+    if (r.status === "pending") counts.pending++;
+    else if (r.status === "approved") counts.approved++;
+    else if (r.status === "rejected") counts.rejected++;
+  });
+  return counts;
+}
