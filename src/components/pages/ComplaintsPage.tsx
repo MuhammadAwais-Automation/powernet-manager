@@ -475,17 +475,20 @@ function ComplaintModal({
             ? null
             : complaint.assigned_at;
 
+      const newlyAssigned = assignedTo && !complaint.assigned_to;
+      const effectiveStatus = newlyAssigned ? "open" : status;
+
       const inProgressAt =
-        status === "in_progress" && complaint.status !== "in_progress"
+        effectiveStatus === "in_progress" && complaint.status !== "in_progress"
           ? new Date().toISOString()
-          : status === "open"
+          : effectiveStatus === "open"
             ? null
             : complaint.in_progress_at;
 
       const resolvedAt =
-        status === "resolved" && complaint.status !== "resolved"
+        effectiveStatus === "resolved" && complaint.status !== "resolved"
           ? new Date().toISOString()
-          : status !== "resolved"
+          : effectiveStatus !== "resolved"
             ? null
             : complaint.resolved_at;
 
@@ -493,7 +496,7 @@ function ComplaintModal({
         assigned_to: assignedTo || null,
         assigned_at: assignedAt,
         in_progress_at: inProgressAt,
-        status,
+        status: effectiveStatus,
         priority,
         resolved_at: resolvedAt,
       });
