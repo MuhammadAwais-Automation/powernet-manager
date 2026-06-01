@@ -683,3 +683,126 @@ async function findBillingCustomerIds(
   if (error) throw error;
   return Array.from(new Set((data ?? []).map((row) => row.id).filter(Boolean)));
 }
+
+export type PaymentVerificationWithRelations = {
+  id: string;
+  bill_id: string;
+  customer_id: string;
+  amount: number;
+  method: 'bank' | 'easypaisa' | 'jazzcash' | 'other';
+  receipt_url: string;
+  customer_remarks: string | null;
+  status: 'pending' | 'approved' | 'rejected';
+  review_note: string | null;
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+  created_at: string;
+  customer: {
+    customer_code: string;
+    full_name: string;
+    phone: string;
+  } | null;
+  bill: {
+    month: string;
+    amount: number;
+    paid_amount: number;
+  } | null;
+};
+
+export async function getPendingPaymentVerifications(): Promise<PaymentVerificationWithRelations[]> {
+  const { data, error } = await supabase
+    .from("payment_verifications")
+    .select(`
+      id,
+      bill_id,
+      customer_id,
+      amount,
+      method,
+      receipt_url,
+      customer_remarks,
+      status,
+      review_note,
+      reviewed_by,
+      reviewed_at,
+      created_at,
+      customer:customers(customer_code, full_name, phone),
+      bill:bills(month, amount, paid_amount)
+    `)
+    .eq("status", "pending")
+    .order("created_at", { ascending: false });
+
+  if (error) throw error;
+  return (data ?? []) as unknown as PaymentVerificationWithRelations[];
+}
+
+export async function approvePaymentVerification(
+  id: string,
+  reviewerId: string,
+  reviewNote?: string,
+): Promise<void> {
+  // 1. Fetch verification details
+  const { data: verification, error: fetchErr } = await supabase
+    .from("payment_verifications")
+    .select("*")
+    .eq("id", id)
+    .single();
+
+  if (fetchErr || !verification) {
+    throw new Error(fetchErr?.message || "Payment verification record not found");
+  }
+  if (verification.status !== "pending") {
+    throw new Error("This payment has already been processed");
+  }
+
+  // 2. Call recordBillPayment to update ledger and bills table
+  const paymentResult = await recordBillPayment({
+    billId: verification.bill_id,
+    amount: verification.amount,
+    collectedBy: reviewerId,
+    method: verification.method,
+    source: "customer",
+    note: reviewNote || "Payment receipt verified by administrator",
+  });
+
+  // 3. Update the newly created payment event row with Cloudinary receipt info
+  if (paymentResult.receiptNo) {
+    await supabase
+      .from("payments")
+      .update({
+        receipt_url: verification.receipt_url,
+        customer_remarks: verification.customer_remarks,
+      })
+      .eq("receipt_no", paymentResult.receiptNo);
+  }
+
+  // 4. Update status of the verification queue row
+  const { error: updateErr } = await supabase
+    .from("payment_verifications")
+    .update({
+      status: "approved",
+      review_note: reviewNote || null,
+      reviewed_by: reviewerId,
+      reviewed_at: new Date().toISOString(),
+    })
+    .eq("id", id);
+
+  if (updateErr) throw updateErr;
+}
+
+export async function rejectPaymentVerification(
+  id: string,
+  reviewerId: string,
+  reviewNote?: string,
+): Promise<void> {
+  const { error } = await supabase
+    .from("payment_verifications")
+    .update({
+      status: "rejected",
+      review_note: reviewNote || "Payment receipt rejected during administrative review",
+      reviewed_by: reviewerId,
+      reviewed_at: new Date().toISOString(),
+    })
+    .eq("id", id);
+
+  if (error) throw error;
+}

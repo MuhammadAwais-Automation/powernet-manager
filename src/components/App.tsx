@@ -4,6 +4,7 @@ import Icon from './Icon';
 import DashboardPage from './pages/DashboardPage';
 import CustomersPage from './pages/CustomersPage';
 import CustomerRequestsPage from './pages/CustomerRequestsPage';
+import PaymentApprovalsPage from './pages/PaymentApprovalsPage';
 import BillingPage from './pages/BillingPage';
 import ComplaintsPage from './pages/ComplaintsPage';
 import StaffPage from './pages/StaffPage';
@@ -31,6 +32,7 @@ const ALL_NAV: { id: PageId; label: string; icon: string }[] = [
   { id: 'dashboard',  label: 'Dashboard',          icon: 'grid' },
   { id: 'customers',  label: 'Customers',          icon: 'users' },
   { id: 'customer_requests', label: 'Customer Requests', icon: 'fileText' },
+  { id: 'payment_approvals', label: 'Payment Approvals', icon: 'check' },
   { id: 'billing',    label: 'Billing & Payments', icon: 'card' },
   { id: 'complaints', label: 'Complaints',         icon: 'alert' },
   { id: 'staff',      label: 'Staff Management',   icon: 'briefcase' },
@@ -42,6 +44,7 @@ const PAGE_META: Record<PageId, { title: string; sub: string }> = {
   dashboard:  { title: 'Dashboard',          sub: 'Overview of network operations' },
   customers:  { title: 'Customers',          sub: 'Subscribers across service areas' },
   customer_requests: { title: 'Customer Requests', sub: 'New signup approvals and account activation' },
+  payment_approvals: { title: 'Payment Approvals', sub: 'Review customer-uploaded receipts and verify payments' },
   billing:    { title: 'Billing & Payments', sub: 'Monthly billing & collections' },
   complaints: { title: 'Complaints',         sub: 'Open & in-progress tickets' },
   staff:      { title: 'Staff Management',   sub: 'Field agents & dashboard users' },
@@ -239,6 +242,13 @@ function ShellContent({ staff, logout }: {
                     refreshToken={customerRequestsVersion}
                     focusRequestId={notificationFocus?.page === 'customer_requests' ? notificationFocus.id : null}
                     focusToken={notificationFocus?.page === 'customer_requests' ? notificationFocus.requestId : 0}
+                  />
+                </div>
+              )}
+              {canAccessPage(staff.role, 'payment_approvals') && (
+                <div style={{ display: active === 'payment_approvals' ? 'contents' : 'none' }}>
+                  <PaymentApprovalsPage
+                    staffId={staff.id}
                   />
                 </div>
               )}
