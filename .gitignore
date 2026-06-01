@@ -49,3 +49,7 @@ skills-lock.json
 *.jpeg
 
 .vercel
+
+# local tmp directories
+.tmp-*
+

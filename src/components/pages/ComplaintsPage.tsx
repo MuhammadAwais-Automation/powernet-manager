@@ -964,11 +964,11 @@ export default function ComplaintsPage({
     if (filterPriority !== "all" && c.priority !== filterPriority) return false;
     if (searchTerm.trim()) {
       const term = searchTerm.toLowerCase().trim();
-      const codeMatch = c.complaint_code?.toLowerCase().includes(term);
-      const phoneMatch = c.customer?.phone?.toLowerCase().includes(term);
-      const nameMatch = c.customer?.full_name?.toLowerCase().includes(term);
-      const issueMatch = c.issue?.toLowerCase().includes(term);
-      const houseMatch = c.customer?.house_id?.toLowerCase().includes(term);
+      const codeMatch = c.complaint_code?.toLowerCase()?.includes(term) ?? false;
+      const phoneMatch = c.customer?.phone?.toLowerCase()?.includes(term) ?? false;
+      const nameMatch = c.customer?.full_name?.toLowerCase()?.includes(term) ?? false;
+      const issueMatch = c.issue?.toLowerCase()?.includes(term) ?? false;
+      const houseMatch = c.customer?.house_id?.toLowerCase()?.includes(term) ?? false;
       if (!codeMatch && !phoneMatch && !nameMatch && !issueMatch && !houseMatch)
         return false;
     }

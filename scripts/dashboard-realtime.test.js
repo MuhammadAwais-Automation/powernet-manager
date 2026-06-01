@@ -51,6 +51,8 @@ assert.deepStrictEqual(
     unpaidBills: 4,
     openComplaints: 2,
     monthlyRevenue: 1800,
+    expectedRevenue: 0,
+    pendingRevenue: 0,
     activeStaff: 3,
     revenueByMonth: [],
     complaintsByStatus: { open: 0, in_progress: 0, resolved: 0 },
