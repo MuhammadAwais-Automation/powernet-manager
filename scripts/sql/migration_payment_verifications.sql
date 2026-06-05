@@ -81,4 +81,25 @@ begin
   end if;
 end $$;
 
+-- 7. Realtime Refresh Trigger for Bills (touches bill to notify customer app of verification updates)
+create or replace function public.touch_bill_on_verification_change()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  update public.bills
+  set amount = amount
+  where id = new.bill_id;
+  return new;
+end;
+$$;
+
+drop trigger if exists touch_bill_on_verification_change_trigger on public.payment_verifications;
+create trigger touch_bill_on_verification_change_trigger
+after update of status on public.payment_verifications
+for each row
+execute function public.touch_bill_on_verification_change();
+
 COMMIT;
