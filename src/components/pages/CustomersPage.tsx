@@ -117,7 +117,6 @@ function AddCustomerDrawer({
         {/* Connection */}
         <div className="card card-pad" style={{ marginBottom: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
           <div className="muted" style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Connection</div>
-          <input className="select" placeholder="Username (e.g. a027_)" value={form.username} onChange={e => set('username', e.target.value)} />
           <select className="select" value={form.package_id} onChange={e => set('package_id', e.target.value)}>
             <option value="">Select package</option>
             {packages.map(p => <option key={p.id} value={p.id}>{p.name}{p.default_price ? ` — Rs. ${p.default_price}` : ''}</option>)}
@@ -339,7 +338,6 @@ function CustomerDetail({
           <div className="card-pad" style={{ paddingTop: 8, paddingBottom: 8 }}>
             <InfoRow label="Package" value={customer.package?.name} />
             <InfoRow label="Area" value={customer.area?.name} />
-            <InfoRow label="Username / Login ID" value={customer.username ?? '—'} mono />
             {customer.onu_number && <InfoRow label="ONU Number" value={customer.onu_number} mono />}
             <InfoRow label="IPTV"
               value={customer.iptv
@@ -766,7 +764,7 @@ export default function CustomersPage() {
                     <Avatar name={c.full_name} size={32} />
                     <div>
                       <div className="nm">{c.full_name}</div>
-                      <div className="sub mono">{c.username ?? c.customer_code}</div>
+                      <div className="sub mono">{c.customer_code}</div>
                     </div>
                   </div>
                 </td>
