@@ -57,11 +57,14 @@ CREATE POLICY "Customers can view their own payment verifications"
 DROP POLICY IF EXISTS "Staff can view/update all payment verifications" ON public.payment_verifications;
 CREATE POLICY "Staff can view/update all payment verifications" 
   ON public.payment_verifications FOR ALL 
+  TO authenticated
   USING (
-    EXISTS (
-      SELECT 1 FROM public.staff 
-      WHERE staff.auth_user_id = auth.uid()
-    )
+    auth.jwt() ->> 'email' LIKE '%@powernet.local' 
+    AND auth.jwt() ->> 'email' NOT LIKE 'customer_%'
+  )
+  WITH CHECK (
+    auth.jwt() ->> 'email' LIKE '%@powernet.local' 
+    AND auth.jwt() ->> 'email' NOT LIKE 'customer_%'
   );
 
 -- 6. Enable Realtime Replication
