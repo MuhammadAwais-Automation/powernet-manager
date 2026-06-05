@@ -1,0 +1,712 @@
+'use client';
+import React, { useState, useEffect, useRef } from 'react';
+import Icon from '../Icon';
+import { Badge, Avatar, Switch, Drawer } from '../ui';
+import { createCustomer, getCustomerById, updateCustomer } from '@/lib/db/customers';
+import { getCustomerList } from '@/lib/db/customer-list';
+import { getCachedAreas, getCachedPackages, setCachedAreas, setCachedPackages } from '@/lib/db/customer-cache';
+import { getAreas } from '@/lib/db/areas';
+import { getPackages } from '@/lib/db/packages';
+import { getBillsByCustomer } from '@/lib/db/bills';
+import { useAuth } from '@/lib/auth/auth-context';
+import type { CustomerWithRelations, Area, Package, CustomerStatus, Bill, CustomerListRow } from '@/types/database';
+
+// ── Add Customer Drawer ──────────────────────────────────────────────────────
+
+function AddCustomerDrawer({
+  areas, packages, onClose, onSaved, editTarget,
+}: {
+  areas: Area[];
+  packages: Package[];
+  onClose: () => void;
+  onSaved: (c: CustomerWithRelations) => void;
+  editTarget?: CustomerWithRelations;
+}) {
+  const [form, setForm] = useState({
+    full_name:         editTarget?.full_name           ?? '',
+    cnic:              editTarget?.cnic                 ?? '',
+    phone:             editTarget?.phone                ?? '',
+    username:          editTarget?.username              ?? '',
+    package_id:        editTarget?.package_id            ?? '',
+    iptv:              editTarget?.iptv                  ?? false,
+    address_type:      (editTarget?.address_type         ?? 'id_number') as 'text' | 'id_number',
+    address_value:     editTarget?.address_value         ?? '',
+    area_id:           editTarget?.area_id               ?? '',
+    connection_date:   editTarget?.connection_date        ?? '',
+    due_amount:        editTarget?.due_amount?.toString() ?? '',
+    status:            (editTarget?.status                ?? 'active') as CustomerStatus,
+    onu_number:        editTarget?.onu_number             ?? '',
+    remarks:           editTarget?.remarks               ?? '',
+    disconnected_date: editTarget?.disconnected_date      ?? '',
+    reconnected_date:  editTarget?.reconnected_date       ?? '',
+  });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const set = (key: string, val: unknown) => setForm(f => ({ ...f, [key]: val }));
+
+  const handleSubmit = async () => {
+    if (!form.full_name.trim()) { setError('Name required'); return; }
+    if (!form.area_id) { setError('Area required'); return; }
+    setSaving(true);
+    setError(null);
+    try {
+      const payload = {
+        username:          form.username || null,
+        full_name:         form.full_name.trim(),
+        cnic:              form.cnic || null,
+        phone:             form.phone || null,
+        package_id:        form.package_id || null,
+        iptv:              form.iptv,
+        address_type:      form.address_type,
+        address_value:     form.address_value || null,
+        area_id:           form.area_id,
+        connection_date:   form.connection_date || null,
+        due_amount:        form.due_amount ? parseInt(form.due_amount) : null,
+        onu_number:        form.onu_number || null,
+        status:            form.status,
+        disconnected_date: form.disconnected_date || null,
+        reconnected_date:  form.reconnected_date || null,
+        remarks:           form.remarks || null,
+      };
+      if (editTarget) {
+        await updateCustomer(editTarget.id, payload);
+        const full = await getCustomerById(editTarget.id);
+        if (full) onSaved(full);
+      } else {
+        const created = await createCustomer(payload);
+        const full = await getCustomerById(created.id);
+        if (full) onSaved(full);
+      }
+      onClose();
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Save failed');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <>
+      <div className="drawer-head">
+        <div><div style={{ fontSize: 15, fontWeight: 600 }}>{editTarget ? 'Edit Customer' : 'Add Customer'}</div></div>
+        <button className="icon-btn" onClick={onClose}><Icon name="close" size={16} /></button>
+      </div>
+      <div className="drawer-body">
+        {error && (
+          <div style={{ padding: '10px 16px', background: 'var(--red-bg, #fef2f2)', color: 'var(--red, #dc2626)',
+                        borderRadius: 8, marginBottom: 14, fontSize: 13 }}>
+            {error}
+          </div>
+        )}
+
+        {/* Basic Info */}
+        <div className="card card-pad" style={{ marginBottom: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div className="muted" style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Basic Info</div>
+          <input className="select" placeholder="Full Name *" value={form.full_name} onChange={e => set('full_name', e.target.value)} />
+          <input className="select" placeholder="CNIC (optional)" value={form.cnic} onChange={e => set('cnic', e.target.value)} />
+          <input className="select" placeholder="Phone (optional)" value={form.phone} onChange={e => set('phone', e.target.value)} />
+        </div>
+
+        {/* Connection */}
+        <div className="card card-pad" style={{ marginBottom: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div className="muted" style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Connection</div>
+          <input className="select" placeholder="Username (e.g. a027_)" value={form.username} onChange={e => set('username', e.target.value)} />
+          <select className="select" value={form.package_id} onChange={e => set('package_id', e.target.value)}>
+            <option value="">Select package</option>
+            {packages.map(p => <option key={p.id} value={p.id}>{p.name}{p.default_price ? ` — Rs. ${p.default_price}` : ''}</option>)}
+          </select>
+          <div className="row gap-sm" style={{ alignItems: 'center' }}>
+            <Switch on={form.iptv} onChange={(v: boolean) => set('iptv', v)} />
+            <span style={{ fontSize: 13 }}>IPTV</span>
+          </div>
+        </div>
+
+        {/* Location */}
+        <div className="card card-pad" style={{ marginBottom: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div className="muted" style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Location</div>
+          <div className="row gap-sm">
+            <button className={`btn btn-sm ${form.address_type === 'id_number' ? 'btn-primary' : 'btn-secondary'}`}
+              onClick={() => set('address_type', 'id_number')}>ID Number</button>
+            <button className={`btn btn-sm ${form.address_type === 'text' ? 'btn-primary' : 'btn-secondary'}`}
+              onClick={() => set('address_type', 'text')}>Text Address</button>
+          </div>
+          <input className="select"
+            placeholder={form.address_type === 'id_number' ? 'ID Number (e.g. 14)' : 'Address (e.g. QTR NO 6/2 F2)'}
+            value={form.address_value} onChange={e => set('address_value', e.target.value)} />
+          <select className="select" value={form.area_id} onChange={e => set('area_id', e.target.value)}>
+            <option value="">Select area *</option>
+            {areas.map(a => <option key={a.id} value={a.id}>{a.name} ({a.code})</option>)}
+          </select>
+        </div>
+
+        {/* Financial */}
+        <div className="card card-pad" style={{ marginBottom: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div className="muted" style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Financial</div>
+          <input className="select" type="number" placeholder="Monthly Due (PKR)" value={form.due_amount} onChange={e => set('due_amount', e.target.value)} />
+          <input className="select" type="date" value={form.connection_date} onChange={e => set('connection_date', e.target.value)} />
+          <select className="select" value={form.status} onChange={e => set('status', e.target.value as CustomerStatus)}>
+            <option value="active">Active</option>
+            <option value="free">Free</option>
+            <option value="suspended">Suspended</option>
+            <option value="disconnected">Disconnected</option>
+            <option value="tdc">TDC (Temp Disconnected)</option>
+            <option value="shifted">Shifted</option>
+          </select>
+        </div>
+
+        {/* Equipment & Notes */}
+        <div className="card card-pad" style={{ marginBottom: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div className="muted" style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Equipment & Notes</div>
+          <input className="select" placeholder="ONU Number (garrison only)" value={form.onu_number} onChange={e => set('onu_number', e.target.value)} />
+          <textarea className="select" placeholder="Remarks" rows={2} value={form.remarks}
+            onChange={e => set('remarks', e.target.value)} style={{ resize: 'none' }} />
+          {(form.status === 'disconnected' || form.status === 'tdc') && (
+            <>
+              <input className="select" type="date" placeholder="Disconnected Date" value={form.disconnected_date} onChange={e => set('disconnected_date', e.target.value)} />
+              <input className="select" type="date" placeholder="Reconnected Date" value={form.reconnected_date} onChange={e => set('reconnected_date', e.target.value)} />
+            </>
+          )}
+        </div>
+      </div>
+      <div className="drawer-foot">
+        <button className="btn btn-secondary" onClick={onClose}>Cancel</button>
+        <button className="btn btn-primary" onClick={handleSubmit} disabled={saving}>
+          {saving ? 'Saving…' : 'Save Customer'}
+        </button>
+      </div>
+    </>
+  );
+}
+
+// ── Customer Detail Drawer ───────────────────────────────────────────────────
+
+function CustomerDetail({ customer, onClose, onEdit, onSuspend, readOnly }: { customer: CustomerWithRelations; onClose: () => void; onEdit: () => void; onSuspend: () => void; readOnly?: boolean; }) {
+  const [bills, setBills] = useState<Bill[]>([]);
+  const [billsError, setBillsError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setBillsError(null);
+    getBillsByCustomer(customer.id)
+      .then(setBills)
+      .catch((e: unknown) => setBillsError(e instanceof Error ? e.message : 'Could not load bills'));
+  }, [customer.id]);
+
+  const statusColor = (s: string) => {
+    if (s === 'active') return 'green';
+    if (s === 'free') return 'blue';
+    if (s === 'suspended' || s === 'tdc') return 'amber';
+    return 'red';
+  };
+
+  const addressDisplay = () => {
+    if (!customer.address_value) return '—';
+    if (customer.address_type === 'id_number') {
+      const v = customer.address_value.trim().toUpperCase();
+      if (v.startsWith('ID NO') || v.startsWith('ID NUMBER')) return customer.address_value;
+      return `ID NO ${customer.address_value}`;
+    }
+    return customer.address_value;
+  };
+
+  const InfoRow = ({ label, value, mono }: { label: string; value: React.ReactNode; mono?: boolean }) => (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 0',
+                  borderBottom: '1px solid var(--border)' }}>
+      <span style={{ fontSize: 12, color: 'var(--text-muted)', width: 110, flexShrink: 0 }}>{label}</span>
+      <span style={{ fontSize: 13, fontFamily: mono ? 'JetBrains Mono, monospace' : undefined, flex: 1 }}>
+        {value || '—'}
+      </span>
+    </div>
+  );
+
+  return (
+    <>
+      <div className="drawer-head">
+        <div className="row gap-md">
+          <Avatar name={customer.full_name} size={44} />
+          <div>
+            <div style={{ fontSize: 15, fontWeight: 600, letterSpacing: '-0.01em' }}>{customer.full_name}</div>
+            <div className="muted mono" style={{ fontSize: 11 }}>
+              {customer.customer_code} · {customer.area?.name ?? '—'}
+            </div>
+          </div>
+        </div>
+        <button className="icon-btn" onClick={onClose}><Icon name="close" size={16} /></button>
+      </div>
+
+      <div className="drawer-body">
+        {/* Status bar */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px',
+                      background: 'var(--bg-muted)', borderRadius: 10, marginBottom: 16,
+                      border: '1px solid var(--border)' }}>
+          <Badge color={statusColor(customer.status)} dot>{customer.status.toUpperCase()}</Badge>
+          {customer.iptv && <Badge color="purple" dot>IPTV</Badge>}
+          {customer.due_amount
+            ? <span style={{ marginLeft: 'auto', fontSize: 13, fontWeight: 600, fontFamily: 'JetBrains Mono, monospace' }}>
+                Rs. {customer.due_amount.toLocaleString()}/mo
+              </span>
+            : <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--text-muted)' }}>Free / No charge</span>
+          }
+        </div>
+
+        {/* Personal Info */}
+        <div className="card" style={{ marginBottom: 14 }}>
+          <div className="card-head"><h3>Personal Info</h3></div>
+          <div className="card-pad" style={{ paddingTop: 8, paddingBottom: 8 }}>
+            <InfoRow label="CNIC" value={customer.cnic} mono />
+            <InfoRow label="Phone" value={customer.phone} mono />
+            <InfoRow label="Address" value={addressDisplay()} />
+          </div>
+        </div>
+
+        {/* Connection Details */}
+        <div className="card" style={{ marginBottom: 14 }}>
+          <div className="card-head"><h3>Connection Details</h3></div>
+          <div className="card-pad" style={{ paddingTop: 8, paddingBottom: 8 }}>
+            <InfoRow label="Package" value={customer.package?.name} />
+            <InfoRow label="Area" value={customer.area?.name} />
+            <InfoRow label="Username / Login ID" value={customer.username ?? '—'} mono />
+            {customer.onu_number && <InfoRow label="ONU Number" value={customer.onu_number} mono />}
+            <InfoRow label="IPTV"
+              value={customer.iptv
+                ? <Badge color="purple" dot>Active</Badge>
+                : <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>Not subscribed</span>}
+            />
+            {customer.connection_date && <InfoRow label="Connected Since" value={customer.connection_date} />}
+            {customer.disconnected_date && <InfoRow label="Disconnected On" value={customer.disconnected_date} />}
+            {customer.reconnected_date && <InfoRow label="Reconnected On" value={customer.reconnected_date} />}
+          </div>
+        </div>
+
+        {/* Bill History */}
+        <div className="card" style={{ marginBottom: 14 }}>
+          <div className="card-head"><h3>Bill History</h3></div>
+          {billsError ? (
+            <div style={{ padding: '14px 20px', color: '#dc2626', fontSize: 13 }}>{billsError}</div>
+          ) : bills.length === 0 ? (
+            <div style={{ padding: '14px 20px', color: 'var(--text-muted)', fontSize: 13 }}>No bills recorded</div>
+          ) : bills.map(b => {
+            const paid = b.paid_amount ?? 0;
+            const remaining = Math.max(b.amount - paid, 0);
+            return (
+              <div key={b.id} className="minirow">
+                <div>
+                  <div className="row gap-sm">
+                    <Icon name="calendar" size={14} style={{ color: 'var(--text-muted)' }} />
+                    <span>{b.month}</span>
+                    {b.receipt_no && <span className="mono muted" style={{ fontSize: 11 }}>{b.receipt_no}</span>}
+                  </div>
+                  <div className="muted" style={{ fontSize: 11, marginTop: 3 }}>
+                    Paid Rs. {paid.toLocaleString()} · Remaining Rs. {remaining.toLocaleString()}
+                  </div>
+                </div>
+                <div className="row gap-md">
+                  <span className="mono">Rs. {b.amount.toLocaleString()}</span>
+                  <Badge color={b.status === 'paid' ? 'green' : b.status === 'overdue' ? 'red' : 'amber'} dot>{b.status}</Badge>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Remarks */}
+        {customer.remarks && (
+          <div className="card">
+            <div className="card-head"><h3>Remarks</h3></div>
+            <div style={{ padding: '12px 20px', fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.6 }}>
+              {customer.remarks}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {!readOnly && (
+        <div className="drawer-foot">
+          <button className="btn btn-secondary" onClick={onEdit}><Icon name="edit" size={14} />Edit</button>
+          {customer.status !== 'suspended' && (
+            <button className="btn btn-danger" onClick={onSuspend}><Icon name="ban" size={14} />Suspend</button>
+          )}
+        </div>
+      )}
+    </>
+  );
+}
+
+// ── Main Page ────────────────────────────────────────────────────────────────
+
+export default function CustomersPage() {
+  const { staff } = useAuth();
+  const readOnly = staff?.role === 'complaint_manager';
+  const [customers, setCustomers] = useState<CustomerListRow[]>([]);
+  const [totalCustomers, setTotalCustomers] = useState(0);
+  const [areas, setAreas] = useState<Area[]>(() => getCachedAreas() ?? []);
+  const [packages, setPackages] = useState<Package[]>(() => getCachedPackages() ?? []);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [selected, setSelected] = useState<CustomerWithRelations | null>(null);
+  const [showAdd, setShowAdd] = useState(false);
+  const [rawSearch, setRawSearch] = useState('');
+  const [search, setSearch] = useState('');
+  const [areaFilter, setAreaFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [pkgFilter, setPkgFilter] = useState('');
+  const [iptvFilter, setIptvFilter] = useState(false);
+  const [connectedBefore, setConnectedBefore] = useState('');
+  const [showMoreFilters, setShowMoreFilters] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [reloadToken, setReloadToken] = useState(0);
+  const [exporting, setExporting] = useState(false);
+  const PAGE_SIZE = 50;
+  const [page, setPage] = useState(0);
+
+  useEffect(() => { setPage(0); }, [search, areaFilter, statusFilter, pkgFilter, iptvFilter, reloadToken]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setSearch(rawSearch), 250);
+    return () => window.clearTimeout(timer);
+  }, [rawSearch]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadLookups() {
+      try {
+        const [loadedAreas, loadedPackages] = await Promise.all([
+          getCachedAreas() ? Promise.resolve(getCachedAreas()!) : getAreas(),
+          getCachedPackages() ? Promise.resolve(getCachedPackages()!) : getPackages(),
+        ]);
+        if (cancelled) return;
+        setCachedAreas(loadedAreas);
+        setCachedPackages(loadedPackages);
+        setAreas(loadedAreas);
+        setPackages(loadedPackages);
+      } catch (e: unknown) {
+        if (!cancelled) setError(e instanceof Error ? e.message : 'Could not load lookup data');
+      }
+    }
+
+    loadLookups();
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+
+    getCustomerList({
+      page,
+      pageSize: PAGE_SIZE,
+      search,
+      areaId: areaFilter || undefined,
+      packageId: pkgFilter || undefined,
+      status: statusFilter ? (statusFilter as CustomerStatus) : undefined,
+      iptv: iptvFilter || undefined,
+      connectedBefore: connectedBefore || undefined,
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    })
+      .then(result => {
+        if (cancelled) return;
+        setCustomers(result.rows);
+        setTotalCustomers(result.total);
+      })
+      .catch((e: unknown) => {
+        if (!cancelled) setError(e instanceof Error ? e.message : 'Could not load customers');
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => { cancelled = true; };
+  }, [page, search, areaFilter, statusFilter, pkgFilter, iptvFilter, connectedBefore, reloadToken]);
+
+  const [editCustomer, setEditCustomer] = useState<CustomerWithRelations | null>(null);
+
+  const handleCustomerSaved = (_c: CustomerWithRelations) => {
+    setReloadToken(t => t + 1);
+  };
+
+  const handleCustomerUpdated = (_updated: CustomerWithRelations) => {
+    setSelected(null);
+    setReloadToken(t => t + 1);
+  };
+
+  const handleSelectCustomer = async (id: string) => {
+    const full = await getCustomerById(id);
+    if (full) setSelected(full);
+  };
+
+  const handleEditCustomer = async (id: string) => {
+    const full = await getCustomerById(id);
+    if (full) setEditCustomer(full);
+  };
+
+  const handleSuspend = async () => {
+    if (!selected) return;
+    if (!window.confirm(`Suspend ${selected.full_name}?`)) return;
+    try {
+      await updateCustomer(selected.id, { status: 'suspended' });
+      setSelected(null);
+      setReloadToken(t => t + 1);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Could not suspend customer');
+    }
+  };
+
+  const handleExport = async () => {
+    setExporting(true);
+    setError(null);
+    try {
+      const MAX = 2000;
+      const BATCH = 500;
+      let all: CustomerListRow[] = [];
+      let p = 0;
+      while (all.length < MAX) {
+        const result = await getCustomerList({
+          page: p, pageSize: BATCH,
+          search, areaId: areaFilter || undefined,
+          packageId: pkgFilter || undefined,
+          status: statusFilter ? (statusFilter as CustomerStatus) : undefined,
+        });
+        all = all.concat(result.rows);
+        if (all.length >= result.total || result.rows.length < BATCH) break;
+        p++;
+      }
+      const esc = (v: string | number | null | undefined) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+      const headers = ['Customer Code', 'Full Name', 'CNIC', 'Phone', 'Area', 'Package', 'Status', 'Due Amount'];
+      const rows = all.map(c => [
+        esc(c.customer_code), esc(c.full_name), esc(c.cnic), esc(c.phone),
+        esc(c.area?.name), esc(c.package?.name), esc(c.status), esc(c.due_amount),
+      ].join(','));
+      const csv = [headers.join(','), ...rows].join('\n');
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = `customers-${statusFilter || 'all'}.csv`; a.click();
+      URL.revokeObjectURL(url);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Export failed');
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const totalPages = Math.ceil(totalCustomers / PAGE_SIZE);
+  const paginated  = customers;
+
+  const moreFiltersRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!showMoreFilters) return;
+    const handler = (e: MouseEvent) => {
+      if (moreFiltersRef.current && !moreFiltersRef.current.contains(e.target as Node)) {
+        setShowMoreFilters(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showMoreFilters]);
+
+  return (
+    <div className="page">
+      <div className="page-header">
+        <div>
+          <h1>Customers</h1>
+          <p>{totalCustomers.toLocaleString()} total · managing active, suspended and onboarding subscribers</p>
+        </div>
+        <div className="row gap-sm">
+          <button className="btn btn-secondary" onClick={handleExport} disabled={exporting}><Icon name="download" size={14} />{exporting ? 'Exporting...' : 'Export CSV'}</button>
+          {!readOnly && (
+            <button className="btn btn-primary" onClick={() => setShowAdd(true)}><Icon name="plus" size={14} />Add Customer</button>
+          )}
+        </div>
+      </div>
+
+      <div className="filter-bar">
+        <div className="search">
+          <Icon name="search" size={14} />
+          <input placeholder="Search by name, username or customer ID…" value={rawSearch} onChange={e => setRawSearch(e.target.value)} />
+        </div>
+        <select className="select" style={{ width: 'auto' }} value={areaFilter} onChange={e => setAreaFilter(e.target.value)}>
+          <option value="">All areas</option>
+          {areas.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+        </select>
+        <select className="select" style={{ width: 'auto' }} value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
+          <option value="">All status</option>
+          <option value="active">Active</option>
+          <option value="free">Free</option>
+          <option value="suspended">Suspended</option>
+          <option value="disconnected">Disconnected</option>
+          <option value="tdc">TDC</option>
+          <option value="shifted">Shifted</option>
+        </select>
+        <select className="select" style={{ width: 'auto' }} value={pkgFilter} onChange={e => setPkgFilter(e.target.value)}>
+          <option value="">All packages</option>
+          {packages.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+        </select>
+        <div className="spacer" />
+        <div ref={moreFiltersRef} style={{ position: 'relative' }}>
+          <button
+            className={`btn btn-ghost btn-sm${showMoreFilters || iptvFilter ? ' active' : ''}`}
+            onClick={() => setShowMoreFilters(v => !v)}
+          >
+            <Icon name="filter" size={14} />
+            More filters
+            {iptvFilter && <span style={{ marginLeft: 4, background: 'var(--color-primary)', color: '#fff', borderRadius: 10, fontSize: 10, padding: '1px 6px' }}>1</span>}
+          </button>
+          {showMoreFilters && (
+            <div style={{
+              position: 'absolute', top: 'calc(100% + 6px)', right: 0, zIndex: 100,
+              background: 'var(--bg)', border: '1px solid var(--border)',
+              borderRadius: 10, boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
+              padding: '12px 16px', minWidth: 200,
+            }}>
+              <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)', marginBottom: 10 }}>
+                More Filters
+              </div>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13, cursor: 'pointer', padding: '6px 0' }}>
+                <input
+                  type="checkbox"
+                  checked={iptvFilter}
+                  onChange={e => { setIptvFilter(e.target.checked); setPage(0); }}
+                  style={{ width: 15, height: 15, accentColor: 'var(--color-primary)' }}
+                />
+                <span>IPTV subscribers only</span>
+              </label>
+              <div style={{ paddingTop: 6 }}>
+                <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)', marginBottom: 6 }}>Connected before</div>
+                <input
+                  type="date"
+                  className="select"
+                  value={connectedBefore}
+                  onChange={e => { setConnectedBefore(e.target.value); setPage(0); }}
+                  style={{ width: '100%', fontSize: 12 }}
+                />
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {error && (
+        <div style={{ padding: '10px 16px', background: 'var(--red-bg, #fef2f2)', color: 'var(--red, #dc2626)', borderRadius: 8, marginBottom: 12, fontSize: 13, display: 'flex', alignItems: 'center', gap: 10 }}>
+          {error}
+          <button className="btn btn-sm btn-secondary" style={{ marginLeft: 'auto' }} onClick={() => setReloadToken(t => t + 1)}>Retry</button>
+        </div>
+      )}
+
+      <div className="table-wrap" style={{ opacity: loading ? 0.5 : 1, transition: 'opacity 0.15s' }}>
+        <table className="data">
+          <thead>
+            <tr>
+              <th style={{ width: 40 }}><input type="checkbox" /></th>
+              <th>Customer</th>
+              <th>CNIC</th>
+              <th>Phone</th>
+              <th>Area</th>
+              <th>Package</th>
+              <th>Connected</th>
+              <th>Status</th>
+              <th>Due Amount</th>
+              <th style={{ textAlign: 'right' }}>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {loading && customers.length === 0 ? (
+              Array.from({ length: 8 }).map((_, i) => (
+                <tr key={i}>
+                  {Array.from({ length: 10 }).map((__, j) => (
+                    <td key={j}><div style={{ height: 16, background: 'var(--border)', borderRadius: 4, opacity: 0.5 }} /></td>
+                  ))}
+                </tr>
+              ))
+            ) : paginated.map(c => (
+              <tr key={c.id} className={`clickable ${selected?.id === c.id ? 'selected' : ''}`} onClick={() => handleSelectCustomer(c.id)}>
+                <td onClick={e => e.stopPropagation()}><input type="checkbox" /></td>
+                <td>
+                  <div className="cell-user">
+                    <Avatar name={c.full_name} size={32} />
+                    <div>
+                      <div className="nm">{c.full_name}</div>
+                      <div className="sub mono">{c.username ?? c.customer_code}</div>
+                    </div>
+                  </div>
+                </td>
+                <td className="mono muted" style={{ fontSize: 12 }}>{c.cnic ?? '—'}</td>
+                <td className="mono" style={{ fontSize: 12 }}>{c.phone ?? '—'}</td>
+                <td>{c.area?.name ?? '—'}</td>
+                <td>{c.package?.name ?? '—'}</td>
+                <td className="mono muted" style={{ fontSize: 12 }}>{c.connection_date ?? '—'}</td>
+                <td>
+                  <Badge color={c.status === 'active' ? 'green' : c.status === 'free' ? 'blue' : c.status === 'suspended' ? 'amber' : 'red'} dot>
+                    {c.status}
+                  </Badge>
+                </td>
+                <td className="mono" style={{ fontSize: 12 }}>
+                  {c.due_amount ? `Rs. ${c.due_amount.toLocaleString()}` : '—'}
+                </td>
+                <td onClick={e => e.stopPropagation()} style={{ textAlign: 'right' }}>
+                  <div className="row gap-sm" style={{ justifyContent: 'flex-end' }}>
+                    <button className="icon-btn" style={{ width: 28, height: 28 }} onClick={() => handleSelectCustomer(c.id)}><Icon name="eye" size={14} /></button>
+                    {!readOnly && (
+                      <button className="icon-btn" style={{ width: 28, height: 28 }} onClick={() => handleEditCustomer(c.id)}><Icon name="edit" size={14} /></button>
+                    )}
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 14, fontSize: 13, color: 'var(--text-muted)' }}>
+        <div>
+          Showing <strong style={{ color: 'var(--text)' }}>{totalCustomers === 0 ? 0 : page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, totalCustomers)}</strong> of {totalCustomers}
+        </div>
+        <div className="row gap-sm">
+          <button className="btn btn-secondary btn-sm" disabled={page === 0} onClick={() => setPage(p => p - 1)}>
+            <Icon name="chevronLeft" size={12} />Prev
+          </button>
+          <span style={{ fontSize: 12, padding: '0 4px' }}>Page {page + 1} of {totalPages || 1}</span>
+          <button className="btn btn-secondary btn-sm" disabled={page >= totalPages - 1} onClick={() => setPage(p => p + 1)}>
+            Next<Icon name="chevronRight" size={12} />
+          </button>
+        </div>
+      </div>
+
+      <Drawer open={!!selected} onClose={() => setSelected(null)}>
+        {selected && (
+          <CustomerDetail
+            customer={selected}
+            onClose={() => setSelected(null)}
+            onEdit={() => { setEditCustomer(selected); setSelected(null); }}
+            onSuspend={handleSuspend}
+            readOnly={readOnly}
+          />
+        )}
+      </Drawer>
+
+      <Drawer open={showAdd} onClose={() => setShowAdd(false)}>
+        {showAdd && (
+          <AddCustomerDrawer
+            areas={areas}
+            packages={packages}
+            onClose={() => setShowAdd(false)}
+            onSaved={handleCustomerSaved}
+          />
+        )}
+      </Drawer>
+
+      <Drawer open={!!editCustomer} onClose={() => setEditCustomer(null)}>
+        {editCustomer && (
+          <AddCustomerDrawer
+            areas={areas}
+            packages={packages}
+            onClose={() => setEditCustomer(null)}
+            onSaved={handleCustomerUpdated}
+            editTarget={editCustomer}
+          />
+        )}
+      </Drawer>
+    </div>
+  );
+}

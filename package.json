@@ -1,0 +1,34 @@
+{
+  "name": "powernet-manager",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "test:async-core": "node scripts/async-core.test.js",
+    "test:billing-core": "node scripts/billing-core.test.js",
+    "test:billing-notifications": "node scripts/billing-notifications.test.js",
+    "test:notification-navigation": "node scripts/notification-navigation.test.js",
+    "test:billing-query": "node scripts/billing-query.test.js",
+    "test:realtime-resilience": "node scripts/realtime-resilience.test.js",
+    "test:reports-core": "node scripts/reports-core.test.js",
+    "perf:smoke": "node scripts/perf-smoke.js",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.104.1",
+    "next": "15.5.15",
+    "react": "^18",
+    "react-dom": "^18"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "@types/react": "^18",
+    "@types/react-dom": "^18",
+    "eslint": "^9",
+    "eslint-config-next": "15.5.15",
+    "typescript": "^5",
+    "xlsx": "^0.18.5"
+  }
+}
