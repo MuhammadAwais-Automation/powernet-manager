@@ -52,6 +52,9 @@ export async function POST(req: Request) {
   if (!customerData) return NextResponse.json({ error: 'Customer not found' }, { status: 404 })
 
   const customer = customerData as CustomerPasswordRow
+  if (!customer.phone || customer.phone.trim().length === 0) {
+    return NextResponse.json({ error: 'Customer has no registered phone number' }, { status: 400 })
+  }
   const loginId = pickCustomerLoginIdentifier(customer)
   if (!loginId) {
     return NextResponse.json({ error: 'Customer has no usable login ID' }, { status: 409 })

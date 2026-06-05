@@ -44,7 +44,7 @@ export async function getCustomerList(params: CustomerListParams): Promise<{
   if (search) {
     const safeSearch = search.replaceAll(',', ' ')
     query = query.or(
-      `full_name.ilike.%${safeSearch}%,customer_code.ilike.%${safeSearch}%,username.ilike.%${safeSearch}%`
+      `full_name.ilike.%${safeSearch}%,customer_code.ilike.%${safeSearch}%,username.ilike.%${safeSearch}%,phone.ilike.%${safeSearch}%,house_id.ilike.%${safeSearch}%`
     )
   }
 

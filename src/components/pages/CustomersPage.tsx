@@ -48,6 +48,12 @@ function AddCustomerDrawer({
   const handleSubmit = async () => {
     if (!form.full_name.trim()) { setError('Name required'); return; }
     if (!form.area_id) { setError('Area required'); return; }
+    if (!form.phone.trim()) { setError('Phone number is required for portal login'); return; }
+    const cleanPhone = form.phone.trim();
+    if (cleanPhone.length !== 11 || !cleanPhone.startsWith('03') || isNaN(Number(cleanPhone))) {
+      setError('Phone must be an 11-digit number starting with 03 (e.g., 03001234567)');
+      return;
+    }
     setSaving(true);
     setError(null);
     try {
@@ -105,7 +111,7 @@ function AddCustomerDrawer({
           <div className="muted" style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Basic Info</div>
           <input className="select" placeholder="Full Name *" value={form.full_name} onChange={e => set('full_name', e.target.value)} />
           <input className="select" placeholder="CNIC (optional)" value={form.cnic} onChange={e => set('cnic', e.target.value)} />
-          <input className="select" placeholder="Phone (optional)" value={form.phone} onChange={e => set('phone', e.target.value)} />
+          <input className="select" placeholder="Phone (11-digits starting with 03) *" value={form.phone} onChange={e => set('phone', e.target.value)} />
         </div>
 
         {/* Connection */}

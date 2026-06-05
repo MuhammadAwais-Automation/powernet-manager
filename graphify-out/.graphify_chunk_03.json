@@ -1,0 +1,999 @@
+{
+  "nodes": [
+    {
+      "id": "layout_RootLayout",
+      "label": "Root Layout",
+      "file_type": "code",
+      "source_file": "src/app/layout.tsx",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "page_Home",
+      "label": "Home Page",
+      "file_type": "code",
+      "source_file": "src/app/page.tsx",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "App_App",
+      "label": "App Root Component",
+      "file_type": "code",
+      "source_file": "src/components/App.tsx",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "App_Shell",
+      "label": "Authenticated Shell",
+      "file_type": "code",
+      "source_file": "src/components/App.tsx",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "App_ShellContent",
+      "label": "Role Based Shell Content",
+      "file_type": "code",
+      "source_file": "src/components/App.tsx",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "App_NotificationNavigation",
+      "label": "Notification Driven Page Focus",
+      "file_type": "rationale",
+      "source_file": "src/components/App.tsx",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "LoginScreen_LoginScreen",
+      "label": "Login Screen",
+      "file_type": "code",
+      "source_file": "src/components/auth/LoginScreen.tsx",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "AccessDenied_AccessDenied",
+      "label": "Access Denied",
+      "file_type": "code",
+      "source_file": "src/components/auth/AccessDenied.tsx",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "NotificationCenter_NotificationBell",
+      "label": "Notification Bell",
+      "file_type": "code",
+      "source_file": "src/components/notifications/NotificationCenter.tsx",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "NotificationCenter_NotificationDrawer",
+      "label": "Notification Drawer",
+      "file_type": "code",
+      "source_file": "src/components/notifications/NotificationCenter.tsx",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "PaymentToast_PaymentToastContainer",
+      "label": "Payment Toast Container",
+      "file_type": "code",
+      "source_file": "src/components/notifications/PaymentToast.tsx",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "NotificationPreferences_NotificationPreferences",
+      "label": "Notification Preferences",
+      "file_type": "code",
+      "source_file": "src/components/NotificationPreferences.tsx",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "Icon_Icon",
+      "label": "Icon Renderer",
+      "file_type": "code",
+      "source_file": "src/components/Icon.tsx",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "ui_Badge",
+      "label": "Badge UI",
+      "file_type": "code",
+      "source_file": "src/components/ui.tsx",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "ui_Avatar",
+      "label": "Avatar UI",
+      "file_type": "code",
+      "source_file": "src/components/ui.tsx",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "ui_IconBadge",
+      "label": "Icon Badge UI",
+      "file_type": "code",
+      "source_file": "src/components/ui.tsx",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "ui_Drawer",
+      "label": "Drawer UI",
+      "file_type": "code",
+      "source_file": "src/components/ui.tsx",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "ui_Modal",
+      "label": "Modal UI",
+      "file_type": "code",
+      "source_file": "src/components/ui.tsx",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "ui_Tabs",
+      "label": "Tabs UI",
+      "file_type": "code",
+      "source_file": "src/components/ui.tsx",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "charts_BarChart",
+      "label": "Bar Chart",
+      "file_type": "code",
+      "source_file": "src/components/charts.tsx",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "charts_SummaryCharts",
+      "label": "SVG Summary Charts",
+      "file_type": "code",
+      "source_file": "src/components/charts.tsx",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "AreasPage_AreasPage",
+      "label": "Areas Page",
+      "file_type": "code",
+      "source_file": "src/components/pages/AreasPage.tsx",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "AreasPage_AreaFormModal",
+      "label": "Area Form Modal",
+      "file_type": "code",
+      "source_file": "src/components/pages/AreasPage.tsx",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "BillingPage_BillingPage",
+      "label": "Billing Page",
+      "file_type": "code",
+      "source_file": "src/components/pages/BillingPage.tsx",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "BillingPage_OfficePaymentModal",
+      "label": "Office Payment Modal",
+      "file_type": "code",
+      "source_file": "src/components/pages/BillingPage.tsx",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "ComplaintsPage_ComplaintsPage",
+      "label": "Complaints Page",
+      "file_type": "code",
+      "source_file": "src/components/pages/ComplaintsPage.tsx",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "ComplaintsPage_LogComplaintModal",
+      "label": "Log Complaint Modal",
+      "file_type": "code",
+      "source_file": "src/components/pages/ComplaintsPage.tsx",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "ComplaintsPage_ComplaintModal",
+      "label": "Complaint Detail Modal",
+      "file_type": "code",
+      "source_file": "src/components/pages/ComplaintsPage.tsx",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "CustomerRequestsPage_CustomerRequestsPage",
+      "label": "Customer Requests Page",
+      "file_type": "code",
+      "source_file": "src/components/pages/CustomerRequestsPage.tsx",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "CustomerRequestsPage_RequestDrawer",
+      "label": "Customer Request Drawer",
+      "file_type": "code",
+      "source_file": "src/components/pages/CustomerRequestsPage.tsx",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "createDashboardUserRoute_POST",
+      "label": "Create Dashboard User API",
+      "file_type": "code",
+      "source_file": "src/app/api/admin/create-dashboard-user/route.ts",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "createStaffRoute_POST",
+      "label": "Create Mobile Staff API",
+      "file_type": "code",
+      "source_file": "src/app/api/admin/create-staff/route.ts",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "customerPasswordResetRoute_POST",
+      "label": "Customer Password Reset API",
+      "file_type": "code",
+      "source_file": "src/app/api/admin/customer-password/reset/route.ts",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "approveCustomerRequestRoute_POST",
+      "label": "Approve Customer Request API",
+      "file_type": "code",
+      "source_file": "src/app/api/admin/customer-requests/approve/route.ts",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "rejectCustomerRequestRoute_POST",
+      "label": "Reject Customer Request API",
+      "file_type": "code",
+      "source_file": "src/app/api/admin/customer-requests/reject/route.ts",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "deleteStaffRoute_DELETE",
+      "label": "Delete Staff API",
+      "file_type": "code",
+      "source_file": "src/app/api/admin/delete-staff/route.ts",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "resetDashboardPasswordRoute_POST",
+      "label": "Reset Dashboard Password API",
+      "file_type": "code",
+      "source_file": "src/app/api/admin/reset-dashboard-password/route.ts",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "adminRoutes_AdminBearerStaffRoleGuard",
+      "label": "Admin Bearer Staff Role Guard",
+      "file_type": "rationale",
+      "source_file": "src/app/api/admin/create-staff/route.ts",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "customerRequests_CustomerActivationFlow",
+      "label": "Signup Request To Customer Activation Flow",
+      "file_type": "rationale",
+      "source_file": "src/app/api/admin/customer-requests/approve/route.ts",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    }
+  ],
+  "edges": [
+    {
+      "source": "page_Home",
+      "target": "App_App",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/app/page.tsx",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "layout_RootLayout",
+      "target": "page_Home",
+      "relation": "references",
+      "confidence": "INFERRED",
+      "confidence_score": 0.7,
+      "source_file": "src/app/layout.tsx",
+      "source_location": null,
+      "weight": 0.7
+    },
+    {
+      "source": "App_App",
+      "target": "App_Shell",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/components/App.tsx",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "App_Shell",
+      "target": "LoginScreen_LoginScreen",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/components/App.tsx",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "App_Shell",
+      "target": "App_ShellContent",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/components/App.tsx",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "App_ShellContent",
+      "target": "AccessDenied_AccessDenied",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/components/App.tsx",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "App_ShellContent",
+      "target": "NotificationCenter_NotificationBell",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/components/App.tsx",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "App_ShellContent",
+      "target": "NotificationCenter_NotificationDrawer",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/components/App.tsx",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "App_ShellContent",
+      "target": "PaymentToast_PaymentToastContainer",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/components/App.tsx",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "NotificationCenter_NotificationDrawer",
+      "target": "App_NotificationNavigation",
+      "relation": "shares_data_with",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/components/notifications/NotificationCenter.tsx",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "PaymentToast_PaymentToastContainer",
+      "target": "App_NotificationNavigation",
+      "relation": "shares_data_with",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/components/notifications/PaymentToast.tsx",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "App_NotificationNavigation",
+      "target": "BillingPage_BillingPage",
+      "relation": "shares_data_with",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/components/App.tsx",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "App_NotificationNavigation",
+      "target": "ComplaintsPage_ComplaintsPage",
+      "relation": "shares_data_with",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/components/App.tsx",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "App_NotificationNavigation",
+      "target": "CustomerRequestsPage_CustomerRequestsPage",
+      "relation": "shares_data_with",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/components/App.tsx",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "NotificationPreferences_NotificationPreferences",
+      "target": "NotificationCenter_NotificationDrawer",
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.65,
+      "source_file": "src/components/NotificationPreferences.tsx",
+      "source_location": null,
+      "weight": 0.65
+    },
+    {
+      "source": "NotificationPreferences_NotificationPreferences",
+      "target": "PaymentToast_PaymentToastContainer",
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.65,
+      "source_file": "src/components/NotificationPreferences.tsx",
+      "source_location": null,
+      "weight": 0.65
+    },
+    {
+      "source": "NotificationCenter_NotificationDrawer",
+      "target": "ui_Drawer",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/components/notifications/NotificationCenter.tsx",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "NotificationCenter_NotificationDrawer",
+      "target": "ui_Badge",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/components/notifications/NotificationCenter.tsx",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "AreasPage_AreasPage",
+      "target": "AreasPage_AreaFormModal",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/components/pages/AreasPage.tsx",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "AreasPage_AreasPage",
+      "target": "ui_Badge",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/components/pages/AreasPage.tsx",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "AreasPage_AreaFormModal",
+      "target": "ui_Modal",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/components/pages/AreasPage.tsx",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "BillingPage_BillingPage",
+      "target": "BillingPage_OfficePaymentModal",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/components/pages/BillingPage.tsx",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "BillingPage_BillingPage",
+      "target": "charts_BarChart",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/components/pages/BillingPage.tsx",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "BillingPage_BillingPage",
+      "target": "ui_Tabs",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/components/pages/BillingPage.tsx",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "BillingPage_BillingPage",
+      "target": "ui_IconBadge",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/components/pages/BillingPage.tsx",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "BillingPage_OfficePaymentModal",
+      "target": "ui_Modal",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/components/pages/BillingPage.tsx",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "ComplaintsPage_ComplaintsPage",
+      "target": "ComplaintsPage_LogComplaintModal",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/components/pages/ComplaintsPage.tsx",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "ComplaintsPage_ComplaintsPage",
+      "target": "ComplaintsPage_ComplaintModal",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/components/pages/ComplaintsPage.tsx",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "ComplaintsPage_ComplaintsPage",
+      "target": "ui_Tabs",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/components/pages/ComplaintsPage.tsx",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "ComplaintsPage_ComplaintModal",
+      "target": "ui_Modal",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/components/pages/ComplaintsPage.tsx",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "CustomerRequestsPage_CustomerRequestsPage",
+      "target": "CustomerRequestsPage_RequestDrawer",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/components/pages/CustomerRequestsPage.tsx",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "CustomerRequestsPage_CustomerRequestsPage",
+      "target": "ui_Drawer",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/components/pages/CustomerRequestsPage.tsx",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "CustomerRequestsPage_CustomerRequestsPage",
+      "target": "ui_Tabs",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/components/pages/CustomerRequestsPage.tsx",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "CustomerRequestsPage_RequestDrawer",
+      "target": "approveCustomerRequestRoute_POST",
+      "relation": "calls",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "src/components/pages/CustomerRequestsPage.tsx",
+      "source_location": null,
+      "weight": 0.85
+    },
+    {
+      "source": "CustomerRequestsPage_RequestDrawer",
+      "target": "rejectCustomerRequestRoute_POST",
+      "relation": "calls",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "src/components/pages/CustomerRequestsPage.tsx",
+      "source_location": null,
+      "weight": 0.85
+    },
+    {
+      "source": "approveCustomerRequestRoute_POST",
+      "target": "customerRequests_CustomerActivationFlow",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/app/api/admin/customer-requests/approve/route.ts",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "customerRequests_CustomerActivationFlow",
+      "target": "customerPasswordResetRoute_POST",
+      "relation": "conceptually_related_to",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/app/api/admin/customer-requests/approve/route.ts",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "rejectCustomerRequestRoute_POST",
+      "target": "approveCustomerRequestRoute_POST",
+      "relation": "semantically_similar_to",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/app/api/admin/customer-requests/reject/route.ts",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "createDashboardUserRoute_POST",
+      "target": "createStaffRoute_POST",
+      "relation": "semantically_similar_to",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/app/api/admin/create-dashboard-user/route.ts",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "createDashboardUserRoute_POST",
+      "target": "resetDashboardPasswordRoute_POST",
+      "relation": "conceptually_related_to",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/app/api/admin/create-dashboard-user/route.ts",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "createDashboardUserRoute_POST",
+      "target": "adminRoutes_AdminBearerStaffRoleGuard",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/app/api/admin/create-dashboard-user/route.ts",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "createStaffRoute_POST",
+      "target": "adminRoutes_AdminBearerStaffRoleGuard",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/app/api/admin/create-staff/route.ts",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "customerPasswordResetRoute_POST",
+      "target": "adminRoutes_AdminBearerStaffRoleGuard",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/app/api/admin/customer-password/reset/route.ts",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "approveCustomerRequestRoute_POST",
+      "target": "adminRoutes_AdminBearerStaffRoleGuard",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/app/api/admin/customer-requests/approve/route.ts",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "rejectCustomerRequestRoute_POST",
+      "target": "adminRoutes_AdminBearerStaffRoleGuard",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/app/api/admin/customer-requests/reject/route.ts",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "deleteStaffRoute_DELETE",
+      "target": "adminRoutes_AdminBearerStaffRoleGuard",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/app/api/admin/delete-staff/route.ts",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "resetDashboardPasswordRoute_POST",
+      "target": "adminRoutes_AdminBearerStaffRoleGuard",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/app/api/admin/reset-dashboard-password/route.ts",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "deleteStaffRoute_DELETE",
+      "target": "createStaffRoute_POST",
+      "relation": "conceptually_related_to",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/app/api/admin/delete-staff/route.ts",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "resetDashboardPasswordRoute_POST",
+      "target": "createDashboardUserRoute_POST",
+      "relation": "conceptually_related_to",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/app/api/admin/reset-dashboard-password/route.ts",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "Icon_Icon",
+      "target": "ui_IconBadge",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/components/ui.tsx",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "charts_BarChart",
+      "target": "charts_SummaryCharts",
+      "relation": "semantically_similar_to",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/components/charts.tsx",
+      "source_location": null,
+      "weight": 1.0
+    }
+  ],
+  "hyperedges": [
+    {
+      "id": "authenticated_app_shell",
+      "label": "Authenticated App Shell",
+      "nodes": [
+        "page_Home",
+        "App_App",
+        "App_Shell",
+        "App_ShellContent",
+        "LoginScreen_LoginScreen",
+        "AccessDenied_AccessDenied"
+      ],
+      "relation": "implement",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/components/App.tsx"
+    },
+    {
+      "id": "notification_to_page_focus_flow",
+      "label": "Notification To Page Focus Flow",
+      "nodes": [
+        "App_NotificationNavigation",
+        "NotificationCenter_NotificationDrawer",
+        "PaymentToast_PaymentToastContainer",
+        "BillingPage_BillingPage",
+        "ComplaintsPage_ComplaintsPage",
+        "CustomerRequestsPage_CustomerRequestsPage"
+      ],
+      "relation": "participate_in",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/components/App.tsx"
+    },
+    {
+      "id": "admin_mutation_guard_pattern",
+      "label": "Admin Mutation Guard Pattern",
+      "nodes": [
+        "adminRoutes_AdminBearerStaffRoleGuard",
+        "createDashboardUserRoute_POST",
+        "createStaffRoute_POST",
+        "customerPasswordResetRoute_POST",
+        "approveCustomerRequestRoute_POST",
+        "rejectCustomerRequestRoute_POST",
+        "deleteStaffRoute_DELETE",
+        "resetDashboardPasswordRoute_POST"
+      ],
+      "relation": "form",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/app/api/admin/create-staff/route.ts"
+    }
+  ],
+  "input_tokens": 0,
+  "output_tokens": 0
+}

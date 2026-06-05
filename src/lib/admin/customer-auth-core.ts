@@ -5,6 +5,7 @@ export type CustomerLoginSource = {
   username?: string | null
   address_value?: string | null
   customer_code?: string | null
+  phone?: string | null
 }
 
 export function normalizeCustomerAuthIdentifier(value: string): string {
@@ -22,6 +23,13 @@ export function makeCustomerAuthEmail(identifier: string): string {
 }
 
 export function pickCustomerLoginIdentifier(customer: CustomerLoginSource): string | null {
+  if (customer.phone && customer.phone.trim().length > 0) {
+    const phoneDigits = customer.phone.replace(/[^0-9]/g, '').trim()
+    if (phoneDigits.length > 0) {
+      return phoneDigits
+    }
+  }
+
   const candidates = [
     customer.house_id,
     customer.username,

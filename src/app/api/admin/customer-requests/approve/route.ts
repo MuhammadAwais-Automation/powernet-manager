@@ -65,7 +65,11 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Only pending requests can be approved' }, { status: 409 })
   }
 
-  const email = makeCustomerAuthEmail(signup.house_id)
+  const phoneDigits = signup.phone.replace(/[^0-9]/g, '')
+  if (!phoneDigits) {
+    return NextResponse.json({ error: 'Invalid phone number in signup request' }, { status: 400 })
+  }
+  const email = makeCustomerAuthEmail(phoneDigits)
 
   const duplicateChecks = await Promise.all([
     supabaseAdmin.from('customers').select('id').eq('house_id', signup.house_id).limit(1),
@@ -84,6 +88,7 @@ export async function POST(req: Request) {
     email_confirm: true,
     user_metadata: {
       role: 'customer',
+      login_id: phoneDigits,
       house_id: signup.house_id,
       full_name: signup.full_name,
     },
