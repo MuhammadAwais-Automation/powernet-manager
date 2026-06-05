@@ -1,9 +1,9 @@
 'use client';
 import React, { useState, useEffect } from 'react';
 import Icon from '../Icon';
-import { Badge, Switch, Modal } from '../ui';
+import { Badge, Switch, Modal, Drawer, Tabs } from '../ui';
 import { supabase } from '@/lib/supabase';
-import { getStaff, updateStaff, updateStaffPassword, deleteStaff } from '@/lib/db/staff';
+import { getStaff, updateStaff, updateStaffPassword, deleteStaff, getStaffActivity, type StaffActivity } from '@/lib/db/staff';
 import { getAreas } from '@/lib/db/areas';
 import { initials, avClass } from '@/lib/utils';
 import { useAuth } from '@/lib/auth/auth-context';
@@ -484,14 +484,374 @@ function DeleteConfirmModal({ staff, onClose, onConfirm }: {
   );
 }
 
+// ── Staff Activity Drawer ──────────────────────────────────────────────────────
+
+function StaffActivityDrawer({ staff, onClose }: {
+  staff: StaffWithArea;
+  onClose: () => void;
+}) {
+  const [dateStr, setDateStr] = useState(() => {
+    const today = new Date();
+    const y = today.getFullYear();
+    const m = String(today.getMonth() + 1).padStart(2, '0');
+    const d = String(today.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [activity, setActivity] = useState<StaffActivity | null>(null);
+  const [activeTab, setActiveTab] = useState<string>('');
+
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+    setError(null);
+    getStaffActivity(staff.id, dateStr)
+      .then(data => {
+        if (!active) return;
+        setActivity(data);
+        
+        // Auto-select tab based on role and data
+        if (staff.role === 'recovery_agent') {
+          setActiveTab('payments');
+        } else if (staff.role === 'technician') {
+          setActiveTab('active');
+        } else {
+          if (data.payments.length > 0) setActiveTab('payments');
+          else if (data.activeComplaints.length > 0) setActiveTab('active');
+          else if (data.visits.length > 0) setActiveTab('visits');
+          else setActiveTab('resolved');
+        }
+      })
+      .catch(e => {
+        if (!active) return;
+        setError(e instanceof Error ? e.message : 'Could not load activity');
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [staff.id, staff.role, dateStr]);
+
+  const formatTime = (isoString: string | null) => {
+    if (!isoString) return '';
+    try {
+      return new Date(isoString).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    } catch {
+      return '';
+    }
+  };
+
+  const getAddress = (cust: { address_type: string; address_value: string | null; area: { name: string } | null } | null) => {
+    if (!cust) return 'No customer details';
+    const areaName = cust.area?.name || 'No Area';
+    const val = cust.address_value;
+    if (!val) return areaName;
+    return cust.address_type === 'id_number' ? `${areaName} (ID: ${val})` : `${areaName} - ${val}`;
+  };
+
+  const totalRecovered = activity?.payments.reduce((sum, p) => sum + p.amount, 0) ?? 0;
+  const partialCount = activity?.payments.filter(p => p.bill?.status !== 'paid').length ?? 0;
+  const fullCount = (activity?.payments.length ?? 0) - partialCount;
+  const visitsCount = activity?.visits.length ?? 0;
+  const resolvedCount = activity?.resolvedComplaints.length ?? 0;
+  const activeCount = activity?.activeComplaints.length ?? 0;
+
+  const tabsList = [];
+  if (staff.role === 'recovery_agent' || staff.role === 'helper' || (activity && (activity.payments.length > 0 || activity.visits.length > 0))) {
+    tabsList.push({ value: 'payments', label: 'Payments', count: activity?.payments.length ?? 0 });
+    tabsList.push({ value: 'visits', label: 'Visits Logged', count: visitsCount });
+  }
+  if (staff.role === 'technician' || staff.role === 'complaint_manager' || (activity && (activity.resolvedComplaints.length > 0 || activity.activeComplaints.length > 0))) {
+    tabsList.push({ value: 'active', label: 'Active Complaints', count: activeCount });
+    tabsList.push({ value: 'resolved', label: 'Resolved Today', count: resolvedCount });
+  }
+
+  if (tabsList.length === 0) {
+    tabsList.push({ value: 'payments', label: 'Payments', count: 0 });
+    tabsList.push({ value: 'visits', label: 'Visits', count: 0 });
+  }
+
+  const currentTab = tabsList.some(t => t.value === activeTab) ? activeTab : (tabsList[0]?.value || 'payments');
+
+  return (
+    <Drawer open onClose={onClose} width={480}>
+      <div className="drawer-head">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <span className={`av ${avClass(staff.full_name)}`} style={{ width: 38, height: 38, fontSize: 13 }}>
+            {initials(staff.full_name)}
+          </span>
+          <div>
+            <div style={{ fontSize: 15, fontWeight: 600 }}>{staff.full_name}</div>
+            <div className="muted" style={{ fontSize: 11, textTransform: 'capitalize' }}>
+              {ROLE_LABELS[staff.role] ?? staff.role} · Activity Report
+            </div>
+          </div>
+        </div>
+        <button className="icon-btn" onClick={onClose}>
+          <Icon name="close" size={16} />
+        </button>
+      </div>
+
+      <div className="drawer-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <div className="card" style={{ padding: 12, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--text-muted)', fontSize: 13 }}>
+            <Icon name="calendar" size={15} />
+            <span>Select Report Date</span>
+          </div>
+          <input
+            type="date"
+            className="input"
+            value={dateStr}
+            onChange={e => setDateStr(e.target.value)}
+            style={{ width: 'auto', padding: '4px 8px', height: 32, borderRadius: 6, fontSize: 13 }}
+          />
+        </div>
+
+        {loading ? (
+          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 120 }}>
+            <span className="muted" style={{ fontSize: 13 }}>Loading activity logs…</span>
+          </div>
+        ) : error ? (
+          <div style={{ padding: '12px 14px', background: '#fef2f2', color: '#dc2626', borderRadius: 8, fontSize: 13 }}>
+            {error}
+          </div>
+        ) : (
+          <>
+            {staff.role === 'recovery_agent' ? (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                <div className="card" style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  <span className="muted" style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase' }}>Total Recovered</span>
+                  <span style={{ fontSize: 18, fontWeight: 700, color: 'var(--brand)' }}>Rs. {totalRecovered.toLocaleString()}</span>
+                </div>
+                <div className="card" style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  <span className="muted" style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase' }}>Payments (F/P)</span>
+                  <span style={{ fontSize: 18, fontWeight: 700, color: 'var(--text)' }}>
+                    {fullCount} <span style={{ fontSize: 12, fontWeight: 400, color: 'var(--text-muted)' }}>full</span> / {partialCount} <span style={{ fontSize: 12, fontWeight: 400, color: 'var(--text-muted)' }}>part</span>
+                  </span>
+                </div>
+                <div className="card" style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 4, gridColumn: 'span 2' }}>
+                  <span className="muted" style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase' }}>Visits Logged Today</span>
+                  <span style={{ fontSize: 18, fontWeight: 700, color: 'var(--amber)' }}>{visitsCount} customer visits</span>
+                </div>
+              </div>
+            ) : staff.role === 'technician' ? (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                <div className="card" style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  <span className="muted" style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase' }}>Resolved Today</span>
+                  <span style={{ fontSize: 18, fontWeight: 700, color: 'var(--green)' }}>{resolvedCount} jobs</span>
+                </div>
+                <div className="card" style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  <span className="muted" style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase' }}>In Progress</span>
+                  <span style={{ fontSize: 18, fontWeight: 700, color: 'var(--blue)' }}>{activeCount} pending</span>
+                </div>
+              </div>
+            ) : null}
+
+            <Tabs value={currentTab} onChange={setActiveTab} items={tabsList} />
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, flex: 1 }}>
+              {currentTab === 'payments' && (
+                <>
+                  {activity?.payments.length === 0 ? (
+                    <div style={{ textAlign: 'center', padding: '30px 10px', color: 'var(--text-muted)', fontSize: 13 }}>
+                      No payments collected on this day.
+                    </div>
+                  ) : (
+                    activity?.payments.map(p => (
+                      <div className="card lift" key={p.id} style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                          <div>
+                            <div style={{ fontWeight: 600, fontSize: 14 }}>{p.customer?.full_name}</div>
+                            <div style={{ fontSize: 11, color: 'var(--brand)', fontFamily: 'monospace', marginTop: 2 }}>
+                              {p.customer?.customer_code}
+                            </div>
+                          </div>
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
+                            <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--green)' }}>
+                              Rs. {p.amount.toLocaleString()}
+                            </span>
+                            <Badge color={p.bill?.status === 'paid' ? 'green' : 'amber'}>
+                              {p.bill?.status === 'paid' ? 'Paid' : 'Partial'}
+                            </Badge>
+                          </div>
+                        </div>
+
+                        <div style={{ fontSize: 12, color: 'var(--text-muted)', display: 'flex', flexDirection: 'column', gap: 4, borderTop: '1px solid var(--border)', paddingTop: 8, marginTop: 4 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <Icon name="pin" size={13} style={{ color: 'var(--text-muted)' }} />
+                            <span>{getAddress(p.customer)}</span>
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <Icon name="clock" size={13} style={{ color: 'var(--text-muted)' }} />
+                            <span>Received at {formatTime(p.paid_at)} via <span style={{ textTransform: 'capitalize' }}>{p.method}</span></span>
+                          </div>
+                          {p.receipt_no && (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, fontFamily: 'monospace' }}>
+                              <Icon name="checkCircle" size={12} style={{ color: 'var(--text-faint)' }} />
+                              <span>Receipt: {p.receipt_no}</span>
+                            </div>
+                          )}
+                          {p.note && (
+                            <div style={{ marginTop: 4, padding: '4px 8px', background: 'var(--bg-muted)', borderRadius: 4, fontStyle: 'italic', fontSize: 11 }}>
+                              Note: {p.note}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </>
+              )}
+
+              {currentTab === 'visits' && (
+                <>
+                  {activity?.visits.length === 0 ? (
+                    <div style={{ textAlign: 'center', padding: '30px 10px', color: 'var(--text-muted)', fontSize: 13 }}>
+                      No customer visits logged on this day.
+                    </div>
+                  ) : (
+                    activity?.visits.map(v => (
+                      <div className="card lift" key={v.id} style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                          <div>
+                            <div style={{ fontWeight: 600, fontSize: 14 }}>{v.customer?.full_name}</div>
+                            <div style={{ fontSize: 11, color: 'var(--brand)', fontFamily: 'monospace', marginTop: 2 }}>
+                              {v.customer?.customer_code}
+                            </div>
+                          </div>
+                          <Badge color="amber">Visited Only</Badge>
+                        </div>
+
+                        <div style={{ fontSize: 12, color: 'var(--text-muted)', display: 'flex', flexDirection: 'column', gap: 4, borderTop: '1px solid var(--border)', paddingTop: 8, marginTop: 4 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <Icon name="pin" size={13} style={{ color: 'var(--text-muted)' }} />
+                            <span>{getAddress(v.customer)}</span>
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <Icon name="clock" size={13} style={{ color: 'var(--text-muted)' }} />
+                            <span>Visited today (Target Bill: Rs. {v.amount})</span>
+                          </div>
+                          {v.payment_note && (
+                            <div style={{ marginTop: 4, padding: '6px 8px', background: 'var(--bg-muted)', borderRadius: 4, fontSize: 12, color: 'var(--text)' }}>
+                              <strong>Details:</strong> {v.payment_note}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </>
+              )}
+
+              {currentTab === 'active' && (
+                <>
+                  {activity?.activeComplaints.length === 0 ? (
+                    <div style={{ textAlign: 'center', padding: '30px 10px', color: 'var(--text-muted)', fontSize: 13 }}>
+                      No active complaints assigned.
+                    </div>
+                  ) : (
+                    activity?.activeComplaints.map(c => (
+                      <div className="card lift" key={c.id} style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                          <div>
+                            <div style={{ fontWeight: 600, fontSize: 14 }}>{c.customer?.full_name}</div>
+                            <div style={{ fontSize: 11, color: 'var(--brand)', fontFamily: 'monospace', marginTop: 2 }}>
+                              {c.complaint_code}
+                            </div>
+                          </div>
+                          <div style={{ display: 'flex', gap: 6 }}>
+                            <Badge color={c.priority === 'high' ? 'red' : c.priority === 'medium' ? 'amber' : 'blue'}>
+                              {c.priority}
+                            </Badge>
+                            <Badge color={c.status === 'in_progress' ? 'blue' : 'gray'}>
+                              {c.status === 'in_progress' ? 'In Progress' : 'Open'}
+                            </Badge>
+                          </div>
+                        </div>
+
+                        <div style={{ fontSize: 13, background: 'var(--bg-muted)', padding: '6px 8px', borderRadius: 4, marginTop: 4 }}>
+                          <strong>Issue:</strong> {c.issue}
+                        </div>
+
+                        <div style={{ fontSize: 12, color: 'var(--text-muted)', display: 'flex', flexDirection: 'column', gap: 4, borderTop: '1px solid var(--border)', paddingTop: 8 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <Icon name="pin" size={13} style={{ color: 'var(--text-muted)' }} />
+                            <span>{getAddress(c.customer)}</span>
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <Icon name="clock" size={13} style={{ color: 'var(--text-muted)' }} />
+                            <span>Assigned/Opened: {new Date(c.opened_at).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </>
+              )}
+
+              {currentTab === 'resolved' && (
+                <>
+                  {activity?.resolvedComplaints.length === 0 ? (
+                    <div style={{ textAlign: 'center', padding: '30px 10px', color: 'var(--text-muted)', fontSize: 13 }}>
+                      No complaints resolved on this day.
+                    </div>
+                  ) : (
+                    activity?.resolvedComplaints.map(c => (
+                      <div className="card lift" key={c.id} style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                          <div>
+                            <div style={{ fontWeight: 600, fontSize: 14 }}>{c.customer?.full_name}</div>
+                            <div style={{ fontSize: 11, color: 'var(--brand)', fontFamily: 'monospace', marginTop: 2 }}>
+                              {c.complaint_code}
+                            </div>
+                          </div>
+                          <Badge color="green">Resolved</Badge>
+                        </div>
+
+                        <div style={{ fontSize: 13, background: 'var(--bg-muted)', padding: '6px 8px', borderRadius: 4, marginTop: 4 }}>
+                          <strong>Resolved Issue:</strong> {c.issue}
+                        </div>
+
+                        <div style={{ fontSize: 12, color: 'var(--text-muted)', display: 'flex', flexDirection: 'column', gap: 4, borderTop: '1px solid var(--border)', paddingTop: 8 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <Icon name="pin" size={13} style={{ color: 'var(--text-muted)' }} />
+                            <span>{getAddress(c.customer)}</span>
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <Icon name="clock" size={13} style={{ color: 'var(--text-muted)' }} />
+                            <span>Resolved at {formatTime(c.resolved_at)}</span>
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </>
+              )}
+            </div>
+          </>
+        )}
+      </div>
+
+      <div className="drawer-foot">
+        <button className="btn btn-primary" onClick={onClose}>Done</button>
+      </div>
+    </Drawer>
+  );
+}
+
 // ── Staff Card ────────────────────────────────────────────────────────────────
 
-function StaffCard({ s, onEdit, onViewCreds, onToggleActive, onDelete }: {
+function StaffCard({ s, onEdit, onViewCreds, onToggleActive, onDelete, onViewActivity }: {
   s: StaffWithArea;
   onEdit: () => void;
   onViewCreds: () => void;
   onToggleActive: (v: boolean) => void;
   onDelete: () => void;
+  onViewActivity: () => void;
 }) {
   const roleLabel = ROLE_LABELS[s.role] ?? s.role;
   const roleColor = ROLE_COLORS[s.role] ?? 'gray';
@@ -543,7 +903,12 @@ function StaffCard({ s, onEdit, onViewCreds, onToggleActive, onDelete }: {
             {s.is_active ? 'Active' : 'Inactive'}
           </span>
         </div>
-        <div className="row gap-sm">
+        <div className="row gap-sm" style={{ flexWrap: 'wrap' }}>
+          {s.role !== 'admin' && (
+            <button className="btn btn-secondary btn-sm" onClick={onViewActivity}>
+              <Icon name="chart" size={12} />Activity
+            </button>
+          )}
           <button className="btn btn-secondary btn-sm" onClick={onViewCreds}>
             <Icon name="key" size={12} />Credentials
           </button>
@@ -586,6 +951,7 @@ export default function StaffPage() {
   const [editTarget, setEditTarget]     = useState<StaffWithArea | null>(null);
   const [credsTarget, setCredsTarget]   = useState<StaffWithArea | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<StaffWithArea | null>(null);
+  const [activityTarget, setActivityTarget] = useState<StaffWithArea | null>(null);
 
   useEffect(() => {
     Promise.all([getStaff(), getAreas()])
@@ -698,7 +1064,8 @@ export default function StaffPage() {
             onEdit={() => setEditTarget(s)}
             onViewCreds={() => setCredsTarget(s)}
             onToggleActive={v => handleToggleActive(s, v)}
-            onDelete={() => setDeleteTarget(s)} />
+            onDelete={() => setDeleteTarget(s)}
+            onViewActivity={() => setActivityTarget(s)} />
         ))}
       </div>
 
@@ -709,7 +1076,8 @@ export default function StaffPage() {
             onEdit={() => setEditTarget(s)}
             onViewCreds={() => setCredsTarget(s)}
             onToggleActive={v => handleToggleActive(s, v)}
-            onDelete={() => setDeleteTarget(s)} />
+            onDelete={() => setDeleteTarget(s)}
+            onViewActivity={() => setActivityTarget(s)} />
         ))}
       </div>
 
@@ -720,7 +1088,8 @@ export default function StaffPage() {
             onEdit={() => setEditTarget(s)}
             onViewCreds={() => setCredsTarget(s)}
             onToggleActive={v => handleToggleActive(s, v)}
-            onDelete={() => setDeleteTarget(s)} />
+            onDelete={() => setDeleteTarget(s)}
+            onViewActivity={() => setActivityTarget(s)} />
         ))}
       </div>
 
@@ -731,7 +1100,8 @@ export default function StaffPage() {
             onEdit={() => setEditTarget(s)}
             onViewCreds={() => setCredsTarget(s)}
             onToggleActive={v => handleToggleActive(s, v)}
-            onDelete={() => setDeleteTarget(s)} />
+            onDelete={() => setDeleteTarget(s)}
+            onViewActivity={() => setActivityTarget(s)} />
         ))}
       </div>
 
@@ -764,6 +1134,13 @@ export default function StaffPage() {
           staff={deleteTarget}
           onClose={() => setDeleteTarget(null)}
           onConfirm={() => handleDelete(deleteTarget)} />
+      )}
+
+      {activityTarget && (
+        <StaffActivityDrawer
+          staff={activityTarget}
+          onClose={() => setActivityTarget(null)}
+        />
       )}
     </div>
   );

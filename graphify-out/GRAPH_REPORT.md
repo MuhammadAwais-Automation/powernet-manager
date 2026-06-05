@@ -1,388 +1,229 @@
-# Graph Report - .  (2026-06-01)
+# Graph Report - e:\Power Net Manager  (2026-05-21)
 
 ## Corpus Check
-- 126 files · ~84,216 words
+- 96 files · ~68,093 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 963 nodes · 1473 edges · 69 communities (60 shown, 9 thin omitted)
-- Extraction: 96% EXTRACTED · 3% INFERRED · 0% AMBIGUOUS · INFERRED: 51 edges (avg confidence: 0.79)
+- 683 nodes · 1067 edges · 42 communities (29 shown, 13 thin omitted)
+- Extraction: 98% EXTRACTED · 2% INFERRED · 0% AMBIGUOUS · INFERRED: 17 edges (avg confidence: 0.89)
 - Token cost: 0 input · 0 output
 
-## Graph Freshness
-- Built from commit: `b61e69f`
-- Run `git rev-parse HEAD` and compare to check if the graph is stale.
-- Run `graphify update .` after code changes (no API cost).
-
 ## Community Hubs (Navigation)
-- [[_COMMUNITY_AgentCollectionReport, BillReportRow|AgentCollectionReport, BillReportRow]]
-- [[_COMMUNITY_Area Customer Counts, Area Financial Summaries|Area Customer Counts, Area Financial Summaries]]
-- [[_COMMUNITY_Billing Core Helpers, generate_monthly_bills RPC|Billing Core Helpers, generate_monthly_bills RPC]]
-- [[_COMMUNITY_Access Denied, App Root Component|Access Denied, App Root Component]]
-- [[_COMMUNITY_CustomerLoginSource, makeCustomerAuthEmail()|CustomerLoginSource, makeCustomerAuthEmail()]]
-- [[_COMMUNITY_package.json, dependencies|package.json, dependencies]]
-- [[_COMMUNITY_get_area_customer_counts RPC, get_area_financial_summaries RPC|get_area_customer_counts RPC, get_area_financial_summaries RPC]]
-- [[_COMMUNITY_Home(), AuthProvider()|Home(), AuthProvider()]]
-- [[_COMMUNITY_BarChart(), BarDatum|BarChart(), BarDatum]]
-- [[_COMMUNITY_RECENT_COMPLAINT_STATUSES, RecentComplaintStatus|RECENT_COMPLAINT_STATUSES, RecentComplaintStatus]]
-- [[_COMMUNITY_getBillsByCustomer(), getCachedAreas()|getBillsByCustomer(), getCachedAreas()]]
-- [[_COMMUNITY_approvePaymentVerification(), billingSummaryCache|approvePaymentVerification(), billingSummaryCache]]
-- [[_COMMUNITY_AuthContext Session Bootstrap, Dashboard Auth Design Spec Citation|AuthContext Session Bootstrap, Dashboard Auth Design Spec Citation]]
-- [[_COMMUNITY_Billing Notifications, Complaint Notifications|Billing Notifications, Complaint Notifications]]
-- [[_COMMUNITY_getRecentPaymentEvents(), buildComplaintNotification()|getRecentPaymentEvents(), buildComplaintNotification()]]
-- [[_COMMUNITY_tsconfig.json, compilerOptions|tsconfig.json, compilerOptions]]
-- [[_COMMUNITY_Avatar(), Badge()|Avatar(), Badge()]]
-- [[_COMMUNITY_AreaFinancialSummary, clearAreaCaches()|AreaFinancialSummary, clearAreaCaches()]]
-- [[_COMMUNITY_getBillCollectionStatus(), getCurrentBillingMonth()|getBillCollectionStatus(), getCurrentBillingMonth()]]
-- [[_COMMUNITY_Drawer(), formatRs()|Drawer(), formatRs()]]
-- [[_COMMUNITY_approveCustomerSignupRequest(), getAccessToken()|approveCustomerSignupRequest(), getAccessToken()]]
-- [[_COMMUNITY_BillingSummaryQuery, BillingTab|BillingSummaryQuery, BillingTab]]
-- [[_COMMUNITY_BillableStatus, BillAmountSource|BillableStatus, BillAmountSource]]
-- [[_COMMUNITY_BillingNotification, BillingNotificationSource|BillingNotification, BillingNotificationSource]]
-- [[_COMMUNITY_migrate_excel.py, clean_cnic()|migrate_excel.py, clean_cnic()]]
-- [[_COMMUNITY_assert, billing|assert, billing]]
-- [[_COMMUNITY_assert, core|assert, core]]
-- [[_COMMUNITY_assert, complaints|assert, complaints]]
-- [[_COMMUNITY_assert, { execFileSync }|assert, { execFileSync }]]
-- [[_COMMUNITY_assert, { execFileSync }|assert, { execFileSync }]]
-- [[_COMMUNITY_{ createClient }, env|{ createClient }, env]]
-- [[_COMMUNITY_assert, { execFileSync }|assert, { execFileSync }]]
-- [[_COMMUNITY_AccessDenied(), Icon()|AccessDenied(), Icon()]]
-- [[_COMMUNITY_assert, core|assert, core]]
-- [[_COMMUNITY_assert, { execFileSync }|assert, { execFileSync }]]
-- [[_COMMUNITY_{ createClient }, env|{ createClient }, env]]
-- [[_COMMUNITY_{ createClient }, env|{ createClient }, env]]
-- [[_COMMUNITY_{ createClient }, env|{ createClient }, env]]
-- [[_COMMUNITY_{ createClient }, env|{ createClient }, env]]
-- [[_COMMUNITY_assert, core|assert, core]]
-- [[_COMMUNITY_assert, { execFileSync }|assert, { execFileSync }]]
-- [[_COMMUNITY_assert, { execFileSync }|assert, { execFileSync }]]
-- [[_COMMUNITY_assert, { execFileSync }|assert, { execFileSync }]]
-- [[_COMMUNITY_{ createClient }, env|{ createClient }, env]]
-- [[_COMMUNITY_{ createClient }, env|{ createClient }, env]]
-- [[_COMMUNITY_{ createClient }, env|{ createClient }, env]]
-- [[_COMMUNITY_{ createClient }, env|{ createClient }, env]]
-- [[_COMMUNITY_{ createClient }, env|{ createClient }, env]]
-- [[_COMMUNITY_AuthContext, AuthContextValue|AuthContext, AuthContextValue]]
-- [[_COMMUNITY_CustomerListParams, getCustomerList()|CustomerListParams, getCustomerList()]]
-- [[_COMMUNITY_getPaymentVerifications(), getPendingPaymentVerifications()|getPaymentVerifications(), getPendingPaymentVerifications()]]
-- [[_COMMUNITY_check(), { createClient }|check(), { createClient }]]
-- [[_COMMUNITY_{ createClient }, env|{ createClient }, env]]
-- [[_COMMUNITY_Auto-Clarity Boundary, Caveman Response Style|Auto-Clarity Boundary, Caveman Response Style]]
-- [[_COMMUNITY_{ createClient }, fs|{ createClient }, fs]]
-- [[_COMMUNITY_buildDailyCollectionsFromBills(), emptyBillingSummary()|buildDailyCollectionsFromBills(), emptyBillingSummary()]]
-- [[_COMMUNITY_clearStaffCache(), createStaff()|clearStaffCache(), createStaff()]]
-- [[_COMMUNITY_Complaints Realtime Publication, complaint_events Table|Complaints Realtime Publication, complaint_events Table]]
-- [[_COMMUNITY_withTimeout(), fetchStaffByAuthId()|withTimeout(), fetchStaffByAuthId()]]
-- [[_COMMUNITY_generatePDF(), generate-pdf.js|generatePDF(), generate-pdf.js]]
-- [[_COMMUNITY_inter, metadata|inter, metadata]]
-- [[_COMMUNITY_Customer Portal Realtime Publication, Customer Signup Requests Table|Customer Portal Realtime Publication, Customer Signup Requests Table]]
-- [[_COMMUNITY_NotificationPreferences.tsx, NotificationPreferences()|NotificationPreferences.tsx, NotificationPreferences()]]
-- [[_COMMUNITY_NotificationPreferences.tsx, NotificationPreferences()|NotificationPreferences.tsx, NotificationPreferences()]]
-- [[_COMMUNITY_QueryError, QueryResult|QueryError, QueryResult]]
-- [[_COMMUNITY_.eslintrc.json, extends|.eslintrc.json, extends]]
-- [[_COMMUNITY_next.config.ts, nextConfig|next.config.ts, nextConfig]]
-- [[_COMMUNITY_Reports Core Helper Tests|Reports Core Helper Tests]]
-- [[_COMMUNITY_Avatar UI|Avatar UI]]
+- [[_COMMUNITY_Web Dashboard UI Shell|Web Dashboard UI Shell]]
+- [[_COMMUNITY_Flutter Data Repositories|Flutter Data Repositories]]
+- [[_COMMUNITY_Billing Core Logic|Billing Core Logic]]
+- [[_COMMUNITY_Auth & Access Control|Auth & Access Control]]
+- [[_COMMUNITY_Reports & Analytics|Reports & Analytics]]
+- [[_COMMUNITY_Flutter App Theme & Screens|Flutter App Theme & Screens]]
+- [[_COMMUNITY_Manager Pages & API Routes|Manager Pages & API Routes]]
+- [[_COMMUNITY_DB Schema & Core Components|DB Schema & Core Components]]
+- [[_COMMUNITY_Cable Operator Flow|Cable Operator Flow]]
+- [[_COMMUNITY_Field Agent Customer Detail|Field Agent Customer Detail]]
+- [[_COMMUNITY_Collector Bill List|Collector Bill List]]
+- [[_COMMUNITY_Mobile Home Screen|Mobile Home Screen]]
+- [[_COMMUNITY_Technician Complaint List|Technician Complaint List]]
+- [[_COMMUNITY_Cable Operator Customer List|Cable Operator Customer List]]
+- [[_COMMUNITY_Technician Complaint Detail|Technician Complaint Detail]]
+- [[_COMMUNITY_Charts & UI Primitives|Charts & UI Primitives]]
+- [[_COMMUNITY_Field Agent Customer List|Field Agent Customer List]]
+- [[_COMMUNITY_Mobile Router & Navigation|Mobile Router & Navigation]]
+- [[_COMMUNITY_Excel Migration Scripts|Excel Migration Scripts]]
+- [[_COMMUNITY_Reports Core Tests|Reports Core Tests]]
+- [[_COMMUNITY_Community 20|Community 20]]
+- [[_COMMUNITY_Community 21|Community 21]]
+- [[_COMMUNITY_Community 22|Community 22]]
+- [[_COMMUNITY_Community 23|Community 23]]
+- [[_COMMUNITY_Community 24|Community 24]]
+- [[_COMMUNITY_Community 25|Community 25]]
+- [[_COMMUNITY_Community 26|Community 26]]
+- [[_COMMUNITY_Community 27|Community 27]]
+- [[_COMMUNITY_Community 28|Community 28]]
+- [[_COMMUNITY_Community 29|Community 29]]
+- [[_COMMUNITY_Community 30|Community 30]]
+- [[_COMMUNITY_Community 31|Community 31]]
+- [[_COMMUNITY_Community 32|Community 32]]
+- [[_COMMUNITY_Community 33|Community 33]]
+- [[_COMMUNITY_Community 34|Community 34]]
+- [[_COMMUNITY_Community 35|Community 35]]
+- [[_COMMUNITY_Community 36|Community 36]]
+- [[_COMMUNITY_Community 37|Community 37]]
+- [[_COMMUNITY_Community 38|Community 38]]
+- [[_COMMUNITY_Community 39|Community 39]]
+- [[_COMMUNITY_Community 40|Community 40]]
+- [[_COMMUNITY_Community 41|Community 41]]
 
 ## God Nodes (most connected - your core abstractions)
-1. `scripts` - 17 edges
-2. `compilerOptions` - 16 edges
-3. `supabase` - 14 edges
-4. `Area` - 11 edges
-5. `PowerNet Full Database Design Spec` - 11 edges
-6. `Supabase Browser Client` - 11 edges
-7. `getBillsPage()` - 10 edges
-8. `Badge()` - 9 edges
-9. `Avatar()` - 9 edges
-10. `supabaseAdmin` - 9 edges
+1. `package:flutter/material.dart` - 18 edges
+2. `../theme/app_theme.dart` - 17 edges
+3. `Database Table: customers` - 13 edges
+4. `supabase` - 12 edges
+5. `Database Table: staff` - 12 edges
+6. `useAuth()` - 11 edges
+7. `package:go_router/go_router.dart` - 11 edges
+8. `package:provider/provider.dart` - 11 edges
+9. `../../providers/auth_provider.dart` - 10 edges
+10. `Database Table: bills` - 10 edges
 
 ## Surprising Connections (you probably didn't know these)
-- `Caveman Response Style` --semantically_similar_to--> `OpenCode Caveman Response Style`  [INFERRED] [semantically similar]
-  .github/copilot-instructions.md → .opencode/AGENTS.md
-- `OpenCode Caveman Response Style` --semantically_similar_to--> `Always-On Caveman Rule`  [INFERRED] [semantically similar]
-  .opencode/AGENTS.md → .windsurf/rules/caveman.md
-- `run()` --calls--> `withTimeout()`  [INFERRED]
-  scripts/async-core.test.js → src/lib/async/with-timeout.ts
-- `Complaint Manager Read-Only Customers` --shares_data_with--> `customers Table`  [INFERRED]
-  docs/superpowers/plans/2026-04-25-dashboard-auth.md → docs/superpowers/specs/2026-04-24-powernet-database-design.md
-- `Query Result Types` --conceptually_related_to--> `Typed Database Schema`  [AMBIGUOUS]
-  src/lib/db/query-state.ts → src/types/database.ts
+- `Billing Core Module (src/lib/billing/core.ts)` --references--> `Database Table: customers`  [INFERRED]
+  docs/superpowers/plans/2026-04-28-billing-payments-mvp.md → docs/superpowers/specs/2026-04-24-powernet-database-design.md
+- `Billing Core Module (src/lib/billing/core.ts)` --references--> `Database Table: bills`  [INFERRED]
+  docs/superpowers/plans/2026-04-28-billing-payments-mvp.md → docs/superpowers/specs/2026-04-24-powernet-database-design.md
+- `Sidebar()` --calls--> `initials()`  [EXTRACTED]
+  PowerNet Manager/src/components/App.tsx → PowerNet Manager/src/lib/utils.ts
+- `Topbar()` --calls--> `initials()`  [EXTRACTED]
+  PowerNet Manager/src/components/App.tsx → PowerNet Manager/src/lib/utils.ts
+- `LoginScreen()` --calls--> `useAuth()`  [EXTRACTED]
+  PowerNet Manager/src/components/auth/LoginScreen.tsx → PowerNet Manager/src/lib/auth/auth-context.tsx
 
 ## Hyperedges (group relationships)
-- **Core Database Model** — database_areas_table, database_packages_table, database_customers_table, database_staff_table, database_bills_table, database_complaints_table [EXTRACTED 1.00]
-- **Staff Authentication Flow** — staff_auth_credentials, staff_auth_pgcrypto_hashing, staff_auth_set_staff_password, staff_auth_verify_staff_login, staff_app_auth_provider [INFERRED 0.82]
-- **Performance Data Access Improvements** — performance_paginated_customer_query, performance_page_cache, performance_dashboard_summary_rpc, performance_db_indexes, performance_perf_smoke [EXTRACTED 1.00]
-- **Billing Payment Flow** — billing_payments_mvp_generate_monthly_bills, billing_payments_mvp_record_bill_payment, billing_payments_mvp_payments_table, billing_payments_mvp_payments_rls, realtime_billing_events_publication [EXTRACTED 1.00]
-- **Customer Complaint Flow** — customer_complaints_intake_complaint_code_trigger, customer_complaints_intake_complaints_rls, migration_complaint_timestamps_log_trigger, migration_complaint_timestamps_complaint_events, realtime_complaints_events_publication [EXTRACTED 1.00]
-- **Multi-Area Reporting Flow** — migration_multi_area_staff_area_ids, migration_verify_login_multi_area_verify_staff_login, area_customer_counts_get_area_financial_summaries, reports_summary_get_reports_summary, reports_summary_area_scope [INFERRED 0.84]
-- **Authenticated App Shell** — page_Home, App_App, App_Shell, App_ShellContent, LoginScreen_LoginScreen, AccessDenied_AccessDenied [EXTRACTED 1.00]
-- **Notification To Page Focus Flow** — App_NotificationNavigation, NotificationCenter_NotificationDrawer, PaymentToast_PaymentToastContainer, BillingPage_BillingPage, ComplaintsPage_ComplaintsPage, CustomerRequestsPage_CustomerRequestsPage [EXTRACTED 1.00]
-- **Admin Mutation Guard Pattern** — adminRoutes_AdminBearerStaffRoleGuard, createDashboardUserRoute_POST, createStaffRoute_POST, customerPasswordResetRoute_POST, approveCustomerRequestRoute_POST, rejectCustomerRequestRoute_POST, deleteStaffRoute_DELETE, resetDashboardPasswordRoute_POST [EXTRACTED 1.00]
-- **Payment Approval To Ledger Flow** — paymentapprovalspage_payment_approvals_page, paymentapprovalspage_approval_drawer, bills_payment_verification_queue, bills_approve_payment_verification, bills_record_bill_payment, supabase_supabase_client [EXTRACTED 1.00]
-- **Dashboard And Reporting Financial Flow** — dashboardpage_dashboard_page, reportspage_reports_page, bills_billing_summary, areas_area_financial_summaries, dashboard_summary_normalize_dashboard_stats [INFERRED 0.78]
-- **Role Gated Admin Experience** — auth_context_auth_provider, permissions_nav_by_role, permissions_dashboard_roles, customerspage_customers_page, staffpage_staff_page, paymentapprovalspage_payment_approvals_page, reportspage_reports_page [EXTRACTED 1.00]
-- **Supabase Database Adapter Layer** — customer-list_customer_list_query, customer-signup-requests_signup_request_repository, customers_customer_repository, dashboard_dashboard_repository, packages_package_repository, reports_reports_summary_repository, staff_staff_repository, database_typed_schema [EXTRACTED 1.00]
-- **Dashboard Notification Realtime Flow** — notifications-context_notifications_provider, billing_billing_notifications, complaints_complaint_notifications, customer-signups_signup_notifications, realtime-resilience_realtime_resilience_policy, dashboard_dashboard_repository [EXTRACTED 1.00]
-- **Monthly Reporting Data Flow** — reports_reports_summary_repository, core_report_core_utils, database_bill_payment_schema, database_complaint_schema, database_customer_schema, database_staff_area_package_schema [EXTRACTED 1.00]
+- **Core Supabase Tables** — db_table_areas, db_table_packages, db_table_customers, db_table_staff, db_table_bills, db_table_complaints [EXTRACTED 1.00]
+- **Dashboard Authentication Components** — component_auth_context, component_permissions_module, component_login_screen_dashboard, component_supabase_admin_client, api_create_dashboard_user, api_reset_dashboard_password [EXTRACTED 1.00]
+- **Flutter App Screens** — flutter_splash_screen, flutter_login_screen, flutter_home_screen [EXTRACTED 1.00]
+- **Dashboard Roles (admin + complaint_manager)** — role_admin, role_complaint_manager, component_permissions_module, component_auth_context [EXTRACTED 1.00]
+- **Mobile Staff Roles** — role_technician, role_recovery_agent, role_helper, rpc_verify_staff_login [EXTRACTED 1.00]
+- **Billing RPCs (generate + record payment)** — rpc_generate_monthly_bills, rpc_record_bill_payment, db_table_bills, db_table_payments [EXTRACTED 1.00]
+- **Performance Improvements Set** — perf_customer_list_query, perf_customer_cache, rpc_get_dashboard_summary, perf_indexes_sql [EXTRACTED 1.00]
+- **Phase 2 Fixed Features** — feature_customer_pagination, feature_customer_edit, feature_log_complaint_modal, feature_staff_create_account, feature_areas_crud, feature_dashboard_realdata [EXTRACTED 1.00]
 
-## Communities (69 total, 9 thin omitted)
+## Communities (42 total, 13 thin omitted)
 
-### Community 0 - "AgentCollectionReport, BillReportRow"
-Cohesion: 0.07
-Nodes (41): AgentCollectionReport, BillReportRow, buildAgentCollections(), buildDailyCollections(), ComplaintReportRow, CustomerReportRow, fetchAllRows(), getRecentMonths() (+33 more)
+### Community 0 - "Web Dashboard UI Shell"
+Cohesion: 0.05
+Nodes (62): Sidebar(), Topbar(), IconName, IconProps, IconSet, Avatar(), Badge(), Drawer() (+54 more)
 
-### Community 1 - "Area Customer Counts, Area Financial Summaries"
-Cohesion: 0.06
-Nodes (48): Area Customer Counts, Area Financial Summaries, Get Active Areas, Auth Provider, Staff Login Flow, Staff Session Gate, useAuth Hook, Billing Domain Rules (+40 more)
+### Community 1 - "Flutter Data Repositories"
+Cohesion: 0.05
+Nodes (38): ../config/supabase_config.dart, dart:convert, ../../data/bills_repository.dart, AreasRepository, BillsRepository, ComplaintsRepository, AuthProvider, _listenAuthState (+30 more)
 
-### Community 2 - "Billing Core Helpers, generate_monthly_bills RPC"
-Cohesion: 0.06
-Nodes (44): Billing Core Helpers, generate_monthly_bills RPC, Billing Payments MVP Plan, Billing Page Payment UX, Payments Table, record_bill_payment RPC, areas Table, bills Table (+36 more)
-
-### Community 3 - "Access Denied, App Root Component"
-Cohesion: 0.07
-Nodes (38): Access Denied, App Root Component, Notification Driven Page Focus, Authenticated Shell, Role Based Shell Content, Area Form Modal, Areas Page, Billing Page (+30 more)
-
-### Community 4 - "CustomerLoginSource, makeCustomerAuthEmail()"
-Cohesion: 0.11
-Nodes (26): CustomerLoginSource, makeCustomerAuthEmail(), normalizeCustomerAuthIdentifier(), pickCustomerLoginIdentifier(), validateCustomerTemporaryPassword(), createOrReuseStaffAuthUser(), findAuthUserByEmail(), StaffAuthUserResult (+18 more)
-
-### Community 5 - "package.json, dependencies"
-Cohesion: 0.06
-Nodes (32): dependencies, next, react, react-dom, @supabase/supabase-js, devDependencies, eslint, eslint-config-next (+24 more)
-
-### Community 6 - "get_area_customer_counts RPC, get_area_financial_summaries RPC"
+### Community 2 - "Billing Core Logic"
 Cohesion: 0.08
-Nodes (29): get_area_customer_counts RPC, get_area_financial_summaries RPC, generate_monthly_bills RPC, Payments Staff And Customer RLS, payments Table And Indexes, record_bill_payment RPC, Complaint Code Trigger, Complaints Customer And Staff RLS (+21 more)
+Nodes (39): BillableStatus, BillAmountSource, getCurrentBillingMonth(), normalizeBillingMonth(), BillingTab, BillsPageQuery, BillStatus, BillStatusFilter (+31 more)
 
-### Community 7 - "Home(), AuthProvider()"
+### Community 3 - "Auth & Access Control"
+Cohesion: 0.06
+Nodes (32): withTimeout(), AuthContext, AuthContextValue, AuthProvider(), fetchStaffByAuthId(), useAuth(), LoginScreen(), canAccessPage() (+24 more)
+
+### Community 4 - "Reports & Analytics"
+Cohesion: 0.1
+Nodes (30): AgentCollectionReport, getReportsSummary(), normalizeAgentCollection(), normalizeCards(), normalizeChart(), normalizeReportsSummary(), ReportCards, reportsCache (+22 more)
+
+### Community 5 - "Flutter App Theme & Screens"
+Cohesion: 0.06
+Nodes (29): build, Scaffold, SplashScreen, buildDarkTheme, buildLightTheme, _buildTheme, copyWith, lerp (+21 more)
+
+### Community 6 - "Manager Pages & API Routes"
+Cohesion: 0.07
+Nodes (35): API Route: /api/admin/create-dashboard-user, API Route: /api/admin/reset-dashboard-password, App.tsx (Main Shell), AreasPage Component, ComplaintsPage Component, CustomersPage Component, DashboardPage Component, LoginScreen Component (Dashboard) (+27 more)
+
+### Community 7 - "DB Schema & Core Components"
+Cohesion: 0.1
+Nodes (34): Billing Core Module (src/lib/billing/core.ts), React AuthContext & useAuth Hook, BillingPage Component, DB Query Layer (src/lib/db/), Database Table: areas, Database Table: bills, Database Table: complaints, Database Table: customers (+26 more)
+
+### Community 8 - "Cable Operator Flow"
+Cohesion: 0.09
+Nodes (21): build, Card, CoCustomerDetailScreen, _CoCustomerDetailScreenState, _CoInfoTab, _ComplaintsTab, _CopyRow, dispose (+13 more)
+
+### Community 9 - "Field Agent Customer Detail"
+Cohesion: 0.1
+Nodes (20): build, Card, _ComplaintsTab, _CopyRow, CustomerDetailScreen, _CustomerDetailScreenState, dispose, EmptyState (+12 more)
+
+### Community 10 - "Collector Bill List"
 Cohesion: 0.11
-Nodes (16): AuthProvider(), canAccessPage(), DASHBOARD_ROLES, DEFAULT_PAGE_BY_ROLE, isDashboardRole(), NAV_BY_ROLE, PageId, VALID_PAGE_IDS (+8 more)
+Nodes (18): _BillList, BillListScreen, _BillListScreenState, _BillTile, build, Card, Center, dispose (+10 more)
 
-### Community 8 - "BarChart(), BarDatum"
-Cohesion: 0.12
-Nodes (18): BarChart(), BarDatum, Donut(), RevenueLineChart(), Sparkline(), IconBadge(), DashboardStatsShape, getDashboardRefreshToken() (+10 more)
+### Community 11 - "Mobile Home Screen"
+Cohesion: 0.11
+Nodes (18): _ActionTile, build, Card, Column, Container, HomeScreen, _HomeScreenState, initState (+10 more)
 
-### Community 9 - "RECENT_COMPLAINT_STATUSES, RecentComplaintStatus"
-Cohesion: 0.13
-Nodes (18): RECENT_COMPLAINT_STATUSES, RecentComplaintStatus, clearComplaintsCache(), createComplaint(), getComplaintById(), getComplaints(), getRecentComplaintStatusEvents(), updateComplaint() (+10 more)
+### Community 12 - "Technician Complaint List"
+Cohesion: 0.11
+Nodes (18): build, Card, Center, Color, _ComplaintList, ComplaintListScreen, _ComplaintListScreenState, _ComplaintTile (+10 more)
 
-### Community 10 - "getBillsByCustomer(), getCachedAreas()"
-Cohesion: 0.13
-Nodes (18): getBillsByCustomer(), getCachedAreas(), getCachedPackages(), setCachedAreas(), setCachedPackages(), createCustomer(), CustomerSearchResult, getAuthHeaders() (+10 more)
+### Community 13 - "Cable Operator Customer List"
+Cohesion: 0.11
+Nodes (17): build, Card, Center, CoCustomerListScreen, _CoCustomerListScreenState, _CoCustomerTile, _CustomerList, dispose (+9 more)
 
-### Community 11 - "approvePaymentVerification(), billingSummaryCache"
-Cohesion: 0.13
-Nodes (22): approvePaymentVerification(), billingSummaryCache, billsPageCache, BillsPageParams, BillsPageResult, clearBillsCache(), findBillingCustomerIds(), generateMonthlyBills() (+14 more)
+### Community 14 - "Technician Complaint Detail"
+Cohesion: 0.11
+Nodes (17): _ActionButton, _Body, build, Card, ComplaintDetailScreen, _ComplaintDetailScreenState, _formatDate, Function (+9 more)
 
-### Community 12 - "AuthContext Session Bootstrap, Dashboard Auth Design Spec Citation"
-Cohesion: 0.12
-Nodes (23): AuthContext Session Bootstrap, Dashboard Auth Design Spec Citation, Dashboard Auth Role-Based Access Plan, Complaint Manager Read-Only Customers, Admin And Complaint Manager Access, Service-Role Admin API Routes, Supabase Auth Dashboard Sessions, Username At powernet.local Mapping (+15 more)
-
-### Community 13 - "Billing Notifications, Complaint Notifications"
-Cohesion: 0.19
-Nodes (20): Billing Notifications, Complaint Notifications, Report Core Utilities, Customer List Query, Customer Signup Request Repository, Customer Signup Notifications, Customer Repository, Dashboard Repository (+12 more)
-
-### Community 14 - "getRecentPaymentEvents(), buildComplaintNotification()"
+### Community 15 - "Charts & UI Primitives"
 Cohesion: 0.16
-Nodes (16): getRecentPaymentEvents(), buildComplaintNotification(), buildComplaintNotificationDedupeKey(), ComplaintNotification, ComplaintNotificationType, ComplaintRealtimeRow, didComplaintStatusChange(), buildCustomerSignupNotification() (+8 more)
+Nodes (13): BarChart(), BarDatum, Donut(), RevenueLineChart(), Sparkline(), IconBadge(), ActivityItem, DashboardStats (+5 more)
 
-### Community 15 - "tsconfig.json, compilerOptions"
-Cohesion: 0.10
-Nodes (19): compilerOptions, allowJs, esModuleInterop, incremental, isolatedModules, jsx, lib, module (+11 more)
+### Community 16 - "Field Agent Customer List"
+Cohesion: 0.12
+Nodes (16): build, Card, Center, _CustomerTile, dispose, EmptyState, ErrorState, FieldAgentCustomerListScreen (+8 more)
 
-### Community 16 - "Avatar(), Badge()"
-Cohesion: 0.19
-Nodes (13): Avatar(), Badge(), Modal(), Switch(), Tabs(), avClass(), initials(), DASHBOARD_ROLES (+5 more)
+### Community 17 - "Mobile Router & Navigation"
+Cohesion: 0.13
+Nodes (14): buildRouter, GoRouter, ../screens/cable_operator/co_customer_detail_screen.dart, ../screens/cable_operator/co_customer_list_screen.dart, ../screens/collector/bill_list_screen.dart, ../screens/collector/collect_payment_screen.dart, ../screens/field_agent/customer_detail_screen.dart, ../screens/field_agent/customer_list_screen.dart (+6 more)
 
-### Community 17 - "AreaFinancialSummary, clearAreaCaches()"
-Cohesion: 0.18
-Nodes (11): AreaFinancialSummary, clearAreaCaches(), createArea(), fetchAllRows(), getAreaCustomerCounts(), getAreaFinancialSummaries(), getAreaFinancialSummariesFallback(), getAreas() (+3 more)
-
-### Community 18 - "getBillCollectionStatus(), getCurrentBillingMonth()"
-Cohesion: 0.21
-Nodes (14): getBillCollectionStatus(), getCurrentBillingMonth(), BillingSummary, GenerateBillsResult, BillingPage(), formatDateTime(), OfficePaymentModal(), remainingAmount() (+6 more)
-
-### Community 19 - "Drawer(), formatRs()"
-Cohesion: 0.20
-Nodes (10): Drawer(), formatRs(), formatTime(), NotificationBell(), NotificationDrawer(), notificationMeta(), AppNotification, useNotifications() (+2 more)
-
-### Community 20 - "approveCustomerSignupRequest(), getAccessToken()"
-Cohesion: 0.22
-Nodes (7): approveCustomerSignupRequest(), getAccessToken(), getCustomerSignupRequests(), rejectCustomerSignupRequest(), STATUS_META, CustomerSignupRequestWithRelations, CustomerSignupStatus
-
-### Community 21 - "BillingSummaryQuery, BillingTab"
-Cohesion: 0.21
-Nodes (12): BillingSummaryQuery, BillingTab, BillsPageQuery, BillStatus, BillStatusFilter, buildBillingSummaryCacheKey(), buildBillsPageCacheKey(), getBillRange() (+4 more)
-
-### Community 22 - "BillableStatus, BillAmountSource"
-Cohesion: 0.17
-Nodes (9): BillableStatus, BillAmountSource, BillCollectionSource, CustomerIdentitySource, DerivedBillCollectionStatus, getCustomerSecondaryId(), normalizeBillingMonth(), normalizeIdentifier() (+1 more)
-
-### Community 23 - "BillingNotification, BillingNotificationSource"
-Cohesion: 0.23
-Nodes (12): BillingNotification, BillingNotificationSource, BillingNotificationType, BillingRealtimeBillRow, buildBillingNotification(), buildBillingNotificationDedupeKey(), didBillRefreshChange(), didNotifyChange() (+4 more)
-
-### Community 24 - "migrate_excel.py, clean_cnic()"
+### Community 18 - "Excel Migration Scripts"
 Cohesion: 0.17
 Nodes (9): find_header_row(), get_col(), load_env(), main(), parse_due(), PowerNet Manager — Excel to Supabase migration script. Run: python scripts/migra, Return 0-based index of row containing 'USER NAME'., Return 0-based column index for first matching header name. (+1 more)
 
-### Community 25 - "assert, billing"
-Cohesion: 0.17
-Nodes (11): assert, billing, { execFileSync }, fs, full, outDir, partial, path (+3 more)
-
-### Community 26 - "assert, core"
+### Community 19 - "Reports Core Tests"
 Cohesion: 0.17
 Nodes (11): assert, core, csv, { execFileSync }, fs, outDir, path, root (+3 more)
 
-### Community 27 - "assert, complaints"
+### Community 20 - "Community 20"
 Cohesion: 0.18
-Nodes (10): assert, complaints, { execFileSync }, fs, notification, outDir, path, root (+2 more)
+Nodes (10): _Avatar, build, Center, Padding, ProfileScreen, _Row, Scaffold, SizedBox (+2 more)
 
-### Community 28 - "assert, { execFileSync }"
+### Community 21 - "Community 21"
 Cohesion: 0.18
-Nodes (10): assert, { execFileSync }, fs, notification, outDir, path, root, signups (+2 more)
+Nodes (10): app/router.dart, build, initState, initSupabase, MultiProvider, PowerNetStaffApp, _PowerNetStaffAppState, ../../providers/bills_provider.dart (+2 more)
 
-### Community 29 - "assert, { execFileSync }"
+### Community 22 - "Community 22"
 Cohesion: 0.18
-Nodes (10): assert, { execFileSync }, fs, outDir, path, root, sources, statuses (+2 more)
+Nodes (10): build, dispose, Icon, LoginScreen, _LoginScreenState, Scaffold, _showError, SizedBox (+2 more)
 
-### Community 30 - "{ createClient }, env"
-Cohesion: 0.18
-Nodes (9): { createClient }, env, envLines, envPath, fs, parts, path, supabaseAdmin (+1 more)
-
-### Community 31 - "assert, { execFileSync }"
-Cohesion: 0.20
-Nodes (9): assert, { execFileSync }, fs, outDir, path, root, source, tscArgs (+1 more)
-
-### Community 32 - "AccessDenied(), Icon()"
-Cohesion: 0.22
-Nodes (4): IconName, IconProps, IconSet, notificationTypes
-
-### Community 33 - "assert, core"
-Cohesion: 0.20
+### Community 23 - "Community 23"
+Cohesion: 0.2
 Nodes (9): assert, core, { execFileSync }, fs, outDir, path, root, source (+1 more)
 
-### Community 34 - "assert, { execFileSync }"
-Cohesion: 0.20
+### Community 24 - "Community 24"
+Cohesion: 0.2
 Nodes (9): assert, { execFileSync }, fs, outDir, path, query, root, source (+1 more)
 
-### Community 35 - "{ createClient }, env"
-Cohesion: 0.20
-Nodes (8): { createClient }, env, envLines, envPath, fs, parts, path, supabase
+### Community 25 - "Community 25"
+Cohesion: 0.39
+Nodes (5): getCallerStaffRole(), POST(), supabaseAdmin, getCallerStaffRole(), POST()
 
-### Community 36 - "{ createClient }, env"
-Cohesion: 0.20
-Nodes (8): { createClient }, env, envLines, envPath, fs, parts, path, supabase
-
-### Community 37 - "{ createClient }, env"
-Cohesion: 0.20
-Nodes (8): { createClient }, env, envLines, envPath, fs, parts, path, supabase
-
-### Community 38 - "{ createClient }, env"
-Cohesion: 0.20
-Nodes (8): { createClient }, env, envLines, envPath, fs, parts, path, supabase
-
-### Community 39 - "assert, core"
-Cohesion: 0.20
-Nodes (9): assert, core, { execFileSync }, fs, outDir, path, root, source (+1 more)
-
-### Community 40 - "assert, { execFileSync }"
-Cohesion: 0.20
-Nodes (9): assert, { execFileSync }, fs, link, outDir, path, root, source (+1 more)
-
-### Community 41 - "assert, { execFileSync }"
-Cohesion: 0.20
-Nodes (9): assert, { execFileSync }, fs, navigation, outDir, path, root, source (+1 more)
-
-### Community 42 - "assert, { execFileSync }"
-Cohesion: 0.20
-Nodes (9): assert, { execFileSync }, fs, outDir, path, resilience, root, source (+1 more)
-
-### Community 43 - "{ createClient }, env"
-Cohesion: 0.20
-Nodes (8): { createClient }, env, envLines, envPath, fs, parts, path, supabase
-
-### Community 44 - "{ createClient }, env"
-Cohesion: 0.20
-Nodes (8): { createClient }, env, envLines, envPath, fs, parts, path, supabase
-
-### Community 45 - "{ createClient }, env"
-Cohesion: 0.20
-Nodes (8): { createClient }, env, envLines, envPath, fs, parts, path, supabase
-
-### Community 46 - "{ createClient }, env"
-Cohesion: 0.20
-Nodes (8): { createClient }, env, envLines, envPath, fs, parts, path, supabase
-
-### Community 47 - "{ createClient }, env"
-Cohesion: 0.20
-Nodes (8): { createClient }, env, envLines, envPath, fs, parts, path, supabase
-
-### Community 48 - "AuthContext, AuthContextValue"
-Cohesion: 0.24
-Nodes (8): AuthContext, AuthContextValue, useAuth(), LoginScreen(), Shell(), CustomersPage(), StaffPage(), Staff
-
-### Community 49 - "CustomerListParams, getCustomerList()"
-Cohesion: 0.24
-Nodes (6): CustomerListParams, getCustomerList(), getPackages(), supabase, CustomerListRow, CustomerStatus
-
-### Community 50 - "getPaymentVerifications(), getPendingPaymentVerifications()"
-Cohesion: 0.22
-Nodes (5): getPaymentVerifications(), getPendingPaymentVerifications(), PaymentVerificationWithRelations, rejectPaymentVerification(), METHOD_META
-
-### Community 51 - "check(), { createClient }"
-Cohesion: 0.22
-Nodes (7): { createClient }, env, envContent, fs, match, path, supabase
-
-### Community 52 - "{ createClient }, env"
-Cohesion: 0.22
-Nodes (7): { createClient }, env, envContent, fs, match, path, supabase
-
-### Community 53 - "Auto-Clarity Boundary, Caveman Response Style"
-Cohesion: 0.25
-Nodes (8): Auto-Clarity Boundary, Caveman Response Style, Copilot Instructions, Caveman Mode Switches, OpenCode Caveman Response Style, OpenCode Agents Instructions, Always-On Caveman Rule, Windsurf Caveman Rule
-
-### Community 54 - "{ createClient }, fs"
+### Community 26 - "Community 26"
 Cohesion: 0.32
 Nodes (7): { createClient }, fs, getRows(), index, main(), supabase, timed()
 
-### Community 55 - "buildDailyCollectionsFromBills(), emptyBillingSummary()"
+### Community 27 - "Community 27"
 Cohesion: 0.29
-Nodes (7): buildDailyCollectionsFromBills(), emptyBillingSummary(), findAreaCustomerIds(), getBillingSummary(), sumBillAmounts(), sumRemaining(), withCustomerFilter()
+Nodes (5): ../../data/customers_repository.dart, CustomersRepository, clearSearch, CustomersProvider, ../../models/customer.dart
 
-### Community 56 - "clearStaffCache(), createStaff()"
-Cohesion: 0.48
-Nodes (6): clearStaffCache(), createStaff(), deleteStaff(), getStaff(), updateStaff(), updateStaffPassword()
-
-### Community 57 - "Complaints Realtime Publication, complaint_events Table"
-Cohesion: 0.40
-Nodes (5): Complaints Realtime Publication, complaint_events Table, Complaint Events RLS, Complaint Event Logging Trigger, Complaints Realtime Publication Script
-
-### Community 58 - "withTimeout(), fetchStaffByAuthId()"
-Cohesion: 0.50
-Nodes (3): withTimeout(), fetchStaffByAuthId(), run()
-
-### Community 61 - "Customer Portal Realtime Publication, Customer Signup Requests Table"
-Cohesion: 0.67
-Nodes (3): Customer Portal Realtime Publication, Customer Signup Requests Table, Customer Signup Request RLS
-
-## Ambiguous Edges - Review These
-- `Mobile Bills Query Simulation` → `customer_login_lookup RPC`  [AMBIGUOUS]
-  scripts/sql/customer_portal.sql · relation: conceptually_related_to
-- `Record Bill Payment` → `Notification Preferences`  [AMBIGUOUS]
-  src/components/pages/SettingsPage.tsx · relation: conceptually_related_to
-- `Staff Form Modal` → `Create Or Reuse Staff Auth User`  [AMBIGUOUS]
-  src/components/pages/StaffPage.tsx · relation: conceptually_related_to
-- `Staff Credentials Modal` → `Create Or Reuse Staff Auth User`  [AMBIGUOUS]
-  src/components/pages/StaffPage.tsx · relation: conceptually_related_to
-- `Recent Complaint Status Events` → `Notification Preferences`  [AMBIGUOUS]
-  src/components/pages/SettingsPage.tsx · relation: conceptually_related_to
-- `Typed Database Schema` → `Query Result Types`  [AMBIGUOUS]
-  src/lib/db/query-state.ts · relation: conceptually_related_to
+### Community 29 - "Community 29"
+Cohesion: 0.5
+Nodes (3): ../../data/complaints_repository.dart, ComplaintQueueProvider, ../../models/complaint.dart
 
 ## Knowledge Gaps
-- **382 isolated node(s):** `extends`, `nextConfig`, `name`, `version`, `private` (+377 more)
+- **364 isolated node(s):** `inter`, `metadata`, `ALL_NAV`, `PAGE_META`, `ROLE_LABEL_SHORT` (+359 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **9 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **13 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+
+## Suggested Questions
+_Questions this graph is uniquely positioned to answer:_
+
+- **Why does `package:flutter/material.dart` connect `Flutter App Theme & Screens` to `Flutter Data Repositories`, `Cable Operator Flow`, `Field Agent Customer Detail`, `Collector Bill List`, `Mobile Home Screen`, `Technician Complaint List`, `Cable Operator Customer List`, `Technician Complaint Detail`, `Field Agent Customer List`, `Community 20`, `Community 21`, `Community 22`?**
+  _High betweenness centrality (0.048) - this node is a cross-community bridge._
+- **Why does `../theme/app_theme.dart` connect `Flutter App Theme & Screens` to `Flutter Data Repositories`, `Cable Operator Flow`, `Field Agent Customer Detail`, `Collector Bill List`, `Mobile Home Screen`, `Technician Complaint List`, `Cable Operator Customer List`, `Technician Complaint Detail`, `Field Agent Customer List`, `Community 20`, `Community 21`, `Community 22`?**
+  _High betweenness centrality (0.037) - this node is a cross-community bridge._
+- **Why does `../config/supabase_config.dart` connect `Flutter Data Repositories` to `Community 27`, `Community 21`?**
+  _High betweenness centrality (0.021) - this node is a cross-community bridge._
+- **What connects `inter`, `metadata`, `ALL_NAV` to the rest of the system?**
+  _364 weakly-connected nodes found - possible documentation gaps or missing edges._
+- **Should `Web Dashboard UI Shell` be split into smaller, more focused modules?**
+  _Cohesion score 0.05 - nodes in this community are weakly interconnected._
+- **Should `Flutter Data Repositories` be split into smaller, more focused modules?**
+  _Cohesion score 0.05 - nodes in this community are weakly interconnected._
+- **Should `Billing Core Logic` be split into smaller, more focused modules?**
+  _Cohesion score 0.08 - nodes in this community are weakly interconnected._
