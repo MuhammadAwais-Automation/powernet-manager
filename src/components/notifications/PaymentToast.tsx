@@ -104,6 +104,39 @@ function SingleToast({ notification, onDismiss, onOpenNotification }: {
     )
   }
 
+  if (notification.kind === 'payment_verification') {
+    return (
+      <div
+        className="payment-toast payment-toast--partial"
+        role="button"
+        tabIndex={0}
+        aria-live="polite"
+        aria-label={`Open ${notification.title}`}
+        onClick={handleOpen}
+        onKeyDown={handleKeyDown}
+        style={{ borderLeft: '3px solid var(--amber, #d97706)' }}
+      >
+        <div className="payment-toast__icon">
+          <Icon name="cash" size={18} />
+        </div>
+        <div className="payment-toast__body">
+          <div className="payment-toast__title">{notification.title}</div>
+          <div className="payment-toast__message">{notification.message}</div>
+          <div className="payment-toast__meta">
+            Method: {notification.method.toUpperCase()} &middot; Rs. {notification.amount.toLocaleString()}
+          </div>
+        </div>
+        <button
+          className="payment-toast__close"
+          aria-label="Dismiss notification"
+          onClick={handleDismiss}
+        >
+          <Icon name="x" size={14} />
+        </button>
+      </div>
+    )
+  }
+
   const isFull = notification.type === 'payment_full'
   return (
     <div

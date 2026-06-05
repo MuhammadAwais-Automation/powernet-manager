@@ -22,6 +22,7 @@ function notificationIcon(item: AppNotification): 'checkCircle' | 'mapPin' | 'ca
   if (item.kind === 'complaint') {
     return item.type === 'complaint_created' ? 'users' : item.type === 'complaint_resolved' ? 'check' : 'wrench'
   }
+  if (item.kind === 'payment_verification') return 'cash'
   return item.type === 'payment_full' ? 'checkCircle' : item.type === 'visit' ? 'mapPin' : 'cash'
 }
 
@@ -30,6 +31,7 @@ function notificationBadgeColor(item: AppNotification): 'green' | 'amber' | 'blu
   if (item.kind === 'complaint') {
     return item.type === 'complaint_created' ? 'blue' : item.type === 'complaint_resolved' ? 'green' : 'amber'
   }
+  if (item.kind === 'payment_verification') return 'amber'
   return item.type === 'payment_full' ? 'green' : item.type === 'visit' ? 'blue' : 'amber'
 }
 
@@ -38,6 +40,7 @@ function notificationBadgeLabel(item: AppNotification): string {
   if (item.kind === 'complaint') {
     return item.type === 'complaint_created' ? 'new' : item.type === 'complaint_resolved' ? 'resolved' : 'in progress'
   }
+  if (item.kind === 'payment_verification') return 'pending'
   return item.type === 'payment_full' ? 'paid' : item.type === 'visit' ? 'visited' : 'partial'
 }
 
@@ -47,6 +50,9 @@ function notificationMeta(item: AppNotification): string {
   }
   if (item.kind === 'complaint') {
     return `${item.complaintCode} · ${formatTime(item.createdAt)}`
+  }
+  if (item.kind === 'payment_verification') {
+    return `${item.method.toUpperCase()} · ${formatTime(item.createdAt)}`
   }
   return `${item.customerCode ?? 'No code'} · ${formatTime(item.createdAt)}`
 }

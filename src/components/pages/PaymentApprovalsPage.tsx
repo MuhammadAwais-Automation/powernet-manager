@@ -1,5 +1,5 @@
 'use client';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import Icon from '../Icon';
 import { Avatar, Badge, Drawer, Tabs } from '../ui';
 import {
@@ -9,6 +9,7 @@ import {
   getPaymentVerificationCounts,
   type PaymentVerificationWithRelations,
 } from '@/lib/db/bills';
+import { useNotifications } from '@/lib/notifications/notifications-context';
 
 const METHOD_META: Record<string, { label: string; color: string }> = {
   bank: { label: 'Bank Transfer', color: 'blue' },
@@ -301,8 +302,10 @@ export default function PaymentApprovalsPage({
     rejected: 0,
   });
 
-  const load = () => {
-    setLoading(true);
+  const { paymentVerificationsVersion } = useNotifications();
+
+  const load = useCallback((silent = false) => {
+    if (!silent) setLoading(true);
     setError(null);
     Promise.all([
       getPaymentVerifications(activeTab),
@@ -313,14 +316,21 @@ export default function PaymentApprovalsPage({
         setCounts(cnts);
       })
       .catch((e) => setError(e instanceof Error ? e.message : 'Could not load payment approvals queue'))
-      .finally(() => setLoading(false));
-  };
+      .finally(() => {
+        if (!silent) setLoading(false);
+      });
+  }, [activeTab]);
 
   // Reload when tab changes
   useEffect(() => {
     load();
     setSelected(null);
-  }, [activeTab]);
+  }, [load]);
+
+  // Trigger silent reload when notification context version changes
+  useEffect(() => {
+    load(true);
+  }, [paymentVerificationsVersion, load]);
 
   // Synchronize the global pending approvals count badge in the sidebar
   useEffect(() => {
@@ -345,7 +355,7 @@ export default function PaymentApprovalsPage({
             {activeTab === 'rejected' && `${verifications.length} historically rejected receipts`}
           </p>
         </div>
-        <button className="btn btn-secondary" onClick={load} disabled={loading}>
+        <button className="btn btn-secondary" onClick={() => load()} disabled={loading}>
           <Icon name="refresh" size={14} /> Refresh
         </button>
       </div>

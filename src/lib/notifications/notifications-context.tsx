@@ -52,11 +52,27 @@ import {
 const MAX_TOASTS = 3;
 const POLL_LIMIT = 25;
 
+export type PaymentVerificationNotification = {
+  id: string;
+  dedupeKey: string;
+  kind: "payment_verification";
+  type: "payment_verification_pending";
+  verificationId: string;
+  customerName: string;
+  amount: number;
+  method: string;
+  createdAt: string;
+  read: boolean;
+  title: string;
+  message: string;
+};
+
 // Unified notification type — discriminated union on `kind`
 export type AppNotification =
   | BillingNotification
   | ComplaintNotification
-  | CustomerSignupNotification;
+  | CustomerSignupNotification
+  | PaymentVerificationNotification;
 
 type NotificationsContextValue = {
   items: AppNotification[];
@@ -65,11 +81,13 @@ type NotificationsContextValue = {
   billingVersion: number;
   complaintsVersion: number;
   customerRequestsVersion: number;
+  paymentVerificationsVersion: number;
   isInboxOpen: boolean;
   openInbox: () => void;
   closeInbox: () => void;
   markAllRead: () => void;
   markRead: (id: string) => void;
+  markKindRead: (kind: "billing" | "complaint" | "customer_signup" | "payment_verification") => void;
   clearAll: () => void;
   dismissToast: (id: string) => void;
 };
@@ -88,6 +106,7 @@ export function NotificationsProvider({
   const [billingVersion, setBillingVersion] = useState(0);
   const [complaintsVersion, setComplaintsVersion] = useState(0);
   const [customerRequestsVersion, setCustomerRequestsVersion] = useState(0);
+  const [paymentVerificationsVersion, setPaymentVerificationsVersion] = useState(0);
   const [isInboxOpen, setInboxOpen] = useState(false);
   const seenKeysRef = useRef<Set<string>>(new Set());
   const seenPaymentIdsRef = useRef<Set<string>>(new Set());
@@ -125,6 +144,11 @@ export function NotificationsProvider({
   const refreshCustomerRequestViews = useCallback(() => {
     clearDashboardCache();
     setCustomerRequestsVersion((version) => version + 1);
+  }, []);
+
+  const refreshPaymentVerificationViews = useCallback(() => {
+    clearDashboardCache();
+    setPaymentVerificationsVersion((version) => version + 1);
   }, []);
 
   const setPollingFallback = useCallback((active: boolean, reason: string) => {
@@ -588,6 +612,124 @@ export function NotificationsProvider({
     };
   }, [addNotification, refreshCustomerRequestViews, updateRealtimeHealth]);
 
+  // Payment verifications realtime subscription
+  useEffect(() => {
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    let retryTimer: number | null = null;
+    let retryAttempt = 0;
+    let disposed = false;
+
+    const connect = () => {
+      if (disposed) return;
+      channel = supabase
+        .channel("dashboard-payment-verifications")
+        .on(
+          "postgres_changes",
+          {
+            event: "INSERT",
+            schema: "public",
+            table: "payment_verifications",
+          },
+          async (payload) => {
+            const row = payload.new as {
+              id: string;
+              customer_id: string;
+              amount: number;
+              method: string;
+              created_at: string;
+              status: string;
+            } | null;
+            if (!row?.id) return;
+            refreshPaymentVerificationViews();
+
+            const { data } = await supabase
+              .from("payment_verifications")
+              .select("id, amount, method, created_at, customer:customers(full_name)")
+              .eq("id", row.id)
+              .maybeSingle();
+
+            const verification = data as {
+              id: string;
+              amount: number;
+              method: string;
+              created_at: string;
+              customer?: { full_name?: string | null } | null;
+            } | null;
+
+            const dedupeKey = `payment-verification:${row.id}`;
+            const customerName = verification?.customer?.full_name ?? "Unknown customer";
+            addNotification({
+              id: `${dedupeKey}:${verification?.created_at ?? row.created_at ?? Date.now()}`,
+              dedupeKey,
+              kind: "payment_verification",
+              type: "payment_verification_pending",
+              verificationId: row.id,
+              customerName,
+              amount: verification?.amount ?? row.amount ?? 0,
+              method: verification?.method ?? row.method ?? "online",
+              createdAt: verification?.created_at ?? row.created_at ?? new Date().toISOString(),
+              read: false,
+              title: "Payment Approval Pending",
+              message: `${customerName} submitted a payment of Rs. ${(verification?.amount ?? row.amount ?? 0).toLocaleString()} via ${verification?.method ?? row.method ?? "online"} for verification.`,
+            });
+          },
+        )
+        .on(
+          "postgres_changes",
+          {
+            event: "UPDATE",
+            schema: "public",
+            table: "payment_verifications",
+          },
+          () => {
+            refreshPaymentVerificationViews();
+          },
+        )
+        .on(
+          "postgres_changes",
+          {
+            event: "DELETE",
+            schema: "public",
+            table: "payment_verifications",
+          },
+          () => {
+            refreshPaymentVerificationViews();
+          },
+        )
+        .subscribe((status, error) => {
+          if (status === "SUBSCRIBED") {
+            retryAttempt = 0;
+            return;
+          }
+
+          if (!isUnhealthyRealtimeStatus(status)) return;
+          console.warn(
+            "Dashboard payment verifications realtime channel is not healthy:",
+            status,
+            error,
+          );
+
+          if (retryAttempt >= MAX_REALTIME_RETRIES) return;
+          const delay = getReconnectDelayMs(retryAttempt);
+          retryAttempt += 1;
+          retryTimer = window.setTimeout(() => {
+            const current = channel;
+            channel = null;
+            if (current) void supabase.removeChannel(current);
+            connect();
+          }, delay);
+        });
+    };
+
+    connect();
+
+    return () => {
+      disposed = true;
+      if (retryTimer) window.clearTimeout(retryTimer);
+      if (channel) void supabase.removeChannel(channel);
+    };
+  }, [addNotification, refreshPaymentVerificationViews]);
+
   const value = useMemo<NotificationsContextValue>(
     () => ({
       items,
@@ -596,6 +738,7 @@ export function NotificationsProvider({
       billingVersion,
       complaintsVersion,
       customerRequestsVersion,
+      paymentVerificationsVersion,
       isInboxOpen,
       openInbox: () => setInboxOpen(true),
       closeInbox: () => setInboxOpen(false),
@@ -605,6 +748,12 @@ export function NotificationsProvider({
         setItems((current) =>
           current.map((item) =>
             item.id === id ? { ...item, read: true } : item,
+          ),
+        ),
+      markKindRead: (kind) =>
+        setItems((current) =>
+          current.map((item) =>
+            item.kind === kind ? { ...item, read: true } : item,
           ),
         ),
       clearAll: () => {
@@ -617,6 +766,7 @@ export function NotificationsProvider({
       billingVersion,
       complaintsVersion,
       customerRequestsVersion,
+      paymentVerificationsVersion,
       dismissToast,
       isInboxOpen,
       items,
