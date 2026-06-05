@@ -64,4 +64,18 @@ CREATE POLICY "Staff can view/update all payment verifications"
     )
   );
 
+-- 6. Enable Realtime Replication
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_publication_tables
+    where pubname = 'supabase_realtime'
+      and schemaname = 'public'
+      and tablename = 'payment_verifications'
+  ) then
+    alter publication supabase_realtime add table public.payment_verifications;
+  end if;
+end $$;
+
 COMMIT;
