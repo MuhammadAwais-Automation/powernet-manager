@@ -352,3 +352,60 @@ function monthLabel(month: string): string {
     month: "short",
   });
 }
+
+export type AreaConnectionStats = {
+  areaId: string;
+  areaName: string;
+  totalConnections: number;
+  activeConnections: number;
+  inactiveConnections: number;
+};
+
+export async function getAreaConnectionStats(): Promise<AreaConnectionStats[]> {
+  const { data, error } = await supabase.rpc("get_area_connection_stats");
+  if (error) {
+    console.warn("RPC get_area_connection_stats failed, using fallback:", error);
+    return getAreaConnectionStatsFallback();
+  }
+  return (data as Array<{
+    area_id: string;
+    area_name: string;
+    total_connections: number;
+    active_connections: number;
+    inactive_connections: number;
+  }> ?? []).map((row) => ({
+    areaId: row.area_id,
+    areaName: row.area_name,
+    totalConnections: toNumber(row.total_connections),
+    activeConnections: toNumber(row.active_connections),
+    inactiveConnections: toNumber(row.inactive_connections),
+  }));
+}
+
+async function getAreaConnectionStatsFallback(): Promise<AreaConnectionStats[]> {
+  const [areas, customers] = await Promise.all([
+    supabase.from("areas").select("id, name").eq("is_active", true),
+    fetchAllRows<CustomerReportRow>("customers", "id, area_id, status"),
+  ]);
+
+  if (areas.error) throw areas.error;
+
+  const areaList = (areas.data as Array<{ id: string; name: string }>) ?? [];
+  const customerList = customers ?? [];
+
+  return areaList.map((area) => {
+    const areaCustomers = customerList.filter((c) => c.area_id === area.id);
+    const active = areaCustomers.filter((c) => c.status === "active" || c.status === "free").length;
+    const inactive = areaCustomers.length - active;
+
+    return {
+      areaId: area.id,
+      areaName: area.name,
+      totalConnections: areaCustomers.length,
+      activeConnections: active,
+      inactiveConnections: inactive,
+    };
+  }).sort((a, b) => a.areaName.localeCompare(b.areaName));
+}
+
+

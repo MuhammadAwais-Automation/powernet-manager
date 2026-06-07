@@ -5,8 +5,10 @@ import { Avatar, IconBadge, Tabs } from "../ui";
 import { BarChart } from "../charts";
 import {
   getReportsSummary,
+  getAreaConnectionStats,
   type AgentCollectionReport,
   type ReportsSummary,
+  type AreaConnectionStats,
 } from "@/lib/db/reports";
 import { getAreas } from "@/lib/db/areas";
 import {
@@ -162,9 +164,22 @@ export default function ReportsPage() {
   const [summary, setSummary] = useState<ReportsSummary | null>(null);
   const [areas, setAreas] = useState<Area[]>([]);
   const [areaFilter, setAreaFilter] = useState("");
+  const [areaStats, setAreaStats] = useState<AreaConnectionStats[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
+
+  useEffect(() => {
+    async function loadAreas() {
+      try {
+        const data = await getAreas();
+        setAreas(data);
+      } catch (e) {
+        console.error("Failed to load areas:", e);
+      }
+    }
+    loadAreas();
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -174,12 +189,12 @@ export default function ReportsPage() {
       setError(null);
       setSummary(null);
       try {
-        const [data, areaRows] = await Promise.all([
+        const [data, connStats] = await Promise.all([
           getReportsSummary(reportMonth, areaFilter || undefined),
-          areas.length === 0 ? getAreas() : Promise.resolve(areas),
+          getAreaConnectionStats(),
         ]);
         if (active) setSummary(data);
-        if (active) setAreas(areaRows);
+        if (active) setAreaStats(connStats);
       } catch (e: unknown) {
         if (active)
           setError(e instanceof Error ? e.message : "Could not load reports");
@@ -221,6 +236,34 @@ export default function ReportsPage() {
     const csv = buildCsv(buildReportRows(summary, report, areaName));
     downloadTextFile(
       `powernet-${report.toLowerCase()}-${summary.month}-${areaName.toLowerCase().replace(/\s+/g, "-")}.csv`,
+      csv,
+      "text/csv;charset=utf-8",
+    );
+  };
+
+  const handleExportAreaCsv = () => {
+    if (areaStats.length === 0) return;
+    const csvRows = [
+      ["PowerNet Area-wise Connection Summary"],
+      ["Generated At", new Date().toLocaleString()],
+      [],
+      ["Area", "Active Connections", "Inactive Connections", "Total Connections", "Active Ratio %"],
+      ...areaStats.map((stat) => {
+        const total = stat.totalConnections;
+        const active = stat.activeConnections;
+        const rate = total > 0 ? Math.round((active / total) * 100) : 0;
+        return [
+          stat.areaName,
+          stat.activeConnections,
+          stat.inactiveConnections,
+          stat.totalConnections,
+          `${rate}%`,
+        ];
+      }),
+    ];
+    const csv = buildCsv(csvRows);
+    downloadTextFile(
+      `powernet-area-connections-${new Date().toISOString().slice(0, 10)}.csv`,
       csv,
       "text/csv;charset=utf-8",
     );
@@ -496,7 +539,7 @@ export default function ReportsPage() {
         </div>
       </div>
 
-      <div className="card">
+      <div className="card" style={{ marginBottom: 20 }}>
         <div className="card-head">
           <div>
             <h3>Agent-wise Collection Breakdown</h3>
@@ -539,6 +582,95 @@ export default function ReportsPage() {
                 summary.agentCollections.map((agent) => (
                   <AgentRow key={`${agent.name}-${agent.area}`} agent={agent} />
                 ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div className="card">
+        <div className="card-head">
+          <div>
+            <h3>Area-wise Connection Summary</h3>
+            <div className="sub">
+              Active and inactive subscribers count by operational area
+            </div>
+          </div>
+          <button className="btn btn-ghost btn-sm" onClick={handleExportAreaCsv}>
+            <Icon name="download" size={12} />
+            Export table
+          </button>
+        </div>
+        <div className="table-wrap" style={{ border: "none", borderRadius: 0 }}>
+          <table className="data">
+            <thead>
+              <tr>
+                <th>Area</th>
+                <th className="num">Active</th>
+                <th className="num">Inactive</th>
+                <th className="num">Total Connections</th>
+                <th>Active Ratio</th>
+              </tr>
+            </thead>
+            <tbody>
+              {areaStats.length === 0 ? (
+                <tr>
+                  <td
+                    colSpan={5}
+                    style={{
+                      textAlign: "center",
+                      color: "var(--text-muted)",
+                      padding: 28,
+                    }}
+                  >
+                    No area connection data found.
+                  </td>
+                </tr>
+              ) : (
+                areaStats.map((stat) => {
+                  const total = stat.totalConnections;
+                  const active = stat.activeConnections;
+                  const rate = total > 0 ? Math.round((active / total) * 100) : 0;
+                  return (
+                    <tr key={stat.areaId}>
+                      <td>
+                        <div style={{ fontWeight: 500 }}>{stat.areaName}</div>
+                      </td>
+                      <td className="num" style={{ color: "var(--green)", fontWeight: 600 }}>
+                        {stat.activeConnections.toLocaleString()}
+                      </td>
+                      <td className="num" style={{ color: "var(--text-muted)" }}>
+                        {stat.inactiveConnections.toLocaleString()}
+                      </td>
+                      <td className="num" style={{ fontWeight: 600 }}>
+                        {stat.totalConnections.toLocaleString()}
+                      </td>
+                      <td>
+                        <div className="row gap-sm" style={{ minWidth: 140 }}>
+                          <div className="progress" style={{ flex: 1 }}>
+                            <span
+                              style={{
+                                width: `${rate}%`,
+                                background:
+                                  rate > 80
+                                    ? "var(--green)"
+                                    : rate > 50
+                                      ? "var(--blue)"
+                                      : "var(--amber)",
+                              }}
+                            />
+                          </div>
+                          <span
+                            className="num"
+                            style={{ fontSize: 12, fontWeight: 600, minWidth: 32 }}
+                          >
+                            {rate}%
+                          </span>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
