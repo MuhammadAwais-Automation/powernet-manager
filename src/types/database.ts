@@ -219,6 +219,23 @@ export type Payment = {
   created_at: string;
 };
 
+export type Team = {
+  id: string;
+  name: string;
+  created_at: string;
+};
+
+export type TeamMember = {
+  id: string;
+  team_id: string;
+  staff_id: string;
+  created_at: string;
+};
+
+export type TeamWithMembers = Team & {
+  members: (TeamMember & { staff: Pick<Staff, 'id' | 'full_name' | 'role' | 'phone'> })[];
+};
+
 export type ComplaintType =
   | "connectivity"
   | "speed"
@@ -242,6 +259,7 @@ export type Complaint = {
   in_progress_at: string | null;
   opened_at: string;
   resolved_at: string | null;
+  team_id: string | null;
 };
 
 export type ComplaintWithRelations = Complaint & {
@@ -262,4 +280,5 @@ export type ComplaintWithRelations = Complaint & {
       })
     | null;
   technician: Pick<Staff, "id" | "full_name"> | null;
+  team: Pick<Team, "id" | "name"> | null;
 };

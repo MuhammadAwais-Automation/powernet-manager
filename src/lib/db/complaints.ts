@@ -16,7 +16,8 @@ const COMPLAINT_SELECT = `
     email,
     area:areas(id, name, code)
   ),
-  technician:staff(id, full_name)
+  technician:staff(id, full_name),
+  team:teams(id, name)
 `
 
 let complaintsCache: { data: ComplaintWithRelations[]; expiresAt: number } | null = null
@@ -80,7 +81,7 @@ export async function getRecentComplaintStatusEvents(limit = 25): Promise<Compla
 
 export async function updateComplaint(
   id: string,
-  input: Partial<Pick<Complaint, 'status' | 'assigned_to' | 'assigned_at' | 'in_progress_at' | 'resolved_at' | 'priority'>>,
+  input: Partial<Pick<Complaint, 'status' | 'assigned_to' | 'assigned_at' | 'in_progress_at' | 'resolved_at' | 'priority' | 'team_id'>>,
 ): Promise<Complaint> {
   const { data, error } = await supabase
     .from('complaints')

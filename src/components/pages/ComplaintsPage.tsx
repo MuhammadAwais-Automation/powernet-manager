@@ -10,6 +10,7 @@ import {
 } from "@/lib/db/complaints";
 import { getAreas } from "@/lib/db/areas";
 import { getStaff } from "@/lib/db/staff";
+import { getTeams } from "@/lib/db/teams";
 import { searchCustomers, type CustomerSearchResult } from "@/lib/db/customers";
 import type {
   ComplaintWithRelations,
@@ -18,15 +19,18 @@ import type {
   ComplaintType,
   ComplaintPriority,
   ComplaintStatus,
+  TeamWithMembers,
 } from "@/types/database";
 
 function LogComplaintModal({
   onClose,
   staff,
+  teams,
   onSaved,
 }: {
   onClose: () => void;
   staff: StaffWithArea[];
+  teams: TeamWithMembers[];
   onSaved: (c: ComplaintWithRelations) => void;
 }) {
   const [customerSearch, setCustomerSearch] = useState("");
@@ -39,7 +43,7 @@ function LogComplaintModal({
     issue: "",
     type: "connectivity" as ComplaintType,
     priority: "medium" as ComplaintPriority,
-    assigned_to: "",
+    assigned_to: "", // Holds "staff:ID" or "team:ID"
     status: "open" as ComplaintStatus,
   });
   const [saving, setSaving] = useState(false);
@@ -68,15 +72,24 @@ function LogComplaintModal({
     setSaving(true);
     setError(null);
     try {
+      let assignedToId: string | null = null;
+      let teamId: string | null = null;
+      if (form.assigned_to.startsWith("staff:")) {
+        assignedToId = form.assigned_to.substring(6);
+      } else if (form.assigned_to.startsWith("team:")) {
+        teamId = form.assigned_to.substring(5);
+      }
+
       const created = await createComplaint({
         customer_id: selectedCustomer.id,
         issue: form.issue.trim(),
         type: form.type,
         priority: form.priority,
         status: form.status,
-        assigned_to: form.assigned_to || null,
-        assigned_at: form.assigned_to ? new Date().toISOString() : null,
+        assigned_to: assignedToId,
+        assigned_at: assignedToId || teamId ? new Date().toISOString() : null,
         in_progress_at: null,
+        team_id: teamId,
       });
       const withRelations: ComplaintWithRelations = {
         ...created,
@@ -98,8 +111,11 @@ function LogComplaintModal({
               }
             : null,
         },
-        technician: form.assigned_to
-          ? (staff.find((s) => s.id === form.assigned_to) ?? null)
+        technician: assignedToId
+          ? (staff.find((s) => s.id === assignedToId) ?? null)
+          : null,
+        team: teamId
+          ? (teams.find((t) => t.id === teamId) ?? null)
           : null,
       };
       onSaved(withRelations);
@@ -112,7 +128,7 @@ function LogComplaintModal({
   };
 
   return (
-    <Modal open onClose={onClose} width={520}>
+    <Modal open={true} onClose={onClose} width={520}>
       <div className="modal-head">
         <div>
           <div
@@ -374,7 +390,7 @@ function LogComplaintModal({
         </div>
 
         <div className="field" style={{ marginBottom: 14 }}>
-          <label>Assign to Technician (optional)</label>
+          <label>Assign to Technician or Team (optional)</label>
           <select
             className="select"
             value={form.assigned_to}
@@ -383,13 +399,24 @@ function LogComplaintModal({
             }
           >
             <option value="">— Unassigned —</option>
-            {staff
-              .filter((s) => s.role === "technician")
-              .map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.full_name}
-                </option>
-              ))}
+            {teams.length > 0 && (
+              <optgroup label="Teams">
+                {teams.map((t) => (
+                  <option key={t.id} value={`team:${t.id}`}>
+                    {t.name}
+                  </option>
+                ))}
+              </optgroup>
+            )}
+            <optgroup label="Individuals">
+              {staff
+                .filter((s) => s.role === "technician" || s.role === "helper")
+                .map((s) => (
+                  <option key={s.id} value={`staff:${s.id}`}>
+                    {s.full_name} ({s.role === "technician" ? "Tech" : "Helper"})
+                  </option>
+                ))}
+            </optgroup>
           </select>
         </div>
       </div>
@@ -416,6 +443,7 @@ function LogComplaintModal({
   );
 }
 
+
 function formatDateTime(isoString: string | null | undefined): string {
   if (!isoString) return "—";
   try {
@@ -438,14 +466,22 @@ function ComplaintModal({
   complaint,
   onClose,
   staff,
+  teams,
   onSaved,
 }: {
   complaint: ComplaintWithRelations;
   onClose: () => void;
   staff: StaffWithArea[];
+  teams: TeamWithMembers[];
   onSaved: () => void;
 }) {
-  const [assignedTo, setAssignedTo] = useState(complaint.assigned_to ?? "");
+  const [assignedEntity, setAssignedEntity] = useState(
+    complaint.assigned_to
+      ? `staff:${complaint.assigned_to}`
+      : complaint.team_id
+        ? `team:${complaint.team_id}`
+        : ""
+  );
   const [status, setStatus] = useState(complaint.status);
   const [priority, setPriority] = useState<ComplaintPriority>(
     complaint.priority,
@@ -453,7 +489,7 @@ function ComplaintModal({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const isAlreadyAssigned = !!complaint.assigned_to;
+  const isAlreadyAssigned = !!(complaint.assigned_to || complaint.team_id);
   const priLabel: Record<string, string> = {
     high: "High",
     medium: "Medium",
@@ -468,14 +504,22 @@ function ComplaintModal({
     setSaving(true);
     setError(null);
     try {
+      let assignedToId: string | null = null;
+      let teamId: string | null = null;
+      if (assignedEntity.startsWith("staff:")) {
+        assignedToId = assignedEntity.substring(6);
+      } else if (assignedEntity.startsWith("team:")) {
+        teamId = assignedEntity.substring(5);
+      }
+
       const assignedAt =
-        assignedTo && !complaint.assigned_to
+        (assignedToId || teamId) && !(complaint.assigned_to || complaint.team_id)
           ? new Date().toISOString()
-          : !assignedTo
+          : !(assignedToId || teamId)
             ? null
             : complaint.assigned_at;
 
-      const newlyAssigned = assignedTo && !complaint.assigned_to;
+      const newlyAssigned = (assignedToId || teamId) && !(complaint.assigned_to || complaint.team_id);
       const effectiveStatus = newlyAssigned ? "open" : status;
 
       const inProgressAt =
@@ -493,7 +537,8 @@ function ComplaintModal({
             : complaint.resolved_at;
 
       await updateComplaint(complaint.id, {
-        assigned_to: assignedTo || null,
+        assigned_to: assignedToId,
+        team_id: teamId,
         assigned_at: assignedAt,
         in_progress_at: inProgressAt,
         status: effectiveStatus,
@@ -716,7 +761,7 @@ function ComplaintModal({
           >
             <Icon name="key" size={14} />
             <span>
-              Complaint is assigned to active board. Priority and Technician
+              Complaint is assigned to active board. Priority and Technician/Team
               fields are now locked.
             </span>
           </div>
@@ -737,21 +782,32 @@ function ComplaintModal({
             </select>
           </div>
           <div className="field">
-            <label>Assign to Technician</label>
+            <label>Assign to Technician or Team</label>
             <select
               className="select"
-              value={assignedTo}
-              onChange={(e) => setAssignedTo(e.target.value)}
+              value={assignedEntity}
+              onChange={(e) => setAssignedEntity(e.target.value)}
               disabled={isAlreadyAssigned || saving}
             >
               <option value="">— Unassigned —</option>
-              {staff
-                .filter((s) => s.role === "technician")
-                .map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.full_name}
-                  </option>
-                ))}
+              {teams.length > 0 && (
+                <optgroup label="Teams">
+                  {teams.map((t) => (
+                    <option key={t.id} value={`team:${t.id}`}>
+                      {t.name}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
+              <optgroup label="Individuals">
+                {staff
+                  .filter((s) => s.role === "technician" || s.role === "helper")
+                  .map((s) => (
+                    <option key={s.id} value={`staff:${s.id}`}>
+                      {s.full_name} ({s.role === "technician" ? "Tech" : "Helper"})
+                    </option>
+                  ))}
+              </optgroup>
             </select>
           </div>
         </div>
@@ -784,16 +840,27 @@ function ComplaintModal({
               {formatDateTime(complaint.opened_at)}
             </div>
           </div>
-          <div className={`tl-item ${assignedTo ? "done" : ""}`}>
+          <div className={`tl-item ${assignedEntity ? "done" : ""}`}>
             <div className="ttl">
-              {assignedTo
-                ? `Assigned to ${staff.find((s) => s.id === assignedTo)?.full_name ?? "Technician"}`
-                : "Awaiting assignment"}
+              {assignedEntity.startsWith("staff:") ? (
+                `Assigned to ${staff.find((s) => s.id === assignedEntity.substring(6))?.full_name ?? "Technician"}`
+              ) : assignedEntity.startsWith("team:") ? (
+                `Assigned to ${teams.find((t) => t.id === assignedEntity.substring(5))?.name ?? "Team"}`
+              ) : (
+                "Awaiting assignment"
+              )}
             </div>
             <div className="sub">
-              {assignedTo
-                ? `Technician notified via SMS · ${complaint.assigned_to === assignedTo && complaint.assigned_at ? formatDateTime(complaint.assigned_at) : "Just now (unsaved)"}`
-                : "No technician selected yet"}
+              {assignedEntity
+                ? `Technicians notified · ${
+                    (assignedEntity.startsWith("staff:") && complaint.assigned_to === assignedEntity.substring(6)) ||
+                    (assignedEntity.startsWith("team:") && complaint.team_id === assignedEntity.substring(5))
+                      ? complaint.assigned_at
+                        ? formatDateTime(complaint.assigned_at)
+                        : ""
+                      : "Just now (unsaved)"
+                  }`
+                : "No technician or team selected yet"}
             </div>
           </div>
           <div
@@ -851,6 +918,7 @@ export default function ComplaintsPage({
   const [complaints, setComplaints] = useState<ComplaintWithRelations[]>([]);
   const [areas, setAreas] = useState<Area[]>([]);
   const [staff, setStaff] = useState<StaffWithArea[]>([]);
+  const [teams, setTeams] = useState<TeamWithMembers[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [view, setView] = useState("kanban");
@@ -869,11 +937,12 @@ export default function ComplaintsPage({
   const prevRefreshRef = React.useRef(refreshToken);
 
   useEffect(() => {
-    Promise.all([getComplaints(), getAreas(), getStaff()])
-      .then(([c, a, s]) => {
+    Promise.all([getComplaints(), getAreas(), getStaff(), getTeams()])
+      .then(([c, a, s, t]) => {
         setComplaints(c);
         setAreas(a);
         setStaff(s);
+        setTeams(t);
       })
       .catch((e: unknown) =>
         setError(e instanceof Error ? e.message : "Could not load complaints"),
@@ -1383,6 +1452,11 @@ export default function ComplaintsPage({
                               <Avatar name={c.technician.full_name} size={20} />
                               <span>{c.technician.full_name}</span>
                             </>
+                          ) : c.team ? (
+                            <>
+                              <Avatar name={c.team.name} size={20} />
+                              <span style={{ color: 'var(--color-primary)', fontWeight: 600 }}>{c.team.name}</span>
+                            </>
                           ) : (
                             <span style={{ fontStyle: "italic" }}>
                               Unassigned
@@ -1435,7 +1509,7 @@ export default function ComplaintsPage({
                     <span style={{ fontSize: 12 }}>{priLabel[c.priority]}</span>
                   </td>
                   <td>
-                    {c.technician?.full_name ?? (
+                    {c.technician?.full_name ?? c.team?.name ?? (
                       <span className="muted" style={{ fontStyle: "italic" }}>
                         Unassigned
                       </span>
@@ -1461,6 +1535,7 @@ export default function ComplaintsPage({
           complaint={open}
           onClose={() => setOpen(null)}
           staff={staff}
+          teams={teams}
           onSaved={() => {
             getComplaints()
               .then((c) => setComplaints(c))
@@ -1472,6 +1547,7 @@ export default function ComplaintsPage({
         <LogComplaintModal
           onClose={() => setLogOpen(false)}
           staff={staff}
+          teams={teams}
           onSaved={handleComplaintSaved}
         />
       )}
