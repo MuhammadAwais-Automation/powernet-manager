@@ -1,6 +1,12 @@
 import { supabase } from "@/lib/supabase";
 import { withTimeout } from "@/lib/async/with-timeout";
 import {
+  buildCustomerBalanceSummary,
+  buildPaymentCollectionSummary,
+  normalizeBillingMonth,
+  type CustomerBalanceSummary,
+} from "@/lib/billing/core";
+import {
   buildBillsPageCacheKey,
   buildBillingSummaryCacheKey,
   getBillRange,
@@ -310,8 +316,8 @@ export async function getBillingSummary(
     return empty;
   }
 
+  const { startIso, endIso } = getBillingMonthRange(month);
   const [
-    reportsRes,
     totalRes,
     paidRes,
     unpaidRes,
@@ -321,10 +327,8 @@ export async function getBillingSummary(
     partialRes,
     visitedRes,
     summaryRowsRes,
+    paymentRowsRes,
   ] = await Promise.all([
-    areaCustomerIds
-      ? Promise.resolve({ data: null, error: null })
-      : supabase.rpc("get_reports_summary", { p_month: month }),
     withCustomerFilter(
       supabase
         .from("bills")
@@ -396,6 +400,14 @@ export async function getBillingSummary(
         .eq("month", month),
       areaCustomerIds,
     ),
+    withCustomerFilter(
+      supabase
+        .from("payments")
+        .select("amount, paid_at, collected_by")
+        .gte("paid_at", startIso)
+        .lt("paid_at", endIso),
+      areaCustomerIds,
+    ),
   ]);
 
   if (totalRes.error) throw totalRes.error;
@@ -407,18 +419,18 @@ export async function getBillingSummary(
   if (partialRes.error) throw partialRes.error;
   if (visitedRes.error) throw visitedRes.error;
   if (summaryRowsRes.error) throw summaryRowsRes.error;
+  if (paymentRowsRes.error) throw paymentRowsRes.error;
 
-  const raw = (!reportsRes.error && reportsRes.data ? reportsRes.data : {}) as {
-    month?: unknown;
-    cards?: {
-      revenue?: unknown;
-      collections?: unknown;
-      pending?: unknown;
-    };
-    dailyCollections?: unknown;
-  };
+  const paymentSummary = buildPaymentCollectionSummary(
+    (paymentRowsRes.data ?? []) as Array<{
+      amount: number | null;
+      paid_at: string | null;
+      collected_by?: string | null;
+    }>,
+    month,
+  );
   const summary: BillingSummary = {
-    month: typeof raw.month === "string" ? raw.month : month,
+    month,
     totalBills: totalRes.count ?? 0,
     paidBills: paidRes.count ?? 0,
     pendingBills: pendingRes.count ?? 0,
@@ -427,7 +439,7 @@ export async function getBillingSummary(
     overdueBills: overdueRes.count ?? 0,
     visitedBills: visitedRes.count ?? 0,
     totalBilled: sumBillAmounts(summaryRowsRes.data, "amount"),
-    totalPaid: sumBillAmounts(summaryRowsRes.data, "paid_amount"),
+    totalPaid: paymentSummary.totalCollected,
     totalRemaining: sumRemaining(summaryRowsRes.data),
     overdueTotal: (
       (overdueRowsRes.data ?? []) as Array<{
@@ -439,15 +451,7 @@ export async function getBillingSummary(
         sum + Math.max(toNumber(bill.amount) - toNumber(bill.paid_amount), 0),
       0,
     ),
-    dailyCollections: Array.isArray(raw.dailyCollections)
-      ? raw.dailyCollections.map((row) => {
-          const point = row as { d?: unknown; v?: unknown };
-          return {
-            d: typeof point.d === "string" ? point.d : "",
-            v: toNumber(point.v),
-          };
-        })
-      : buildDailyCollectionsFromBills(summaryRowsRes.data),
+    dailyCollections: paymentSummary.dailyCollections,
   };
   billingSummaryCache[key] = {
     data: summary,
@@ -464,6 +468,38 @@ export async function getBillsByCustomer(customerId: string): Promise<Bill[]> {
     .order("created_at", { ascending: false });
   if (error) throw error;
   return data as Bill[];
+}
+
+export async function getCustomerBalanceSummary(
+  customerId: string,
+  currentMonth: string,
+): Promise<CustomerBalanceSummary> {
+  const month = normalizeBillingMonth(currentMonth);
+  const { data: rpcData, error: rpcError } = await supabase.rpc(
+    "get_customer_balance_summary",
+    {
+      p_customer_id: customerId,
+      p_current_month: month,
+    },
+  );
+  if (!rpcError && rpcData) return normalizeCustomerBalanceSummary(rpcData);
+
+  const { data, error } = await supabase
+    .from("bills")
+    .select("id, amount, paid_amount, month, status")
+    .eq("customer_id", customerId)
+    .order("month", { ascending: false });
+  if (error) throw error;
+  return buildCustomerBalanceSummary(
+    (data ?? []) as Array<{
+      id: string;
+      amount: number;
+      paid_amount: number | null;
+      month: string;
+      status: "pending" | "paid" | "overdue";
+    }>,
+    month,
+  );
 }
 
 export async function generateMonthlyBills(
@@ -548,6 +584,19 @@ function toNumber(value: unknown): number {
   return typeof value === "number" && Number.isFinite(value) ? value : 0;
 }
 
+function normalizeCustomerBalanceSummary(value: unknown): CustomerBalanceSummary {
+  const raw = (value ?? {}) as Partial<CustomerBalanceSummary>;
+  return {
+    currentDue: toNumber(raw.currentDue),
+    previousDue: toNumber(raw.previousDue),
+    totalOutstanding: toNumber(raw.totalOutstanding),
+    totalPaid: toNumber(raw.totalPaid),
+    openBillCount: toNumber(raw.openBillCount),
+    currentBillId:
+      typeof raw.currentBillId === "string" ? raw.currentBillId : null,
+  };
+}
+
 function emptyBillingSummary(month: string): BillingSummary {
   return {
     month,
@@ -564,6 +613,13 @@ function emptyBillingSummary(month: string): BillingSummary {
     overdueTotal: 0,
     dailyCollections: [],
   };
+}
+
+function getBillingMonthRange(month: string): { startIso: string; endIso: string } {
+  const [year, monthNumber] = normalizeBillingMonth(month).split("-").map(Number);
+  const start = new Date(Date.UTC(year, monthNumber - 1, 1));
+  const end = new Date(Date.UTC(year, monthNumber, 1));
+  return { startIso: start.toISOString(), endIso: end.toISOString() };
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -625,23 +681,6 @@ function sumRemaining(rows: unknown): number {
       sum + Math.max(toNumber(bill.amount) - toNumber(bill.paid_amount), 0)
     );
   }, 0);
-}
-
-function buildDailyCollectionsFromBills(rows: unknown): { d: string; v: number }[] {
-  if (!Array.isArray(rows)) return [];
-  const byDay = new Map<string, number>();
-  rows.forEach((row) => {
-    const bill = row as Record<string, unknown>;
-    if (bill.status !== "paid") return;
-    if (typeof bill.paid_at !== "string") return;
-    const date = new Date(bill.paid_at);
-    if (Number.isNaN(date.getTime())) return;
-    const label = String(date.getDate()).padStart(2, "0");
-    byDay.set(label, (byDay.get(label) ?? 0) + toNumber(bill.paid_amount));
-  });
-  return Array.from(byDay.entries())
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([d, v]) => ({ d, v }));
 }
 
 async function findAreaCustomerIds(
@@ -753,53 +792,13 @@ export async function approvePaymentVerification(
   reviewerId: string,
   reviewNote?: string,
 ): Promise<void> {
-  // 1. Fetch verification details
-  const { data: verification, error: fetchErr } = await supabase
-    .from("payment_verifications")
-    .select("*")
-    .eq("id", id)
-    .single();
-
-  if (fetchErr || !verification) {
-    throw new Error(fetchErr?.message || "Payment verification record not found");
-  }
-  if (verification.status !== "pending") {
-    throw new Error("This payment has already been processed");
-  }
-
-  // 2. Call recordBillPayment to update ledger and bills table
-  const paymentResult = await recordBillPayment({
-    billId: verification.bill_id,
-    amount: verification.amount,
-    collectedBy: reviewerId,
-    method: verification.method,
-    source: "customer",
-    note: reviewNote || "Payment receipt verified by administrator",
+  const { error } = await supabase.rpc("approve_payment_verification", {
+    p_verification_id: id,
+    p_reviewer_id: reviewerId,
+    p_review_note: reviewNote ?? null,
   });
-
-  // 3. Update the newly created payment event row with Cloudinary receipt info
-  if (paymentResult.receiptNo) {
-    await supabase
-      .from("payments")
-      .update({
-        receipt_url: verification.receipt_url,
-        customer_remarks: verification.customer_remarks,
-      })
-      .eq("receipt_no", paymentResult.receiptNo);
-  }
-
-  // 4. Update status of the verification queue row
-  const { error: updateErr } = await supabase
-    .from("payment_verifications")
-    .update({
-      status: "approved",
-      review_note: reviewNote || null,
-      reviewed_by: reviewerId,
-      reviewed_at: new Date().toISOString(),
-    })
-    .eq("id", id);
-
-  if (updateErr) throw updateErr;
+  if (error) throw error;
+  clearBillsCache();
 }
 
 export async function rejectPaymentVerification(

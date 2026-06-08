@@ -251,7 +251,8 @@ export async function getStaffActivity(staffId: string, dateStr: string): Promis
     `)
     .eq('collected_by', staffId)
     .eq('payment_method', 'visit')
-    .eq('paid_at', dateStr)
+    .gte('paid_at', startISO)
+    .lte('paid_at', endISO)
     .order('paid_at', { ascending: false })
 
   // 3. Fetch resolved complaints

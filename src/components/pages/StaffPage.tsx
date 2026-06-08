@@ -555,7 +555,7 @@ function StaffActivityDrawer({ staff, onClose }: {
   };
 
   const totalRecovered = activity?.payments.reduce((sum, p) => sum + p.amount, 0) ?? 0;
-  const partialCount = activity?.payments.filter(p => p.bill?.status !== 'paid').length ?? 0;
+  const partialCount = activity?.payments.filter(p => p.amount < (p.bill?.amount ?? p.amount)).length ?? 0;
   const fullCount = (activity?.payments.length ?? 0) - partialCount;
   const visitsCount = activity?.visits.length ?? 0;
   const resolvedCount = activity?.resolvedComplaints.length ?? 0;

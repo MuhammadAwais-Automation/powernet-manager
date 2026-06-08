@@ -20,15 +20,14 @@ as $$
       ), 0) as expected_revenue,
       coalesce((
         select sum(amount)
-        from public.bills
-        where status = 'paid'
-          and month like to_char(now(), 'YYYY-MM') || '%'
+        from public.payments
+        where paid_at >= date_trunc('month', now())
+          and paid_at < date_trunc('month', now()) + interval '1 month'
       ), 0) as monthly_revenue,
       coalesce((
         select sum(greatest(amount - coalesce(paid_amount, 0), 0))
         from public.bills
         where status <> 'paid'
-          and month like to_char(now(), 'YYYY-MM') || '%'
       ), 0) as pending_revenue
   ),
   complaint_stats as (
@@ -49,11 +48,11 @@ as $$
     select
       months.month_start,
       to_char(months.month_start, 'Mon') as label,
-      coalesce(sum(bills.amount), 0) as total
+      coalesce(sum(payments.amount), 0) as total
     from months
-    left join public.bills
-      on bills.status = 'paid'
-     and left(bills.month, 7) = to_char(months.month_start, 'YYYY-MM')
+    left join public.payments
+      on payments.paid_at >= months.month_start
+     and payments.paid_at < months.month_start + interval '1 month'
     group by months.month_start
   )
   select jsonb_build_object(

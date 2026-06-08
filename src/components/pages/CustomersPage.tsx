@@ -9,6 +9,7 @@ import { getAreas } from '@/lib/db/areas';
 import { getPackages } from '@/lib/db/packages';
 import { getBillsByCustomer } from '@/lib/db/bills';
 import { useAuth } from '@/lib/auth/auth-context';
+import { getBillCollectionStatus } from '@/lib/billing/core';
 import type { CustomerWithRelations, Area, Package, CustomerStatus, Bill, CustomerListRow } from '@/types/database';
 
 // ── Add Customer Drawer ──────────────────────────────────────────────────────
@@ -425,6 +426,15 @@ function CustomerDetail({
           ) : bills.map(b => {
             const paid = b.paid_amount ?? 0;
             const remaining = Math.max(b.amount - paid, 0);
+            const derivedStatus = getBillCollectionStatus(b);
+            const badgeColor =
+              derivedStatus === 'paid'
+                ? 'green'
+                : derivedStatus === 'partial'
+                  ? 'purple'
+                  : derivedStatus === 'overdue'
+                    ? 'red'
+                    : 'amber';
             return (
               <div key={b.id} className="minirow">
                 <div>
@@ -439,7 +449,7 @@ function CustomerDetail({
                 </div>
                 <div className="row gap-md">
                   <span className="mono">Rs. {b.amount.toLocaleString()}</span>
-                  <Badge color={b.status === 'paid' ? 'green' : b.status === 'overdue' ? 'red' : 'amber'} dot>{b.status}</Badge>
+                  <Badge color={badgeColor} dot>{derivedStatus}</Badge>
                 </div>
               </div>
             );
@@ -743,7 +753,7 @@ export default function CustomersPage() {
               <th>Package</th>
               <th>Connected</th>
               <th>Status</th>
-              <th>Due Amount</th>
+              <th>Monthly Due</th>
               <th style={{ textAlign: 'right' }}>Actions</th>
             </tr>
           </thead>

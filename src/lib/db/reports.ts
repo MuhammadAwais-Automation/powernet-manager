@@ -71,10 +71,14 @@ async function getReportsSummaryFallback(
   areaId?: string,
 ): Promise<ReportsSummary> {
   const months = getRecentMonths(reportMonth, 6);
-  const [billRows, complaintRows, customerRows] = await Promise.all([
+  const [billRows, paymentRows, complaintRows, customerRows] = await Promise.all([
     fetchAllRows<BillReportRow>(
       "bills",
       "amount, paid_amount, status, paid_at, month, collected_by, customer:customers(area_id, area:areas(name)), collector:staff(full_name)",
+    ),
+    fetchAllRows<PaymentReportRow>(
+      "payments",
+      "amount, paid_at, collected_by, customer:customers(area_id, area:areas(name)), collector:staff(full_name)",
     ),
     fetchAllRows<ComplaintReportRow>(
       "complaints",
@@ -88,6 +92,11 @@ async function getReportsSummaryFallback(
       bill.month === reportMonth &&
       (!areaId || bill.customer?.area_id === areaId),
   );
+  const scopedPayments = paymentRows.filter(
+    (payment) =>
+      getMonth(payment.paid_at) === reportMonth &&
+      (!areaId || payment.customer?.area_id === areaId),
+  );
   const scopedComplaints = complaintRows.filter(
     (complaint) =>
       getMonth(complaint.opened_at) === reportMonth &&
@@ -98,8 +107,8 @@ async function getReportsSummaryFallback(
   );
 
   const revenue = scopedBills.reduce((sum, bill) => sum + toNumber(bill.amount), 0);
-  const collections = scopedBills.reduce(
-    (sum, bill) => sum + toNumber(bill.paid_amount),
+  const collections = scopedPayments.reduce(
+    (sum, payment) => sum + toNumber(payment.amount),
     0,
   );
   const pending = scopedBills.reduce((sum, bill) => {
@@ -136,7 +145,7 @@ async function getReportsSummaryFallback(
       ...point,
       v: toChartThousands(point.v),
     })),
-    dailyCollections: buildDailyCollections(scopedBills).map((point) => ({
+    dailyCollections: buildDailyCollections(scopedPayments).map((point) => ({
       ...point,
       v: toChartThousands(point.v),
     })),
@@ -171,7 +180,7 @@ async function getReportsSummaryFallback(
       ).length;
       return { d: monthLabel(month), v: created - disconnected };
     }),
-    agentCollections: buildAgentCollections(scopedBills),
+    agentCollections: buildAgentCollections(scopedPayments, scopedBills),
   };
 }
 
@@ -252,6 +261,14 @@ type BillReportRow = {
   collector: { full_name: string | null } | null;
 };
 
+type PaymentReportRow = {
+  amount: number | null;
+  paid_at: string | null;
+  collected_by: string | null;
+  customer: { area_id: string | null; area?: { name: string | null } | null } | null;
+  collector: { full_name: string | null } | null;
+};
+
 type ComplaintReportRow = {
   status: string | null;
   opened_at: string | null;
@@ -267,7 +284,7 @@ type CustomerReportRow = {
 };
 
 async function fetchAllRows<T extends Record<string, unknown>>(
-  table: "bills" | "complaints" | "customers",
+  table: "bills" | "payments" | "complaints" | "customers",
   select: string,
 ): Promise<T[]> {
   const rows: T[] = [];
@@ -289,38 +306,55 @@ async function fetchAllRows<T extends Record<string, unknown>>(
   return rows;
 }
 
-function buildDailyCollections(bills: BillReportRow[]): ReportChartPoint[] {
+function buildDailyCollections(payments: PaymentReportRow[]): ReportChartPoint[] {
   const byDay = new Map<string, number>();
-  bills.forEach((bill) => {
-    if (toNumber(bill.paid_amount) <= 0 || !bill.paid_at) return;
-    const date = new Date(bill.paid_at);
+  payments.forEach((payment) => {
+    if (toNumber(payment.amount) <= 0 || !payment.paid_at) return;
+    const date = new Date(payment.paid_at);
     if (Number.isNaN(date.getTime())) return;
     const day = String(date.getDate()).padStart(2, "0");
-    byDay.set(day, (byDay.get(day) ?? 0) + toNumber(bill.paid_amount));
+    byDay.set(day, (byDay.get(day) ?? 0) + toNumber(payment.amount));
   });
   return Array.from(byDay.entries())
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([d, v]) => ({ d, v }));
 }
 
-function buildAgentCollections(bills: BillReportRow[]): AgentCollectionReport[] {
+function buildAgentCollections(
+  payments: PaymentReportRow[],
+  bills: BillReportRow[],
+): AgentCollectionReport[] {
   const byAgent = new Map<string, AgentCollectionReport>();
-  bills.forEach((bill) => {
-    if (!bill.collected_by || toNumber(bill.paid_amount) <= 0) return;
-    const existing = byAgent.get(bill.collected_by) ?? {
-      name: bill.collector?.full_name ?? "Unknown",
-      area: bill.customer?.area?.name ?? "No area",
+  payments.forEach((payment) => {
+    const key = payment.collected_by ?? "__unassigned__";
+    const existing = byAgent.get(key) ?? {
+      name: payment.collector?.full_name ?? "Unassigned / Manual",
+      area: payment.customer?.area?.name ?? "No area",
       payments: 0,
       collected: 0,
       pending: 0,
       collectionRate: 0,
     };
     existing.payments += 1;
-    existing.collected += toNumber(bill.paid_amount);
-    if (bill.status !== "paid") {
-      existing.pending += Math.max(toNumber(bill.amount) - toNumber(bill.paid_amount), 0);
-    }
-    byAgent.set(bill.collected_by, existing);
+    existing.collected += toNumber(payment.amount);
+    byAgent.set(key, existing);
+  });
+
+  bills.forEach((bill) => {
+    if (bill.status === "paid") return;
+    const pending = Math.max(toNumber(bill.amount) - toNumber(bill.paid_amount), 0);
+    if (pending <= 0) return;
+    const key = bill.collected_by ?? "__unassigned__";
+    const existing = byAgent.get(key) ?? {
+      name: bill.collector?.full_name ?? "Unassigned / Manual",
+      area: bill.customer?.area?.name ?? "No area",
+      payments: 0,
+      collected: 0,
+      pending: 0,
+      collectionRate: 0,
+    };
+    existing.pending += pending;
+    byAgent.set(key, existing);
   });
 
   return Array.from(byAgent.values()).map((agent) => ({
@@ -407,5 +441,4 @@ async function getAreaConnectionStatsFallback(): Promise<AreaConnectionStats[]> 
     };
   }).sort((a, b) => a.areaName.localeCompare(b.areaName));
 }
-
 

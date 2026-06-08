@@ -8,6 +8,7 @@ import {
   getBillingSummary,
   generateMonthlyBills,
   getBillByIdWithRelations,
+  getCustomerBalanceSummary,
   recordBillPayment,
   type BillingSummary,
   type GenerateBillsResult,
@@ -18,6 +19,7 @@ import {
   getCurrentBillingMonth,
   getCustomerSecondaryId,
   normalizeBillingMonth,
+  type CustomerBalanceSummary,
 } from "@/lib/billing/core";
 import {
   normalizeBillingSearch,
@@ -382,6 +384,8 @@ export default function BillingPage({
 
   const [exporting, setExporting] = useState(false);
   const [detailBill, setDetailBill] = useState<BillWithRelations | null>(null);
+  const [detailBalance, setDetailBalance] =
+    useState<CustomerBalanceSummary | null>(null);
   const [paymentBill, setPaymentBill] = useState<BillWithRelations | null>(
     null,
   );
@@ -409,6 +413,35 @@ export default function BillingPage({
       cancelled = true;
     };
   }, [focusBillId, focusToken]);
+
+  useEffect(() => {
+    if (!detailBill) {
+      setDetailBalance(null);
+      return;
+    }
+
+    let cancelled = false;
+    getCustomerBalanceSummary(detailBill.customer_id, detailBill.month)
+      .then((balance) => {
+        if (!cancelled) setDetailBalance(balance);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setDetailBalance({
+            currentDue: remainingAmount(detailBill),
+            previousDue: 0,
+            totalOutstanding: remainingAmount(detailBill),
+            totalPaid: detailBill.paid_amount ?? 0,
+            openBillCount: remainingAmount(detailBill) > 0 ? 1 : 0,
+            currentBillId: detailBill.id,
+          });
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [detailBill]);
 
   const handleExport = async () => {
     setExporting(true);
@@ -1131,6 +1164,91 @@ export default function BillingPage({
                   </div>
                 </div>
               </div>
+              {detailBalance && (
+                <div className="grid-responsive-4" style={{ gap: 12 }}>
+                  <div className="card card-pad" style={{ padding: "10px 14px" }}>
+                    <div
+                      className="muted"
+                      style={{
+                        fontSize: 11,
+                        textTransform: "uppercase",
+                        fontWeight: 600,
+                        letterSpacing: "0.05em",
+                      }}
+                    >
+                      Previous Months
+                    </div>
+                    <div
+                      className="num"
+                      style={{ fontWeight: 700, fontSize: 15, marginTop: 4 }}
+                    >
+                      {fmt(detailBalance.previousDue)}
+                    </div>
+                  </div>
+                  <div className="card card-pad" style={{ padding: "10px 14px" }}>
+                    <div
+                      className="muted"
+                      style={{
+                        fontSize: 11,
+                        textTransform: "uppercase",
+                        fontWeight: 600,
+                        letterSpacing: "0.05em",
+                      }}
+                    >
+                      Current Month
+                    </div>
+                    <div
+                      className="num"
+                      style={{ fontWeight: 700, fontSize: 15, marginTop: 4 }}
+                    >
+                      {fmt(detailBalance.currentDue)}
+                    </div>
+                  </div>
+                  <div
+                    className="card card-pad"
+                    style={{ padding: "10px 14px", borderColor: "var(--brand)" }}
+                  >
+                    <div
+                      className="muted"
+                      style={{
+                        fontSize: 11,
+                        textTransform: "uppercase",
+                        fontWeight: 600,
+                        letterSpacing: "0.05em",
+                      }}
+                    >
+                      Total Payable
+                    </div>
+                    <div
+                      className="num"
+                      style={{
+                        fontWeight: 800,
+                        fontSize: 15,
+                        marginTop: 4,
+                        color: "var(--brand)",
+                      }}
+                    >
+                      {fmt(detailBalance.totalOutstanding)}
+                    </div>
+                  </div>
+                  <div className="card card-pad" style={{ padding: "10px 14px" }}>
+                    <div
+                      className="muted"
+                      style={{
+                        fontSize: 11,
+                        textTransform: "uppercase",
+                        fontWeight: 600,
+                        letterSpacing: "0.05em",
+                      }}
+                    >
+                      Open Bills
+                    </div>
+                    <div style={{ fontWeight: 700, fontSize: 15, marginTop: 4 }}>
+                      {detailBalance.openBillCount}
+                    </div>
+                  </div>
+                </div>
+              )}
               {detailBill.receipt_no && (
                 <div className="card card-pad" style={{ padding: "10px 14px" }}>
                   <div
@@ -1348,7 +1466,12 @@ export default function BillingPage({
                 className="btn btn-primary"
                 onClick={() => {
                   const b = detailBill;
-                  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Receipt ${b.receipt_no ?? b.id.slice(0, 8)}</title><style>body{font-family:sans-serif;padding:32px;max-width:400px;margin:auto}h2{margin-bottom:4px}p{margin:4px 0;font-size:14px}.row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #eee}.label{color:#888;font-size:12px}</style></head><body><h2>Payment Receipt</h2><p class="label">#${(b.receipt_no ?? b.id.slice(0, 8)).toUpperCase()}</p><div class="row"><span class="label">Customer</span><span>${b.customer?.full_name ?? "—"} (${b.customer?.customer_code ?? ""})</span></div><div class="row"><span class="label">Month</span><span>${b.month}</span></div><div class="row"><span class="label">Amount</span><span>Rs. ${b.amount.toLocaleString()}</span></div><div class="row"><span class="label">Paid</span><span>Rs. ${(b.paid_amount ?? 0).toLocaleString()}</span></div><div class="row"><span class="label">Status</span><span>${b.status}</span></div>${b.payment_method ? `<div class="row"><span class="label">Method</span><span>${b.payment_method}</span></div>` : ""}${b.collector ? `<div class="row"><span class="label">Collected By</span><span>${b.collector.full_name}</span></div>` : ""}<script>window.onload=()=>window.print()</script></body></html>`;
+                  const balance = detailBalance ?? {
+                    currentDue: remainingAmount(b),
+                    previousDue: 0,
+                    totalOutstanding: remainingAmount(b),
+                  };
+                  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Receipt ${b.receipt_no ?? b.id.slice(0, 8)}</title><style>body{font-family:sans-serif;padding:32px;max-width:400px;margin:auto}h2{margin-bottom:4px}p{margin:4px 0;font-size:14px}.row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #eee}.label{color:#888;font-size:12px}</style></head><body><h2>Payment Receipt</h2><p class="label">#${(b.receipt_no ?? b.id.slice(0, 8)).toUpperCase()}</p><div class="row"><span class="label">Customer</span><span>${b.customer?.full_name ?? "-"} (${b.customer?.customer_code ?? ""})</span></div><div class="row"><span class="label">Month</span><span>${b.month}</span></div><div class="row"><span class="label">Current Month</span><span>Rs. ${balance.currentDue.toLocaleString()}</span></div><div class="row"><span class="label">Previous Months</span><span>Rs. ${balance.previousDue.toLocaleString()}</span></div><div class="row"><span class="label">Total Payable</span><span>Rs. ${balance.totalOutstanding.toLocaleString()}</span></div><div class="row"><span class="label">Paid This Bill</span><span>Rs. ${(b.paid_amount ?? 0).toLocaleString()}</span></div><div class="row"><span class="label">Status</span><span>${statusLabel(b)}</span></div>${b.payment_method ? `<div class="row"><span class="label">Method</span><span>${b.payment_method}</span></div>` : ""}${b.collector ? `<div class="row"><span class="label">Collected By</span><span>${b.collector.full_name}</span></div>` : ""}<script>window.onload=()=>window.print()</script></body></html>`;
                   const w = window.open("", "_blank");
                   if (w) {
                     w.document.write(html);

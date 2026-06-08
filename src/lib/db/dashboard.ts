@@ -22,9 +22,10 @@ export type ActivityItem = {
   when: string;
 };
 
-type RecentBillRow = {
+type RecentPaymentRow = {
   amount: number | null;
   paid_at: string | null;
+  source: string | null;
   customer: { full_name: string | null } | null;
 };
 type RecentComplaintRow = {
@@ -79,12 +80,10 @@ export async function getRecentActivity(): Promise<ActivityItem[]> {
   if (activityCache && activityCache.expiresAt > Date.now())
     return activityCache.value;
 
-  const [billsRes, complaintsRes, customersRes] = await Promise.all([
+  const [paymentsRes, complaintsRes, customersRes] = await Promise.all([
     supabase
-      .from("bills")
-      .select("amount, paid_at, customer:customers(full_name)")
-      .eq("status", "paid")
-      .not("paid_at", "is", null)
+      .from("payments")
+      .select("amount, paid_at, source, customer:customers(full_name)")
       .order("paid_at", { ascending: false })
       .limit(3),
     supabase
@@ -101,21 +100,21 @@ export async function getRecentActivity(): Promise<ActivityItem[]> {
       .limit(3),
   ]);
 
-  if (billsRes.error) throw billsRes.error;
+  if (paymentsRes.error) throw paymentsRes.error;
   if (complaintsRes.error) throw complaintsRes.error;
   if (customersRes.error) throw customersRes.error;
 
   type TimedItem = ActivityItem & { ts: string };
   const items: TimedItem[] = [];
 
-  ((billsRes.data ?? []) as unknown as RecentBillRow[]).forEach((b) => {
+  ((paymentsRes.data ?? []) as unknown as RecentPaymentRow[]).forEach((p) => {
     items.push({
       icon: "dollar",
       color: "green",
-      lead: `Payment received from ${b.customer?.full_name ?? "-"}`,
-      amt: `Rs. ${(b.amount ?? 0).toLocaleString()}`,
-      when: formatRelative(b.paid_at),
-      ts: b.paid_at ?? "",
+      lead: `Payment received from ${p.customer?.full_name ?? "-"}`,
+      amt: `Rs. ${(p.amount ?? 0).toLocaleString()}`,
+      when: formatRelative(p.paid_at),
+      ts: p.paid_at ?? "",
     });
   });
   ((complaintsRes.data ?? []) as unknown as RecentComplaintRow[]).forEach(
