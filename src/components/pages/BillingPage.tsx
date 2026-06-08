@@ -37,8 +37,9 @@ function remainingAmount(
   return Math.max(bill.amount - (bill.paid_amount ?? 0), 0);
 }
 
-function statusColor(status: string): "green" | "red" | "amber" {
+function statusColor(status: string): "green" | "red" | "amber" | "purple" {
   if (status === "paid") return "green";
+  if (status === "partial") return "purple";
   if (status === "overdue") return "red";
   return "amber";
 }
@@ -1151,24 +1152,61 @@ export default function BillingPage({
                   </div>
                 </div>
               )}
-              {detailBill.paid_at && (
-                <div className="card card-pad" style={{ padding: "10px 14px" }}>
-                  <div
-                    className="muted"
-                    style={{
-                      fontSize: 11,
-                      textTransform: "uppercase",
-                      fontWeight: 600,
-                      letterSpacing: "0.05em",
-                    }}
-                  >
-                    Paid At
+              {detailBill.paid_at && (() => {
+                const paidAtDate = new Date(detailBill.paid_at);
+                const formattedDate = Number.isNaN(paidAtDate.getTime()) ? "-" : paidAtDate.toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' });
+                const formattedTime = Number.isNaN(paidAtDate.getTime()) ? "-" : paidAtDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+                return (
+                  <div className="card card-pad" style={{ padding: "10px 14px" }}>
+                    <div
+                      className="muted"
+                      style={{
+                        fontSize: 11,
+                        textTransform: "uppercase",
+                        fontWeight: 600,
+                        letterSpacing: "0.05em",
+                        marginBottom: 8,
+                      }}
+                    >
+                      Paid At
+                    </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                      <div className="card" style={{ padding: "10px 14px", background: "var(--bg-muted)" }}>
+                        <div
+                          className="muted"
+                          style={{
+                            fontSize: 11,
+                            textTransform: "uppercase",
+                            fontWeight: 600,
+                            letterSpacing: "0.05em",
+                          }}
+                        >
+                          Date
+                        </div>
+                        <div style={{ fontWeight: 600, fontSize: 13, marginTop: 4 }}>
+                          {formattedDate}
+                        </div>
+                      </div>
+                      <div className="card" style={{ padding: "10px 14px", background: "var(--bg-muted)" }}>
+                        <div
+                          className="muted"
+                          style={{
+                            fontSize: 11,
+                            textTransform: "uppercase",
+                            fontWeight: 600,
+                            letterSpacing: "0.05em",
+                          }}
+                        >
+                          Time
+                        </div>
+                        <div style={{ fontWeight: 600, fontSize: 13, marginTop: 4 }}>
+                          {formattedTime}
+                        </div>
+                      </div>
+                    </div>
                   </div>
-                  <div style={{ fontWeight: 600, fontSize: 13, marginTop: 4 }}>
-                    {formatDateTime(detailBill.paid_at)}
-                  </div>
-                </div>
-              )}
+                );
+              })()}
               {detailBill.payment_source === "office" && (
                 <div
                   className="card card-pad"
