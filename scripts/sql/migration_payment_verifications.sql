@@ -57,11 +57,49 @@ CREATE POLICY "Customers can view their own payment verifications"
 DROP POLICY IF EXISTS "Staff can view/update all payment verifications" ON public.payment_verifications;
 CREATE POLICY "Staff can view/update all payment verifications" 
   ON public.payment_verifications FOR ALL 
+  TO authenticated
   USING (
-    EXISTS (
-      SELECT 1 FROM public.staff 
-      WHERE staff.auth_user_id = auth.uid()
-    )
+    auth.jwt() ->> 'email' LIKE '%@powernet.local' 
+    AND auth.jwt() ->> 'email' NOT LIKE 'customer_%'
+  )
+  WITH CHECK (
+    auth.jwt() ->> 'email' LIKE '%@powernet.local' 
+    AND auth.jwt() ->> 'email' NOT LIKE 'customer_%'
   );
+
+-- 6. Enable Realtime Replication
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_publication_tables
+    where pubname = 'supabase_realtime'
+      and schemaname = 'public'
+      and tablename = 'payment_verifications'
+  ) then
+    alter publication supabase_realtime add table public.payment_verifications;
+  end if;
+end $$;
+
+-- 7. Realtime Refresh Trigger for Bills (touches bill to notify customer app of verification updates)
+create or replace function public.touch_bill_on_verification_change()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  update public.bills
+  set amount = amount
+  where id = new.bill_id;
+  return new;
+end;
+$$;
+
+drop trigger if exists touch_bill_on_verification_change_trigger on public.payment_verifications;
+create trigger touch_bill_on_verification_change_trigger
+after update of status on public.payment_verifications
+for each row
+execute function public.touch_bill_on_verification_change();
 
 COMMIT;

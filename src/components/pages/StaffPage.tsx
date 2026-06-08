@@ -5,9 +5,10 @@ import { Badge, Switch, Modal, Drawer, Tabs } from '../ui';
 import { supabase } from '@/lib/supabase';
 import { getStaff, updateStaff, updateStaffPassword, deleteStaff, getStaffActivity, type StaffActivity } from '@/lib/db/staff';
 import { getAreas } from '@/lib/db/areas';
+import { getTeams, createTeam, updateTeam, deleteTeam, updateTeamMembers } from '@/lib/db/teams';
 import { initials, avClass } from '@/lib/utils';
 import { useAuth } from '@/lib/auth/auth-context';
-import type { Staff, StaffWithArea, Area, StaffRole } from '@/types/database';
+import type { Staff, StaffWithArea, Area, StaffRole, Team, TeamWithMembers } from '@/types/database';
 
 const ROLE_LABELS: Record<string, string> = {
   technician:        'Technician',
@@ -855,85 +856,158 @@ function StaffCard({ s, onEdit, onViewCreds, onToggleActive, onDelete, onViewAct
 }) {
   const roleLabel = ROLE_LABELS[s.role] ?? s.role;
   const roleColor = ROLE_COLORS[s.role] ?? 'gray';
+  const [menuOpen, setMenuOpen] = useState(false);
 
   return (
-    <div className="card staff-card lift">
-      <div className="head">
-        <span className={`av ${avClass(s.full_name)}`} style={{ width: 44, height: 44, fontSize: 14 }}>
-          {initials(s.full_name)}
-        </span>
-        <div className="who" style={{ flex: 1, minWidth: 0 }}>
-          <div className="nm">{s.full_name}</div>
-          <div className="ph mono" style={{ fontSize: 11 }}>
-            {s.username
-              ? <span style={{ color: 'var(--brand)' }}>@{s.username}</span>
-              : <span style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>no username</span>
-            }
+    <div className="card staff-card lift" style={{ position: 'relative', overflow: 'visible' }}>
+      <div className="head" style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1, minWidth: 0 }}>
+          <span className={`av ${avClass(s.full_name)}`} style={{ width: 44, height: 44, fontSize: 14 }}>
+            {initials(s.full_name)}
+          </span>
+          <div className="who" style={{ flex: 1, minWidth: 0 }}>
+            <div className="nm" style={{ fontWeight: 600, fontSize: 15, textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>{s.full_name}</div>
+            <div className="ph mono" style={{ fontSize: 11, marginTop: 2 }}>
+              {s.username
+                ? <span style={{ color: 'var(--brand)' }}>@{s.username}</span>
+                : <span style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>no username</span>
+              }
+            </div>
           </div>
         </div>
-        <Badge color={roleColor}>{roleLabel}</Badge>
+        
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4, position: 'relative' }}>
+          <Badge color={roleColor}>{roleLabel}</Badge>
+          
+          <div style={{ position: 'relative' }}>
+            <button 
+              className="icon-btn" 
+              style={{ width: 28, height: 28, borderRadius: '50%', border: 'none', background: 'none' }}
+              onClick={() => setMenuOpen(!menuOpen)}
+              title="More actions"
+            >
+              <Icon name="moreV" size={16} />
+            </button>
+            
+            {menuOpen && (
+              <>
+                <div 
+                  style={{ position: 'fixed', inset: 0, zIndex: 998 }} 
+                  onClick={() => setMenuOpen(false)} 
+                />
+                <div style={{
+                  position: 'absolute',
+                  right: 0,
+                  top: '100%',
+                  marginTop: 4,
+                  background: 'var(--bg-elev)',
+                  border: '1px solid var(--border)',
+                  borderRadius: 10,
+                  boxShadow: '0 8px 24px rgba(0, 0, 0, 0.12)',
+                  zIndex: 999,
+                  minWidth: 160,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  overflow: 'hidden',
+                  padding: '4px 0'
+                }}>
+                  <button 
+                    className="menu-item-btn"
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 8, width: '100%', border: 'none',
+                      background: 'none', padding: '8px 12px', fontSize: 13, cursor: 'pointer',
+                      textAlign: 'left', color: 'var(--text)', transition: 'background 0.2s'
+                    }}
+                    onClick={() => { setMenuOpen(false); onEdit(); }}
+                    onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-muted)')}
+                    onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+                  >
+                    <Icon name="edit" size={13} />
+                    Edit Details
+                  </button>
+                  <button 
+                    className="menu-item-btn"
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 8, width: '100%', border: 'none',
+                      background: 'none', padding: '8px 12px', fontSize: 13, cursor: 'pointer',
+                      textAlign: 'left', color: 'var(--text)', transition: 'background 0.2s'
+                    }}
+                    onClick={() => { setMenuOpen(false); onViewCreds(); }}
+                    onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-muted)')}
+                    onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+                  >
+                    <Icon name="key" size={13} />
+                    Credentials
+                  </button>
+                  <div style={{ borderTop: '1px solid var(--border)', margin: '4px 0' }} />
+                  <button 
+                    className="menu-item-btn"
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 8, width: '100%', border: 'none',
+                      background: 'none', padding: '8px 12px', fontSize: 13, cursor: 'pointer',
+                      textAlign: 'left', color: 'var(--red)', transition: 'background 0.2s'
+                    }}
+                    onClick={() => { setMenuOpen(false); onDelete(); }}
+                    onMouseEnter={e => (e.currentTarget.style.background = 'var(--red-50)')}
+                    onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+                  >
+                    <Icon name="trash" size={13} style={{ color: 'var(--red)' }} />
+                    Remove Staff
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
       </div>
 
-      <div className="row gap-sm" style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
-        <Icon name="pin" size={13} />
-        <span style={{
-          textOverflow: 'ellipsis',
-          overflow: 'hidden',
-          whiteSpace: 'nowrap',
-          maxWidth: 180
-        }} title={s.areas && s.areas.length > 0 ? s.areas.map(a => a.name).join(', ') : (s.area?.name ?? 'No area assigned')}>
-          {s.areas && s.areas.length > 0
-            ? s.areas.map(a => a.name).join(', ')
-            : (s.area?.name ?? 'No area assigned')
-          }
-        </span>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, margin: '8px 0 12px 0' }}>
+        <div className="row gap-sm" style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+          <Icon name="pin" size={13} />
+          <span style={{
+            textOverflow: 'ellipsis',
+            overflow: 'hidden',
+            whiteSpace: 'nowrap',
+            flex: 1
+          }} title={s.areas && s.areas.length > 0 ? s.areas.map(a => a.name).join(', ') : (s.area?.name ?? 'No area assigned')}>
+            {s.areas && s.areas.length > 0
+              ? s.areas.map(a => a.name).join(', ')
+              : (s.area?.name ?? 'No area assigned')
+            }
+          </span>
+        </div>
         {s.phone && (
-          <>
-            <span style={{ margin: '0 4px' }}>·</span>
+          <div className="row gap-sm" style={{ fontSize: 12, color: 'var(--text-muted)' }}>
             <Icon name="phone" size={13} />
-            <span className="mono">{s.phone}</span>
-          </>
+            <span className="mono" style={{ flex: 1 }}>{s.phone}</span>
+          </div>
         )}
       </div>
 
-      <div className="foot" style={{ marginTop: 12 }}>
+      <div className="foot" style={{ 
+        display: 'flex', 
+        alignItems: 'center', 
+        justifyContent: 'space-between', 
+        gap: 12, 
+        paddingTop: 12, 
+        borderTop: '1px solid var(--border)',
+        marginTop: 'auto'
+      }}>
         <div className="row gap-sm">
           <Switch on={s.is_active} onChange={onToggleActive} />
-          <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+          <span style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 500 }}>
             {s.is_active ? 'Active' : 'Inactive'}
           </span>
         </div>
-        <div className="row gap-sm" style={{ flexWrap: 'wrap' }}>
-          {s.role !== 'admin' && (
-            <button className="btn btn-secondary btn-sm" onClick={onViewActivity}>
-              <Icon name="chart" size={12} />Activity
-            </button>
-          )}
-          <button className="btn btn-secondary btn-sm" onClick={onViewCreds}>
-            <Icon name="key" size={12} />Credentials
-          </button>
-          <button className="icon-btn" style={{ width: 32, height: 32 }} onClick={onEdit}>
-            <Icon name="edit" size={14} />
-          </button>
-          <button
-            className="icon-btn"
-            style={{ width: 32, height: 32 }}
-            onClick={onDelete}
-            title="Remove staff member"
-            onMouseEnter={e => {
-              (e.currentTarget as HTMLButtonElement).style.background = 'var(--red-50)';
-              (e.currentTarget as HTMLButtonElement).style.color = 'var(--red)';
-              (e.currentTarget as HTMLButtonElement).style.borderColor = 'color-mix(in srgb, var(--red) 30%, transparent)';
-            }}
-            onMouseLeave={e => {
-              (e.currentTarget as HTMLButtonElement).style.background = '';
-              (e.currentTarget as HTMLButtonElement).style.color = '';
-              (e.currentTarget as HTMLButtonElement).style.borderColor = '';
-            }}
+        {s.role !== 'admin' && (
+          <button 
+            className="btn btn-secondary btn-sm" 
+            onClick={onViewActivity}
+            style={{ padding: '6px 12px', borderRadius: 8, display: 'flex', alignItems: 'center', gap: 6 }}
           >
-            <Icon name="trash" size={14} />
+            <Icon name="chart" size={12} />Activity
           </button>
-        </div>
+        )}
       </div>
     </div>
   );
@@ -945,6 +1019,7 @@ export default function StaffPage() {
   const { staff: currentStaff } = useAuth();
   const [staff, setStaff]             = useState<StaffWithArea[]>([]);
   const [areas, setAreas]             = useState<Area[]>([]);
+  const [teams, setTeams]             = useState<TeamWithMembers[]>([]);
   const [loading, setLoading]         = useState(true);
   const [error, setError]             = useState<string | null>(null);
   const [addOpen, setAddOpen]           = useState(false);
@@ -952,10 +1027,15 @@ export default function StaffPage() {
   const [credsTarget, setCredsTarget]   = useState<StaffWithArea | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<StaffWithArea | null>(null);
   const [activityTarget, setActivityTarget] = useState<StaffWithArea | null>(null);
+  const [activePageTab, setActivePageTab]   = useState<'members' | 'teams'>('members');
+  const [teamAddOpen, setTeamAddOpen]       = useState(false);
+  const [teamEditTarget, setTeamEditTarget] = useState<TeamWithMembers | null>(null);
+  const [teamDeleteTarget, setTeamDeleteTarget] = useState<TeamWithMembers | null>(null);
+  const [selectedRoleFilter, setSelectedRoleFilter] = useState<string>('all');
 
   useEffect(() => {
-    Promise.all([getStaff(), getAreas()])
-      .then(([s, a]) => { setStaff(s); setAreas(a); })
+    Promise.all([getStaff(), getAreas(), getTeams()])
+      .then(([s, a, t]) => { setStaff(s); setAreas(a); setTeams(t); })
       .catch((e: unknown) => setError(e instanceof Error ? e.message : 'Could not load staff'))
       .finally(() => setLoading(false));
   }, []);
@@ -1030,15 +1110,19 @@ export default function StaffPage() {
   const agents      = byRole('recovery_agent');
   const helpers     = byRole('helper');
 
-  const SectionHeader = ({ label, count, color }: { label: string; count: number; color: string }) =>
-    count > 0 ? (
-      <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em',
-                    color: 'var(--text-muted)', marginBottom: 10, marginTop: 20, display: 'flex',
-                    alignItems: 'center', gap: 8 }}>
-        <span style={{ width: 8, height: 8, borderRadius: '50%', background: color, display: 'inline-block' }} />
-        {label} · {count}
-      </div>
-    ) : null;
+  const roleFilters = [
+    { value: 'all', label: 'All', count: visibleStaff.length },
+    { value: 'dashboard', label: 'Dashboard Users', count: dashUsers.length, color: 'var(--purple)' },
+    { value: 'technician', label: 'Technicians', count: technicians.length, color: 'var(--blue)' },
+    { value: 'recovery_agent', label: 'Recovery Agents', count: agents.length, color: 'var(--amber)' },
+    { value: 'helper', label: 'Helpers', count: helpers.length, color: 'var(--green)' }
+  ];
+
+  const filteredStaff = visibleStaff.filter(s => {
+    if (selectedRoleFilter === 'all') return true;
+    if (selectedRoleFilter === 'dashboard') return DASHBOARD_ROLES.has(s.role);
+    return s.role === selectedRoleFilter;
+  });
 
   return (
     <div className="page">
@@ -1046,64 +1130,154 @@ export default function StaffPage() {
         <div>
           <h1>Staff Management</h1>
           <p>
-            {visibleStaff.length} total · {dashUsers.length} dashboard · {technicians.length} technicians · {agents.length} recovery agents
-            {helpers.length > 0 ? ` · ${helpers.length} helpers` : ''}
+            {activePageTab === 'members' ? (
+              <>
+                {visibleStaff.length} total · {dashUsers.length} dashboard · {technicians.length} technicians · {agents.length} recovery agents
+                {helpers.length > 0 ? ` · ${helpers.length} helpers` : ''}
+              </>
+            ) : (
+              <>{teams.length} teams configured</>
+            )}
           </p>
         </div>
         <div className="row gap-sm">
-          <button className="btn btn-primary" onClick={() => setAddOpen(true)}>
-            <Icon name="plus" size={14} />Add Staff
-          </button>
+          {activePageTab === 'members' ? (
+            <button className="btn btn-primary" onClick={() => setAddOpen(true)}>
+              <Icon name="plus" size={14} />Add Staff
+            </button>
+          ) : (
+            <button className="btn btn-primary" onClick={() => setTeamAddOpen(true)}>
+              <Icon name="plus" size={14} />Add Team
+            </button>
+          )}
         </div>
       </div>
 
-      <SectionHeader label="Dashboard Users" count={dashUsers.length} color="var(--purple)" />
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 14, marginBottom: 4 }}>
-        {dashUsers.map(s => (
-          <StaffCard key={s.id} s={s}
-            onEdit={() => setEditTarget(s)}
-            onViewCreds={() => setCredsTarget(s)}
-            onToggleActive={v => handleToggleActive(s, v)}
-            onDelete={() => setDeleteTarget(s)}
-            onViewActivity={() => setActivityTarget(s)} />
-        ))}
+      <div style={{ marginBottom: 20 }}>
+        <Tabs
+          value={activePageTab}
+          onChange={(val) => setActivePageTab(val as 'members' | 'teams')}
+          items={[
+            { value: 'members', label: 'Staff Members', count: visibleStaff.length },
+            { value: 'teams', label: 'Teams', count: teams.length }
+          ]}
+        />
       </div>
 
-      <SectionHeader label="Technicians"       count={technicians.length} color="var(--blue)" />
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 14, marginBottom: 4 }}>
-        {technicians.map(s => (
-          <StaffCard key={s.id} s={s}
-            onEdit={() => setEditTarget(s)}
-            onViewCreds={() => setCredsTarget(s)}
-            onToggleActive={v => handleToggleActive(s, v)}
-            onDelete={() => setDeleteTarget(s)}
-            onViewActivity={() => setActivityTarget(s)} />
-        ))}
-      </div>
+      {activePageTab === 'teams' ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 14 }}>
+            {teams.map(t => (
+              <div className="card staff-card lift" key={t.id} style={{ display: 'flex', flexDirection: 'column', padding: 16 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                  <div>
+                    <h3 style={{ fontSize: 16, fontWeight: 600, margin: 0 }}>{t.name}</h3>
+                    <span className="muted" style={{ fontSize: 12 }}>{t.members.length} members</span>
+                  </div>
+                  <div className="row gap-xs">
+                    <button className="icon-btn" onClick={() => setTeamEditTarget(t)}>
+                      <Icon name="edit" size={14} />
+                    </button>
+                    <button className="icon-btn" onClick={() => setTeamDeleteTarget(t)}
+                      onMouseEnter={e => {
+                        (e.currentTarget as HTMLButtonElement).style.background = 'var(--red-50)';
+                        (e.currentTarget as HTMLButtonElement).style.color = 'var(--red)';
+                        (e.currentTarget as HTMLButtonElement).style.borderColor = 'color-mix(in srgb, var(--red) 30%, transparent)';
+                      }}
+                      onMouseLeave={e => {
+                        (e.currentTarget as HTMLButtonElement).style.background = '';
+                        (e.currentTarget as HTMLButtonElement).style.color = '';
+                        (e.currentTarget as HTMLButtonElement).style.borderColor = '';
+                      }}>
+                      <Icon name="trash" size={14} />
+                    </button>
+                  </div>
+                </div>
 
-      <SectionHeader label="Recovery Agents"   count={agents.length}     color="var(--amber)" />
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 14, marginBottom: 4 }}>
-        {agents.map(s => (
-          <StaffCard key={s.id} s={s}
-            onEdit={() => setEditTarget(s)}
-            onViewCreds={() => setCredsTarget(s)}
-            onToggleActive={v => handleToggleActive(s, v)}
-            onDelete={() => setDeleteTarget(s)}
-            onViewActivity={() => setActivityTarget(s)} />
-        ))}
-      </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, borderTop: '1px solid var(--border)', paddingTop: 10 }}>
+                  {t.members.length === 0 ? (
+                    <span className="muted" style={{ fontSize: 12, fontStyle: 'italic' }}>No members in this team</span>
+                  ) : (
+                    t.members.map(m => {
+                      if (!m.staff) return null;
+                      return (
+                        <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <span className={`av ${avClass(m.staff.full_name)}`} style={{ width: 26, height: 26, fontSize: 11 }}>
+                            {initials(m.staff.full_name)}
+                          </span>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: 13, fontWeight: 500, textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>{m.staff.full_name}</div>
+                          </div>
+                          <Badge color={ROLE_COLORS[m.staff.role] ?? 'gray'}>
+                            {ROLE_LABELS[m.staff.role] ?? m.staff.role}
+                          </Badge>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
 
-      <SectionHeader label="Helpers" count={helpers.length} color="var(--green)" />
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 14 }}>
-        {helpers.map(s => (
-          <StaffCard key={s.id} s={s}
-            onEdit={() => setEditTarget(s)}
-            onViewCreds={() => setCredsTarget(s)}
-            onToggleActive={v => handleToggleActive(s, v)}
-            onDelete={() => setDeleteTarget(s)}
-            onViewActivity={() => setActivityTarget(s)} />
-        ))}
-      </div>
+          {teams.length === 0 && (
+            <div className="card" style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)' }}>
+              <Icon name="users" size={28} style={{ color: 'var(--text-faint)', marginBottom: 12 }} />
+              <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text)', marginBottom: 4 }}>No teams yet</div>
+              <div style={{ fontSize: 13 }}>Click Add Team to create a new team of staff.</div>
+            </div>
+          )}
+        </div>
+      ) : (
+        <>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 18, flexWrap: 'wrap', alignItems: 'center' }}>
+            {roleFilters.map(filter => {
+              const isActive = selectedRoleFilter === filter.value;
+              return (
+                <button
+                  key={filter.value}
+                  className={`btn ${isActive ? 'btn-primary' : 'btn-secondary'} btn-sm`}
+                  style={{
+                    borderRadius: 20,
+                    padding: '6px 14px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    fontSize: 12,
+                    fontWeight: 600,
+                    border: '1px solid var(--border)',
+                    boxShadow: isActive ? '0 2px 8px rgba(240, 90, 43, 0.2)' : 'none'
+                  }}
+                  onClick={() => setSelectedRoleFilter(filter.value)}
+                >
+                  {filter.color && (
+                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: filter.color }} />
+                  )}
+                  {filter.label}
+                  <span style={{ 
+                    fontSize: 10, 
+                    background: isActive ? 'rgba(255,255,255,0.2)' : 'var(--bg-muted)', 
+                    padding: '1px 6px', 
+                    borderRadius: 10,
+                    color: isActive ? 'white' : 'var(--text-muted)'
+                  }}>{filter.count}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 14 }}>
+            {filteredStaff.map(s => (
+              <StaffCard key={s.id} s={s}
+                onEdit={() => setEditTarget(s)}
+                onViewCreds={() => setCredsTarget(s)}
+                onToggleActive={v => handleToggleActive(s, v)}
+                onDelete={() => setDeleteTarget(s)}
+                onViewActivity={() => setActivityTarget(s)} />
+            ))}
+          </div>
+        </>
+      )}
 
       {visibleStaff.length === 0 && (
         <div className="card" style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)' }}>
@@ -1142,6 +1316,294 @@ export default function StaffPage() {
           onClose={() => setActivityTarget(null)}
         />
       )}
+
+      {teamAddOpen && (
+        <TeamFormModal
+          open
+          onClose={() => setTeamAddOpen(false)}
+          staff={visibleStaff}
+          onSaved={(newTeam) => {
+            setTeams(prev => [...prev, newTeam]);
+            setTeamAddOpen(false);
+          }}
+        />
+      )}
+
+      {teamEditTarget && (
+        <TeamFormModal
+          open
+          onClose={() => setTeamEditTarget(null)}
+          staff={visibleStaff}
+          editTarget={teamEditTarget}
+          onSaved={(updatedTeam) => {
+            setTeams(prev => prev.map(t => t.id === updatedTeam.id ? updatedTeam : t));
+            setTeamEditTarget(null);
+          }}
+        />
+      )}
+
+      {teamDeleteTarget && (
+        <TeamDeleteConfirmModal
+          open
+          onClose={() => setTeamDeleteTarget(null)}
+          team={teamDeleteTarget}
+          onConfirm={async () => {
+            await deleteTeam(teamDeleteTarget.id);
+            setTeams(prev => prev.filter(t => t.id !== teamDeleteTarget.id));
+            setTeamDeleteTarget(null);
+          }}
+        />
+      )}
     </div>
+  );
+}
+
+// ── Team Form Modal ────────────────────────────────────────────────────────────
+
+function TeamFormModal({ open, onClose, staff, onSaved, editTarget }: {
+  open: boolean;
+  onClose: () => void;
+  staff: StaffWithArea[];
+  onSaved: (t: TeamWithMembers) => void;
+  editTarget?: TeamWithMembers | null;
+}) {
+  const [name, setName] = useState(editTarget?.name ?? '');
+  const [selectedStaffIds, setSelectedStaffIds] = useState<string[]>(
+    editTarget?.members.map(m => m.staff_id) ?? []
+  );
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const handleSubmit = async () => {
+    if (!name.trim()) { setError('Team name required'); return; }
+    setSaving(true);
+    setError(null);
+    try {
+      let saved: Team;
+      if (editTarget) {
+        saved = await updateTeam(editTarget.id, name.trim());
+      } else {
+        saved = await createTeam(name.trim());
+      }
+      await updateTeamMembers(saved.id, selectedStaffIds);
+      
+      const members = selectedStaffIds.map(staffId => {
+        const s = staff.find(x => x.id === staffId)!;
+        return {
+          id: '', // dummy
+          team_id: saved.id,
+          staff_id: staffId,
+          created_at: new Date().toISOString(),
+          staff: {
+            id: s.id,
+            full_name: s.full_name,
+            role: s.role,
+            phone: s.phone
+          }
+        };
+      });
+      onSaved({ ...saved, members });
+      onClose();
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Save failed');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const filterBySearch = (list: StaffWithArea[]) => {
+    if (!searchQuery.trim()) return list;
+    const q = searchQuery.toLowerCase();
+    return list.filter(s => 
+      s.full_name.toLowerCase().includes(q) || 
+      (s.username && s.username.toLowerCase().includes(q))
+    );
+  };
+
+  const technicians = filterBySearch(staff.filter(s => s.role === 'technician'));
+  const helpers = filterBySearch(staff.filter(s => s.role === 'helper'));
+  const recoveryAgents = filterBySearch(staff.filter(s => s.role === 'recovery_agent'));
+  const complaintManagers = filterBySearch(staff.filter(s => s.role === 'complaint_manager'));
+
+  const renderStaffSection = (title: string, list: StaffWithArea[], color: string) => {
+    if (list.length === 0) return null;
+    return (
+      <div style={{ marginBottom: 16 }}>
+        <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={{ width: 6, height: 6, borderRadius: '50%', background: color }} />
+          {title}
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+          {list.map(s => {
+            const isChecked = selectedStaffIds.includes(s.id);
+            return (
+              <label key={s.id} className="card lift" style={{
+                display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px',
+                borderRadius: 10, cursor: 'pointer', 
+                border: isChecked ? '1px solid var(--color-primary)' : '1px solid var(--border)',
+                background: isChecked ? 'var(--bg-muted)' : 'none',
+                transition: 'all 0.2s',
+                userSelect: 'none'
+              }}>
+                <div style={{
+                  width: 18, height: 18, borderRadius: '50%',
+                  border: isChecked ? '2px solid var(--color-primary)' : '2px solid var(--text-faint)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  background: isChecked ? 'var(--color-primary)' : 'none',
+                  transition: 'all 0.15s'
+                }}>
+                  {isChecked && <Icon name="check" size={10} style={{ color: 'white' }} />}
+                </div>
+                
+                <input type="checkbox" checked={isChecked} style={{ display: 'none' }} onChange={(e) => {
+                  if (e.target.checked) {
+                    setSelectedStaffIds(prev => [...prev, s.id]);
+                  } else {
+                    setSelectedStaffIds(prev => prev.filter(id => id !== s.id));
+                  }
+                }} />
+                
+                <span className={`av ${avClass(s.full_name)}`} style={{ width: 26, height: 26, fontSize: 11 }}>
+                  {initials(s.full_name)}
+                </span>
+                <span style={{ fontSize: 13, fontWeight: 500, flex: 1, textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }} title={s.full_name}>
+                  {s.full_name}
+                </span>
+              </label>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <Modal open={open} onClose={onClose} width={500}>
+      <div className="modal-head">
+        <div>
+          <div style={{ fontSize: 17, fontWeight: 600 }}>
+            {editTarget ? 'Edit Team' : 'Create Team'}
+          </div>
+          <div className="muted" style={{ fontSize: 12, marginTop: 2 }}>
+            {editTarget ? `Editing ${editTarget.name}` : 'Group multiple staff members into a team'}
+          </div>
+        </div>
+        <button className="icon-btn" onClick={onClose}><Icon name="close" size={16} /></button>
+      </div>
+
+      <div className="modal-body">
+        {error && (
+          <div style={{ padding: '10px 14px', background: '#fef2f2', color: '#dc2626',
+                        borderRadius: 8, marginBottom: 14, fontSize: 13 }}>
+            {error}
+          </div>
+        )}
+
+        <div className="field" style={{ marginBottom: 16 }}>
+          <label>Team Name *</label>
+          <input className="input" placeholder="e.g. Mukhtar Team, DHA North Team"
+            value={name} onChange={e => setName(e.target.value)} />
+        </div>
+
+        <div className="field" style={{ marginBottom: 16 }}>
+          <label>Search Members</label>
+          <input className="input" placeholder="Filter staff by name or username..."
+            value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
+        </div>
+
+        <div style={{ borderTop: '1px solid var(--border)', paddingTop: 14 }}>
+          <label style={{ fontSize: 13, fontWeight: 600, display: 'block', marginBottom: 10 }}>Select Team Members</label>
+          <div style={{ maxHeight: 300, overflowY: 'auto', paddingRight: 4 }}>
+            {renderStaffSection('Technicians', technicians, 'var(--blue)')}
+            {renderStaffSection('Helpers', helpers, 'var(--green)')}
+            {renderStaffSection('Recovery Agents', recoveryAgents, 'var(--amber)')}
+            {renderStaffSection('Complaint Managers', complaintManagers, 'var(--purple)')}
+          </div>
+        </div>
+      </div>
+
+      <div className="modal-foot">
+        <button className="btn btn-ghost" onClick={onClose}>Cancel</button>
+        <button className="btn btn-primary" onClick={handleSubmit} disabled={saving}>
+          <Icon name="check" size={14} />
+          {saving ? 'Saving…' : editTarget ? 'Save Changes' : 'Create Team'}
+        </button>
+      </div>
+    </Modal>
+  );
+}
+
+// ── Team Delete Confirm Modal ──────────────────────────────────────────────────
+
+function TeamDeleteConfirmModal({ open, onClose, team, onConfirm }: {
+  open: boolean;
+  onClose: () => void;
+  team: TeamWithMembers | null;
+  onConfirm: () => Promise<void>;
+}) {
+  const [deleting, setDeleting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleConfirm = async () => {
+    if (!team) return;
+    setDeleting(true);
+    setError(null);
+    try {
+      await onConfirm();
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Delete failed');
+      setDeleting(false);
+    }
+  };
+
+  return (
+    <Modal open={open} onClose={onClose} width={420}>
+      <div className="modal-head">
+        <div>
+          <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--red)' }}>Delete Team</div>
+          <div className="muted" style={{ fontSize: 12, marginTop: 2 }}>This action cannot be undone</div>
+        </div>
+        <button className="icon-btn" onClick={onClose}><Icon name="close" size={16} /></button>
+      </div>
+
+      <div className="modal-body">
+        <div style={{
+          padding: '12px 14px', borderRadius: 10,
+          background: 'var(--bg-muted)', border: '1px solid var(--border)',
+          marginBottom: 16, fontSize: 14
+        }}>
+          Are you sure you want to delete <strong>{team?.name}</strong>?
+          <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>
+            This team has {team?.members.length ?? 0} members. This will not delete the staff members themselves.
+          </div>
+        </div>
+
+        {error && (
+          <div style={{ padding: '10px 14px', background: '#fef2f2', color: '#dc2626',
+                        borderRadius: 8, fontSize: 13 }}>
+            {error}
+          </div>
+        )}
+      </div>
+
+      <div className="modal-foot">
+        <button className="btn btn-ghost" onClick={onClose} disabled={deleting}>Cancel</button>
+        <button
+          className="btn"
+          style={{
+            background: deleting ? 'color-mix(in srgb, var(--red) 50%, transparent)' : 'var(--red)',
+            color: '#fff',
+            borderColor: 'transparent',
+            opacity: deleting ? 0.8 : 1,
+          }}
+          onClick={handleConfirm}
+          disabled={deleting}
+        >
+          <Icon name="trash" size={13} />
+          {deleting ? 'Deleting…' : 'Delete Team'}
+        </button>
+      </div>
+    </Modal>
   );
 }
