@@ -20,8 +20,9 @@ function remainingAmount(bill: Pick<BillWithRelations, 'amount' | 'paid_amount'>
   return Math.max(bill.amount - (bill.paid_amount ?? 0), 0);
 }
 
-function statusColor(status: string): 'green' | 'red' | 'amber' {
+function statusColor(status: string, hasPartial = false): 'green' | 'red' | 'amber' | 'purple' {
   if (status === 'paid') return 'green';
+  if (hasPartial) return 'purple';
   if (status === 'overdue') return 'red';
   return 'amber';
 }
@@ -381,7 +382,7 @@ export default function BillingPage({ refreshToken = 0, focusBillId = null, focu
                       <td className="num" style={{ fontWeight: 600 }}>{fmt(b.amount)}</td>
                       <td className="num" style={{ color: 'var(--green)' }}>{fmt(b.paid_amount ?? 0)}</td>
                       <td className="num" style={{ color: remainingAmount(b) > 0 ? 'var(--amber)' : 'var(--green)' }}>{fmt(remainingAmount(b))}</td>
-                      <td><Badge color={statusColor(b.status)} dot>{b.status}</Badge></td>
+                      <td><Badge color={statusColor(b.status, (b.paid_amount ?? 0) > 0)} dot>{b.status !== 'paid' && (b.paid_amount ?? 0) > 0 ? 'partial' : b.status}</Badge></td>
                       <td className="mono" style={{ fontSize: 11 }}>{b.receipt_no ?? '-'}</td>
                       <td style={{ textAlign: 'right' }}>
                         <div className="row gap-sm" style={{ justifyContent: 'flex-end' }}>
@@ -443,7 +444,7 @@ export default function BillingPage({ refreshToken = 0, focusBillId = null, focu
                 <div style={{ fontWeight: 700, fontSize: 16 }}>Bill Details</div>
                 <div className="muted" style={{ fontSize: 12 }}>#{detailBill.id.slice(0, 8).toUpperCase()}</div>
               </div>
-              <Badge color={statusColor(detailBill.status)} dot>{detailBill.status}</Badge>
+              <Badge color={statusColor(detailBill.status, (detailBill.paid_amount ?? 0) > 0)} dot>{detailBill.status !== 'paid' && (detailBill.paid_amount ?? 0) > 0 ? 'partial' : detailBill.status}</Badge>
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 20 }}>
@@ -481,12 +482,26 @@ export default function BillingPage({ refreshToken = 0, focusBillId = null, focu
                   <div className="mono" style={{ fontWeight: 600, fontSize: 13, marginTop: 4 }}>{detailBill.receipt_no}</div>
                 </div>
               )}
-              {detailBill.paid_at && (
-                <div className="card card-pad" style={{ padding: '10px 14px' }}>
-                  <div className="muted" style={{ fontSize: 11, textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.05em' }}>Paid At</div>
-                  <div style={{ fontWeight: 600, fontSize: 13, marginTop: 4 }}>{new Date(detailBill.paid_at).toLocaleString()}</div>
-                </div>
-              )}
+              {detailBill.paid_at && (() => {
+                const paidAtDate = new Date(detailBill.paid_at);
+                const formattedDate = paidAtDate.toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' });
+                const formattedTime = paidAtDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+                return (
+                  <div className="card card-pad" style={{ padding: '10px 14px' }}>
+                    <div className="muted" style={{ fontSize: 11, textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.05em', marginBottom: 8 }}>Paid At</div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                      <div className="card" style={{ padding: '10px 14px', background: 'var(--bg-muted)' }}>
+                        <div className="muted" style={{ fontSize: 11, textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.05em' }}>Date</div>
+                        <div style={{ fontWeight: 600, fontSize: 13, marginTop: 4 }}>{formattedDate}</div>
+                      </div>
+                      <div className="card" style={{ padding: '10px 14px', background: 'var(--bg-muted)' }}>
+                        <div className="muted" style={{ fontSize: 11, textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.05em' }}>Time</div>
+                        <div style={{ fontWeight: 600, fontSize: 13, marginTop: 4 }}>{formattedTime}</div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
               {(detailBill.payment_method || detailBill.collector) && (
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                   {detailBill.payment_method && (
