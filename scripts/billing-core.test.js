@@ -58,6 +58,22 @@ assert.strictEqual(core.getBillCollectionStatus({ amount: 1700, paid_amount: 0, 
 assert.strictEqual(core.getBillCollectionStatus({ amount: 1700, paid_amount: 700, status: 'pending' }), 'partial')
 assert.strictEqual(core.getBillCollectionStatus({ amount: 1700, paid_amount: 1700, status: 'pending' }), 'paid')
 assert.strictEqual(core.getBillCollectionStatus({ amount: 1700, paid_amount: 0, status: 'overdue' }), 'overdue')
+assert.strictEqual(
+  core.getCustomerLedgerCollectionStatus([
+    { amount: 2200, paid_amount: 2200, status: 'paid' },
+    { amount: 2200, paid_amount: 0, status: 'pending' },
+    { amount: 2200, paid_amount: 0, status: 'pending' },
+  ]),
+  'partial'
+)
+assert.deepStrictEqual(
+  core.getLedgerPartialCustomerIds([
+    { customer_id: 'c1', amount: 2200, paid_amount: 2200, status: 'paid' },
+    { customer_id: 'c1', amount: 2200, paid_amount: 0, status: 'pending' },
+    { customer_id: 'c2', amount: 2200, paid_amount: 0, status: 'pending' },
+  ]),
+  ['c1']
+)
 assert.strictEqual(core.getPaymentSourceLabel('office'), 'Paid in Office')
 assert.strictEqual(core.getPaymentSourceLabel('agent'), 'Collected by Agent')
 

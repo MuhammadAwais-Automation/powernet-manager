@@ -48,7 +48,22 @@ function statusColor(status: string): "green" | "red" | "amber" | "purple" {
 
 function statusLabel(
   bill: Pick<BillWithRelations, "amount" | "paid_amount" | "status">,
+  balance?: Pick<CustomerBalanceSummary, "totalPaid" | "totalOutstanding"> | null,
 ): string {
+  const paid = bill.paid_amount ?? 0;
+  const isOpen = bill.status !== "paid" && paid < bill.amount;
+  const ledgerStatus = (
+    bill as Pick<BillWithRelations, "amount" | "paid_amount" | "status"> & {
+      ledger_collection_status?: string;
+    }
+  ).ledger_collection_status;
+  if (
+    isOpen &&
+    (ledgerStatus === "partial" ||
+      ((balance?.totalPaid ?? 0) > 0 && (balance?.totalOutstanding ?? 0) > 0))
+  ) {
+    return "partial";
+  }
   const status = getBillCollectionStatus(bill);
   return status === "partial" ? "partial" : bill.status;
 }
@@ -1024,8 +1039,8 @@ export default function BillingPage({
                   #{detailBill.id.slice(0, 8).toUpperCase()}
                 </div>
               </div>
-              <Badge color={statusColor(statusLabel(detailBill))} dot>
-                {statusLabel(detailBill)}
+              <Badge color={statusColor(statusLabel(detailBill, detailBalance))} dot>
+                {statusLabel(detailBill, detailBalance)}
               </Badge>
             </div>
 
@@ -1460,8 +1475,11 @@ export default function BillingPage({
                     currentDue: remainingAmount(b),
                     previousDue: 0,
                     totalOutstanding: remainingAmount(b),
+                    totalPaid: b.paid_amount ?? 0,
+                    openBillCount: remainingAmount(b) > 0 ? 1 : 0,
+                    currentBillId: b.id,
                   };
-                  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Receipt ${b.receipt_no ?? b.id.slice(0, 8)}</title><style>body{font-family:sans-serif;padding:32px;max-width:400px;margin:auto}h2{margin-bottom:4px}p{margin:4px 0;font-size:14px}.row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #eee}.label{color:#888;font-size:12px}</style></head><body><h2>Payment Receipt</h2><p class="label">#${(b.receipt_no ?? b.id.slice(0, 8)).toUpperCase()}</p><div class="row"><span class="label">Customer</span><span>${b.customer?.full_name ?? "-"} (${b.customer?.customer_code ?? ""})</span></div><div class="row"><span class="label">Month</span><span>${b.month}</span></div><div class="row"><span class="label">Current Month</span><span>Rs. ${balance.currentDue.toLocaleString()}</span></div><div class="row"><span class="label">Previous Months</span><span>Rs. ${balance.previousDue.toLocaleString()}</span></div><div class="row"><span class="label">Total Payable</span><span>Rs. ${balance.totalOutstanding.toLocaleString()}</span></div><div class="row"><span class="label">Paid This Bill</span><span>Rs. ${(b.paid_amount ?? 0).toLocaleString()}</span></div><div class="row"><span class="label">Status</span><span>${statusLabel(b)}</span></div>${b.payment_method ? `<div class="row"><span class="label">Method</span><span>${b.payment_method}</span></div>` : ""}${b.collector ? `<div class="row"><span class="label">Collected By</span><span>${b.collector.full_name}</span></div>` : ""}<script>window.onload=()=>window.print()</script></body></html>`;
+                  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Receipt ${b.receipt_no ?? b.id.slice(0, 8)}</title><style>body{font-family:sans-serif;padding:32px;max-width:400px;margin:auto}h2{margin-bottom:4px}p{margin:4px 0;font-size:14px}.row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #eee}.label{color:#888;font-size:12px}</style></head><body><h2>Payment Receipt</h2><p class="label">#${(b.receipt_no ?? b.id.slice(0, 8)).toUpperCase()}</p><div class="row"><span class="label">Customer</span><span>${b.customer?.full_name ?? "-"} (${b.customer?.customer_code ?? ""})</span></div><div class="row"><span class="label">Month</span><span>${b.month}</span></div><div class="row"><span class="label">Current Month</span><span>Rs. ${balance.currentDue.toLocaleString()}</span></div><div class="row"><span class="label">Previous Months</span><span>Rs. ${balance.previousDue.toLocaleString()}</span></div><div class="row"><span class="label">Total Payable</span><span>Rs. ${balance.totalOutstanding.toLocaleString()}</span></div><div class="row"><span class="label">Paid This Bill</span><span>Rs. ${(b.paid_amount ?? 0).toLocaleString()}</span></div><div class="row"><span class="label">Status</span><span>${statusLabel(b, balance)}</span></div>${b.payment_method ? `<div class="row"><span class="label">Method</span><span>${b.payment_method}</span></div>` : ""}${b.collector ? `<div class="row"><span class="label">Collected By</span><span>${b.collector.full_name}</span></div>` : ""}<script>window.onload=()=>window.print()</script></body></html>`;
                   const w = window.open("", "_blank");
                   if (w) {
                     w.document.write(html);

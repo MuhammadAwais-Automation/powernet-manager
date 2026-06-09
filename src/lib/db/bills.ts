@@ -3,7 +3,10 @@ import { withTimeout } from "@/lib/async/with-timeout";
 import {
   buildCustomerBalanceSummary,
   buildPaymentCollectionSummary,
+  getCustomerLedgerCollectionStatus,
+  getLedgerPartialCustomerIds,
   normalizeBillingMonth,
+  type DerivedBillCollectionStatus,
   type CustomerBalanceSummary,
 } from "@/lib/billing/core";
 import {
@@ -77,8 +80,12 @@ export type BillsPageParams = {
 };
 
 export type BillsPageResult = {
-  rows: BillWithRelations[];
+  rows: BillingBillRow[];
   total: number;
+};
+
+export type BillingBillRow = BillWithRelations & {
+  ledger_collection_status?: DerivedBillCollectionStatus;
 };
 
 export type PaymentEventWithRelations = Payment & {
@@ -233,7 +240,15 @@ export async function getBillsPage(
   ]);
 
   const customerIds = mergeCustomerIdFilters(searchIds, areaIds);
-  if (customerIds?.length === 0) {
+  const ledgerPartialCustomerIds =
+    params.status === "partial"
+      ? await findLedgerPartialCustomerIdsForMonth(params.month, customerIds)
+      : undefined;
+  const effectiveCustomerIds =
+    params.status === "partial"
+      ? mergeCustomerIdFilters(customerIds, ledgerPartialCustomerIds ?? [])
+      : customerIds;
+  if (effectiveCustomerIds?.length === 0) {
     const emptyResult = { rows: [], total: 0 };
     billsPageCache[key] = {
       data: emptyResult,
@@ -252,17 +267,21 @@ export async function getBillsPage(
 
     if (params.status === "unpaid") query = query.neq("status", "paid");
     else if (params.status === "partial")
-      query = query.neq("status", "paid").gt("paid_amount", 0);
+      query = query.neq("status", "paid");
     else if (params.status === "visited")
       query = query.eq("payment_method", "visit");
     else if (params.status) query = query.eq("status", params.status);
     if (params.source) query = query.eq("payment_source", params.source);
-    if (customerIds) query = query.in("customer_id", customerIds);
+    if (effectiveCustomerIds) query = query.in("customer_id", effectiveCustomerIds);
     return query;
   });
 
+  const rows = await annotateRowsWithLedgerStatuses(
+    (data ?? []) as unknown as BillWithRelations[],
+  );
+
   const result = {
-    rows: (data ?? []) as unknown as BillWithRelations[],
+    rows,
     total: count ?? 0,
   };
   billsPageCache[key] = { data: result, expiresAt: Date.now() + CACHE_MS };
@@ -429,12 +448,16 @@ export async function getBillingSummary(
     }>,
     month,
   );
+  const ledgerPartialBills = await countLedgerPartialBillsForMonth(
+    month,
+    areaCustomerIds,
+  );
   const summary: BillingSummary = {
     month,
     totalBills: totalRes.count ?? 0,
     paidBills: paidRes.count ?? 0,
     pendingBills: pendingRes.count ?? 0,
-    partialBills: partialRes.count ?? 0,
+    partialBills: ledgerPartialBills,
     unpaidBills: unpaidRes.count ?? 0,
     overdueBills: overdueRes.count ?? 0,
     visitedBills: visitedRes.count ?? 0,
@@ -681,6 +704,104 @@ function sumRemaining(rows: unknown): number {
       sum + Math.max(toNumber(bill.amount) - toNumber(bill.paid_amount), 0)
     );
   }, 0);
+}
+
+async function findLedgerPartialCustomerIdsForMonth(
+  month: string,
+  customerIds?: string[],
+): Promise<string[]> {
+  if (customerIds?.length === 0) return [];
+  let openQuery = supabase
+    .from("bills")
+    .select("customer_id")
+    .eq("month", month)
+    .neq("status", "paid");
+  if (customerIds) openQuery = openQuery.in("customer_id", customerIds);
+
+  const { data: openRows, error: openError } = await openQuery;
+  if (openError) throw openError;
+  const openCustomerIds = Array.from(
+    new Set((openRows ?? []).map((row) => row.customer_id).filter(Boolean)),
+  );
+  if (openCustomerIds.length === 0) return [];
+
+  const { data: ledgerRows, error: ledgerError } = await supabase
+    .from("bills")
+    .select("customer_id, amount, paid_amount, status")
+    .in("customer_id", openCustomerIds);
+  if (ledgerError) throw ledgerError;
+
+  return getLedgerPartialCustomerIds(
+    (ledgerRows ?? []) as Array<{
+      customer_id: string;
+      amount: number;
+      paid_amount: number | null;
+      status: "pending" | "paid" | "overdue";
+    }>,
+  );
+}
+
+async function countLedgerPartialBillsForMonth(
+  month: string,
+  customerIds?: string[],
+): Promise<number> {
+  const partialCustomerIds = await findLedgerPartialCustomerIdsForMonth(
+    month,
+    customerIds,
+  );
+  if (partialCustomerIds.length === 0) return 0;
+
+  const { count, error } = await supabase
+    .from("bills")
+    .select("id", { count: "exact", head: true })
+    .eq("month", month)
+    .neq("status", "paid")
+    .in("customer_id", partialCustomerIds);
+  if (error) throw error;
+  return count ?? 0;
+}
+
+async function annotateRowsWithLedgerStatuses(
+  rows: BillWithRelations[],
+): Promise<BillingBillRow[]> {
+  const customerIds = Array.from(
+    new Set(rows.map((row) => row.customer_id).filter(Boolean)),
+  );
+  if (customerIds.length === 0) return rows;
+
+  const { data, error } = await supabase
+    .from("bills")
+    .select("customer_id, amount, paid_amount, status")
+    .in("customer_id", customerIds);
+  if (error) throw error;
+
+  const byCustomer = new Map<
+    string,
+    Array<{
+      amount: number;
+      paid_amount: number | null;
+      status: "pending" | "paid" | "overdue";
+    }>
+  >();
+  ((data ?? []) as Array<{
+    customer_id: string;
+    amount: number;
+    paid_amount: number | null;
+    status: "pending" | "paid" | "overdue";
+  }>).forEach((bill) => {
+    const group = byCustomer.get(bill.customer_id) ?? [];
+    group.push(bill);
+    byCustomer.set(bill.customer_id, group);
+  });
+
+  return rows.map((row) => {
+    const customerBills = byCustomer.get(row.customer_id);
+    if (!customerBills) return row;
+    return {
+      ...row,
+      ledger_collection_status: getCustomerLedgerCollectionStatus(customerBills),
+    };
+  });
 }
 
 async function findAreaCustomerIds(

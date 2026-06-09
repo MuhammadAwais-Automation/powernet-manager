@@ -31,6 +31,10 @@ type PaymentCollectionSource = {
   collected_by?: string | null;
 };
 
+type CustomerLedgerBillSource = BillCollectionSource & {
+  customer_id: string;
+};
+
 export type PaymentSource =
   | "office"
   | "agent"
@@ -108,6 +112,43 @@ export function getBillCollectionStatus(
   if (paid > 0) return "partial";
   if (bill.status === "overdue") return "overdue";
   return "pending";
+}
+
+export function getCustomerLedgerCollectionStatus(
+  bills: BillCollectionSource[],
+): DerivedBillCollectionStatus {
+  let totalPaid = 0;
+  let totalOutstanding = 0;
+  let hasOverdue = false;
+
+  bills.forEach((bill) => {
+    const remaining = getBillRemaining(bill);
+    totalPaid += toNumber(bill.paid_amount);
+    if (bill.status !== "paid" && remaining > 0) {
+      totalOutstanding += remaining;
+      if (bill.status === "overdue") hasOverdue = true;
+    }
+  });
+
+  if (totalOutstanding <= 0) return "paid";
+  if (totalPaid > 0) return "partial";
+  if (hasOverdue) return "overdue";
+  return "pending";
+}
+
+export function getLedgerPartialCustomerIds(
+  bills: CustomerLedgerBillSource[],
+): string[] {
+  const grouped = new Map<string, CustomerLedgerBillSource[]>();
+  bills.forEach((bill) => {
+    const group = grouped.get(bill.customer_id) ?? [];
+    group.push(bill);
+    grouped.set(bill.customer_id, group);
+  });
+
+  return Array.from(grouped.entries())
+    .filter(([, customerBills]) => getCustomerLedgerCollectionStatus(customerBills) === "partial")
+    .map(([customerId]) => customerId);
 }
 
 export function getBillRemaining(
