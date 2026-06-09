@@ -1043,7 +1043,7 @@ export default function BillingPage({
         <Modal
           open={!!detailBill}
           onClose={() => setDetailBill(null)}
-          width={520}
+          width={800}
         >
           <div style={{ padding: "24px 28px" }}>
             <div
@@ -1069,215 +1069,221 @@ export default function BillingPage({
 
             <div
               style={{
-                display: "flex",
-                flexDirection: "column",
-                gap: 12,
+                display: "grid",
+                gridTemplateColumns: "1fr 1.1fr",
+                gap: 20,
                 marginBottom: 20,
               }}
             >
-              {/* Customer Info & Billing Month */}
-              <div className="bill-detail-grid-2">
-                <div className="bill-detail-card">
-                  <span className="label">Customer</span>
-                  <span className="value">{detailBill.customer?.full_name ?? "—"}</span>
-                  <span className="subtext mono">{getCustomerSecondaryId(detailBill.customer ?? {}) ?? ""}</span>
-                  {detailBill.customer?.address_value && (
-                    <span className="subtext">{detailBill.customer.address_value}</span>
-                  )}
-                </div>
-                <div className="bill-detail-card">
-                  <span className="label">Billing Month</span>
-                  <span className="value">{detailBill.month}</span>
-                </div>
-              </div>
-
-              {/* Amount, Paid, Remaining */}
-              <div className="bill-detail-grid-3">
-                <div className="bill-detail-card">
-                  <span className="label">Amount</span>
-                  <span className="value">{fmt(detailBill.amount)}</span>
-                </div>
-                <div className="bill-detail-card">
-                  <span className="label">Paid</span>
-                  <span className="value" style={{ color: "var(--green)" }}>{fmt(detailBill.paid_amount ?? 0)}</span>
-                </div>
-                <div className="bill-detail-card">
-                  <span className="label">Remaining</span>
-                  <span className="value" style={{ color: remainingAmount(detailBill) > 0 ? "var(--amber)" : "var(--green)" }}>
-                    {fmt(remainingAmount(detailBill))}
-                  </span>
-                </div>
-              </div>
-
-              {/* Ledger Balance Summary */}
-              {detailBalance && (
-                <div className="bill-detail-grid-4">
+              {/* Left Column: Customer details, Month, Amount Stats, Ledger */}
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                {/* Customer Info & Billing Month */}
+                <div className="bill-detail-grid-2">
                   <div className="bill-detail-card">
-                    <span className="label">Previous</span>
-                    <span className="value">{fmt(detailBalance.previousDue)}</span>
+                    <span className="label">Customer</span>
+                    <span className="value">{detailBill.customer?.full_name ?? "—"}</span>
+                    <span className="subtext mono">{getCustomerSecondaryId(detailBill.customer ?? {}) ?? ""}</span>
+                    {detailBill.customer?.address_value && (
+                      <span className="subtext">{detailBill.customer.address_value}</span>
+                    )}
                   </div>
                   <div className="bill-detail-card">
-                    <span className="label">Current</span>
-                    <span className="value">{fmt(detailBalance.currentDue)}</span>
-                  </div>
-                  <div className="bill-detail-card highlight-brand">
-                    <span className="label">Total Payable</span>
-                    <span className="value">{fmt(detailBalance.totalOutstanding)}</span>
-                  </div>
-                  <div className="bill-detail-card">
-                    <span className="label">Open Bills</span>
-                    <span className="value">{detailBalance.openBillCount}</span>
+                    <span className="label">Billing Month</span>
+                    <span className="value">{detailBill.month}</span>
                   </div>
                 </div>
-              )}
 
-              {/* Visit details if payment_method is visit */}
-              {detailBill.payment_method === "visit" && (() => {
-                const targetPaidAt = billPayments[0]?.paid_at ?? detailBill.paid_at;
-                let paidAtDateStr = "-";
-                let paidAtTimeStr = "-";
-                if (targetPaidAt) {
-                  const d = new Date(targetPaidAt);
-                  if (!isNaN(d.getTime())) {
-                    paidAtDateStr = d.toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' });
-                    paidAtTimeStr = d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
-                  }
-                }
-                return (
-                  <div className="bill-detail-card" style={{ gap: 8, borderColor: "var(--amber)" }}>
-                    <span className="label" style={{ color: "var(--amber)" }}>Visit Details</span>
-                    <div className="bill-detail-pill-container">
-                      <div className="bill-detail-pill-box">
-                        <span className="label">Visited Date</span>
-                        <span className="value">{paidAtDateStr}</span>
-                      </div>
-                      <div className="bill-detail-pill-box">
-                        <span className="label">Visited Time</span>
-                        <span className="value">{paidAtTimeStr}</span>
-                      </div>
+                {/* Amount, Paid, Remaining */}
+                <div className="bill-detail-grid-3">
+                  <div className="bill-detail-card">
+                    <span className="label">Amount</span>
+                    <span className="value">{fmt(detailBill.amount)}</span>
+                  </div>
+                  <div className="bill-detail-card">
+                    <span className="label">Paid</span>
+                    <span className="value" style={{ color: "var(--green)" }}>{fmt(detailBill.paid_amount ?? 0)}</span>
+                  </div>
+                  <div className="bill-detail-card">
+                    <span className="label">Remaining</span>
+                    <span className="value" style={{ color: remainingAmount(detailBill) > 0 ? "var(--amber)" : "var(--green)" }}>
+                      {fmt(remainingAmount(detailBill))}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Ledger Balance Summary (2x2 Grid) */}
+                {detailBalance && (
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                    <div className="bill-detail-card">
+                      <span className="label">Previous Dues</span>
+                      <span className="value">{fmt(detailBalance.previousDue)}</span>
                     </div>
-                    {detailBill.collector && (
-                      <div style={{ marginTop: 6, fontSize: 12, color: "var(--text)" }}>
-                        <strong>Visited By: </strong>{detailBill.collector.full_name}
-                      </div>
-                    )}
-                    {detailBill.payment_note && (
-                      <div style={{ marginTop: 4, fontSize: 12, color: "var(--text)" }}>
-                        <strong>Remarks: </strong>{detailBill.payment_note}
-                      </div>
-                    )}
+                    <div className="bill-detail-card">
+                      <span className="label">Current Due</span>
+                      <span className="value">{fmt(detailBalance.currentDue)}</span>
+                    </div>
+                    <div className="bill-detail-card highlight-brand">
+                      <span className="label">Total Payable</span>
+                      <span className="value">{fmt(detailBalance.totalOutstanding)}</span>
+                    </div>
+                    <div className="bill-detail-card">
+                      <span className="label">Open Bills</span>
+                      <span className="value">{detailBalance.openBillCount}</span>
+                    </div>
                   </div>
-                );
-              })()}
+                )}
+              </div>
 
-              {/* Paid details: pills + payment details (if paid/partial and NOT a pure visit) */}
-              {detailBill.payment_method !== "visit" && (detailBill.paid_at || billPayments.length > 0) && (() => {
-                const targetPaidAt = billPayments[0]?.paid_at ?? detailBill.paid_at;
-                const targetMethod = billPayments[0]?.method ?? detailBill.payment_method;
-                const targetCollector = billPayments[0]?.collector?.full_name ?? detailBill.collector?.full_name;
-                const targetNote = billPayments[0]?.note ?? detailBill.payment_note;
-                const lastPaidAmt = billPayments[0]?.amount ?? detailBill.paid_amount ?? 0;
-                const latestReceipt = billPayments[0]?.receipt_no ?? detailBill.receipt_no;
-
-                let paidAtDateStr = "-";
-                let paidAtTimeStr = "-";
-                if (targetPaidAt) {
-                  const d = new Date(targetPaidAt);
-                  if (!isNaN(d.getTime())) {
-                    paidAtDateStr = d.toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' });
-                    paidAtTimeStr = d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+              {/* Right Column: Transaction Details, Notes, visited details, Payment History */}
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                {/* Visit details if payment_method is visit */}
+                {detailBill.payment_method === "visit" && (() => {
+                  const targetPaidAt = billPayments[0]?.paid_at ?? detailBill.paid_at;
+                  let paidAtDateStr = "-";
+                  let paidAtTimeStr = "-";
+                  if (targetPaidAt) {
+                    const d = new Date(targetPaidAt);
+                    if (!isNaN(d.getTime())) {
+                      paidAtDateStr = d.toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' });
+                      paidAtTimeStr = d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+                    }
                   }
-                }
-
-                return (
-                  <>
-                    {targetPaidAt && (
-                      <div className="bill-detail-card" style={{ gap: 8 }}>
-                        <span className="label">Paid At</span>
-                        <div className="bill-detail-pill-container">
-                          <div className="bill-detail-pill-box">
-                            <span className="label">Date</span>
-                            <span className="value">{paidAtDateStr}</span>
-                          </div>
-                          <div className="bill-detail-pill-box">
-                            <span className="label">Time</span>
-                            <span className="value">{paidAtTimeStr}</span>
-                          </div>
+                  return (
+                    <div className="bill-detail-card" style={{ gap: 8, borderColor: "var(--amber)" }}>
+                      <span className="label" style={{ color: "var(--amber)" }}>Visit Details</span>
+                      <div className="bill-detail-pill-container">
+                        <div className="bill-detail-pill-box">
+                          <span className="label">Visited Date</span>
+                          <span className="value">{paidAtDateStr}</span>
+                        </div>
+                        <div className="bill-detail-pill-box">
+                          <span className="label">Visited Time</span>
+                          <span className="value">{paidAtTimeStr}</span>
                         </div>
                       </div>
-                    )}
+                      {detailBill.collector && (
+                        <div style={{ marginTop: 6, fontSize: 12, color: "var(--text)" }}>
+                          <strong>Visited By: </strong>{detailBill.collector.full_name}
+                        </div>
+                      )}
+                      {detailBill.payment_note && (
+                        <div style={{ marginTop: 4, fontSize: 12, color: "var(--text)" }}>
+                          <strong>Remarks: </strong>{detailBill.payment_note}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
 
-                    {(targetMethod || targetCollector || lastPaidAmt > 0 || latestReceipt) && (
-                      <div className="bill-detail-grid-2">
-                        {targetMethod && (
-                          <div className="bill-detail-card">
-                            <span className="label">Method</span>
-                            <span className="value" style={{ textTransform: "capitalize" }}>{targetMethod}</span>
-                          </div>
-                        )}
-                        {targetCollector && (
-                          <div className="bill-detail-card">
-                            <span className="label">Collected By</span>
-                            <span className="value">{targetCollector}</span>
-                          </div>
-                        )}
-                        {lastPaidAmt > 0 && (
-                          <div className="bill-detail-card">
-                            <span className="label">Last Paid</span>
-                            <span className="value" style={{ color: "var(--green)" }}>{fmt(lastPaidAmt)}</span>
-                          </div>
-                        )}
-                        {latestReceipt && (
-                          <div className="bill-detail-card">
-                            <span className="label">Receipt No</span>
-                            <span className="value mono">{latestReceipt}</span>
-                          </div>
-                        )}
-                      </div>
-                    )}
+                {/* Paid details: pills + payment details (if paid/partial and NOT a pure visit) */}
+                {detailBill.payment_method !== "visit" && (detailBill.paid_at || billPayments.length > 0) && (() => {
+                  const targetPaidAt = billPayments[0]?.paid_at ?? detailBill.paid_at;
+                  const targetMethod = billPayments[0]?.method ?? detailBill.payment_method;
+                  const targetCollector = billPayments[0]?.collector?.full_name ?? detailBill.collector?.full_name;
+                  const targetNote = billPayments[0]?.note ?? detailBill.payment_note;
+                  const lastPaidAmt = billPayments[0]?.amount ?? detailBill.paid_amount ?? 0;
+                  const latestReceipt = billPayments[0]?.receipt_no ?? detailBill.receipt_no;
 
-                    {targetNote && (
-                      <div className="bill-detail-card">
-                        <span className="label">Notes</span>
-                        <span className="value" style={{ fontWeight: "normal", fontSize: 13 }}>{targetNote}</span>
-                      </div>
-                    )}
-                  </>
-                );
-              })()}
+                  let paidAtDateStr = "-";
+                  let paidAtTimeStr = "-";
+                  if (targetPaidAt) {
+                    const d = new Date(targetPaidAt);
+                    if (!isNaN(d.getTime())) {
+                      paidAtDateStr = d.toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' });
+                      paidAtTimeStr = d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+                    }
+                  }
 
-              {/* Payment History List (table) */}
-              {billPayments.length > 0 && (
-                <div className="bill-detail-card">
-                  <span className="label">Payment History</span>
-                  <table className="payment-history-table">
-                    <thead>
-                      <tr>
-                        <th>Date/Time</th>
-                        <th>Amount</th>
-                        <th>Method</th>
-                        <th>Collected By</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {billPayments.map((p) => {
-                        const date = p.paid_at ? new Date(p.paid_at) : null;
-                        const formatted = date && !isNaN(date.getTime())
-                          ? `${date.toLocaleDateString("en-US", { month: "short", day: "numeric" })} ${date.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true })}`
-                          : "-";
-                        return (
-                          <tr key={p.id}>
-                            <td>{formatted}</td>
-                            <td style={{ fontWeight: 600 }}>{fmt(p.amount ?? 0)}</td>
-                            <td style={{ textTransform: "capitalize" }}>{p.method ?? "-"}</td>
-                            <td>{p.collector?.full_name ?? p.collected_by ?? "-"}</td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              )}
+                  return (
+                    <>
+                      {targetPaidAt && (
+                        <div className="bill-detail-card" style={{ gap: 8 }}>
+                          <span className="label">Paid At</span>
+                          <div className="bill-detail-pill-container">
+                            <div className="bill-detail-pill-box">
+                              <span className="label">Date</span>
+                              <span className="value">{paidAtDateStr}</span>
+                            </div>
+                            <div className="bill-detail-pill-box">
+                              <span className="label">Time</span>
+                              <span className="value">{paidAtTimeStr}</span>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {(targetMethod || targetCollector || lastPaidAmt > 0 || latestReceipt) && (
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                          {targetMethod && (
+                            <div className="bill-detail-card">
+                              <span className="label">Method</span>
+                              <span className="value" style={{ textTransform: "capitalize" }}>{targetMethod}</span>
+                            </div>
+                          )}
+                          {targetCollector && (
+                            <div className="bill-detail-card">
+                              <span className="label">Collected By</span>
+                              <span className="value">{targetCollector}</span>
+                            </div>
+                          )}
+                          {lastPaidAmt > 0 && (
+                            <div className="bill-detail-card">
+                              <span className="label">Last Paid</span>
+                              <span className="value" style={{ color: "var(--green)" }}>{fmt(lastPaidAmt)}</span>
+                            </div>
+                          )}
+                          {latestReceipt && (
+                            <div className="bill-detail-card">
+                              <span className="label">Receipt No</span>
+                              <span className="value mono">{latestReceipt}</span>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {targetNote && (
+                        <div className="bill-detail-card">
+                          <span className="label">Notes</span>
+                          <span className="value" style={{ fontWeight: "normal", fontSize: 13 }}>{targetNote}</span>
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
+
+                {/* Payment History List (table) - scrollable */}
+                {billPayments.length > 0 && (
+                  <div className="bill-detail-card" style={{ maxHeight: 180, overflowY: "auto" }}>
+                    <span className="label">Payment History</span>
+                    <table className="payment-history-table">
+                      <thead>
+                        <tr>
+                          <th>Date/Time</th>
+                          <th>Amount</th>
+                          <th>Method</th>
+                          <th>Collected By</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {billPayments.map((p) => {
+                          const date = p.paid_at ? new Date(p.paid_at) : null;
+                          const formatted = date && !isNaN(date.getTime())
+                            ? `${date.toLocaleDateString("en-US", { month: "short", day: "numeric" })} ${date.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true })}`
+                            : "-";
+                          return (
+                            <tr key={p.id}>
+                              <td>{formatted}</td>
+                              <td style={{ fontWeight: 600 }}>{fmt(p.amount ?? 0)}</td>
+                              <td style={{ textTransform: "capitalize" }}>{p.method ?? "-"}</td>
+                              <td>{p.collector?.full_name ?? p.collected_by ?? "-"}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
             </div>
 
             <div
