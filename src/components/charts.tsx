@@ -88,56 +88,82 @@ export function Donut({ segments, size = 200, thickness = 28, center }: {
   );
 }
 
-export function BarChart({ data, height = 220, accent, labelKey = 'd', valueKey = 'v', unit = 'k' }: {
+export function BarChart({ data, height = 220, accent, labelKey = 'd', valueKey = 'v', unit }: {
   data: BarDatum[];
-  height?: number; accent?: string; labelKey?: string; valueKey?: string; unit?: string;
+  height?: number; accent?: string; labelKey?: string; valueKey?: string;
+  /** Optional override: forces this unit suffix instead of auto-scaling */
+  unit?: string;
 }) {
   const fill = accent || 'var(--brand)';
   const w = 640, h = height;
-  const pad = { l: 40, r: 16, t: 20, b: 30 };
+  const pad = { l: 52, r: 16, t: 24, b: 30 };
   const innerW = w - pad.l - pad.r, innerH = h - pad.t - pad.b;
-  const rawMax = Math.max(...data.map(d => Number(d[valueKey] ?? 0)));
-  const maxVal = Number.isFinite(rawMax) && rawMax > 0 ? rawMax : 20;
-  const max = Math.ceil(maxVal / 20) * 20 + 20;
-  const barW = innerW / (data.length || 1) * 0.58;
+  const rawValues = data.map(d => Number(d[valueKey] ?? 0));
+  const rawMax = Math.max(...rawValues);
+  const maxVal = Number.isFinite(rawMax) && rawMax > 0 ? rawMax : 1000;
+
+  // Auto-scale: use 'k' if any value >= 1000 AND no manual unit override
+  const useK = !unit && maxVal >= 1000;
+  const scaledMax = useK ? maxVal / 1000 : maxVal;
+  const max = Math.ceil(scaledMax / 5) * 5 + 5;
+
+  const displayVal = (v: number) => useK ? v / 1000 : v;
+  const formatBarLabel = (v: number) => {
+    if (v === 0) return unit ? `0${unit}` : '0';
+    if (unit) return `${v}${unit}`;
+    return useK ? `${(v / 1000).toFixed(v >= 10000 ? 0 : 1)}K` : String(v);
+  };
+  const formatTickLabel = (t: number) => {
+    if (unit) return `${t}${unit}`;
+    return useK ? `${t}k` : String(t);
+  };
+
+
+  const barW = Math.max(innerW / (data.length || 1) * 0.55, 12);
   const gap = innerW / (data.length || 1);
   const ticks = [0, Math.round(max / 2), max];
   const hatchId = `hatch-${Math.random().toString(36).slice(2, 8)}`;
 
   return (
-    <svg viewBox={`0 0 ${w} ${h}`} width="100%" height={h} style={{ display: 'block' }}>
-      <defs>
-        <pattern id={hatchId} patternUnits="userSpaceOnUse" width="6" height="6" patternTransform="rotate(45)">
-          <rect width="6" height="6" fill={fill} />
-          <line x1="0" y1="0" x2="0" y2="6" stroke="rgba(255,255,255,0.35)" strokeWidth="3" />
-        </pattern>
-      </defs>
-      {ticks.map(tk => {
-        const yy = pad.t + (1 - tk / max) * innerH;
-        return (
-          <g key={tk}>
-            <line x1={pad.l} x2={w - pad.r} y1={yy} y2={yy} stroke="var(--border)" strokeDasharray="3 3" />
-            <text x={pad.l - 8} y={yy + 4} fontSize="10" textAnchor="end" fill="var(--text-muted)" fontFamily="JetBrains Mono, monospace">{tk}{unit}</text>
-          </g>
-        );
-      })}
-      {data.map((d, i) => {
-        const bx = pad.l + i * gap + gap / 2 - barW / 2;
-        const value = Number(d[valueKey] ?? 0);
-        const bh = (value / max) * innerH;
-        const yy = pad.t + innerH - bh;
-        const rx = barW / 2;
-        return (
-          <g key={i}>
-            <rect x={bx} y={yy} width={barW} height={bh} fill={fill} rx={rx} opacity={d.highlight ? 1 : 0.85} />
-            <text x={bx + barW / 2} y={h - pad.b + 16} fontSize="11" textAnchor="middle" fill="var(--text-muted)">{String(d[labelKey] ?? '')}</text>
-            <text x={bx + barW / 2} y={yy - 6} fontSize="10" textAnchor="middle" fill="var(--text)" fontWeight="600" fontFamily="JetBrains Mono, monospace">{value}{unit}</text>
-          </g>
-        );
-      })}
-    </svg>
+    <div style={{ overflowX: 'auto', width: '100%' }}>
+      <svg viewBox={`0 0 ${w} ${h}`} width="100%" height={h} style={{ display: 'block', minWidth: Math.max(data.length * 40, 300) }}>
+        <defs>
+          <pattern id={hatchId} patternUnits="userSpaceOnUse" width="6" height="6" patternTransform="rotate(45)">
+            <rect width="6" height="6" fill={fill} />
+            <line x1="0" y1="0" x2="0" y2="6" stroke="rgba(255,255,255,0.35)" strokeWidth="3" />
+          </pattern>
+        </defs>
+        {ticks.map(tk => {
+          const yy = pad.t + (1 - tk / max) * innerH;
+          return (
+            <g key={tk}>
+              <line x1={pad.l} x2={w - pad.r} y1={yy} y2={yy} stroke="var(--border)" strokeDasharray="3 3" />
+              <text x={pad.l - 8} y={yy + 4} fontSize="10" textAnchor="end" fill="var(--text-muted)" fontFamily="JetBrains Mono, monospace">{formatTickLabel(tk)}</text>
+            </g>
+          );
+        })}
+        {data.map((d, i) => {
+          const bx = pad.l + i * gap + gap / 2 - barW / 2;
+          const value = Number(d[valueKey] ?? 0);
+          const scaled = displayVal(value);
+          const bh = Math.max((scaled / max) * innerH, value > 0 ? 3 : 0);
+          const yy = pad.t + innerH - bh;
+          const rx = Math.min(barW / 2, 8);
+          return (
+            <g key={i}>
+              <rect x={bx} y={yy} width={barW} height={bh} fill={fill} rx={rx} opacity={0.88} />
+              <text x={bx + barW / 2} y={h - pad.b + 16} fontSize="11" textAnchor="middle" fill="var(--text-muted)">{String(d[labelKey] ?? '')}</text>
+              {value > 0 && (
+                <text x={bx + barW / 2} y={yy - 5} fontSize="9" textAnchor="middle" fill="var(--text)" fontWeight="600" fontFamily="JetBrains Mono, monospace">{formatBarLabel(value)}</text>
+              )}
+            </g>
+          );
+        })}
+      </svg>
+    </div>
   );
 }
+
 
 export function Sparkline({ data, color = '#F05A2B', width = 120, height = 30 }: {
   data: number[]; color?: string; width?: number; height?: number;

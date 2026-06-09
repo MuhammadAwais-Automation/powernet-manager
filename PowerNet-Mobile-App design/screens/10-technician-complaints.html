@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PowerNet Technician Complaints</title>
+  <link rel="stylesheet" href="../css/powernet.css">
+</head>
+<body>
+  <main class="phone-stage">
+    <section class="phone" data-od-id="technician-complaints-screen" aria-label="Technician complaints">
+      <div class="android-status"><span>9:41</span><span class="status-icons"><span class="dot"></span><span>5G</span><span class="battery"><i></i></span></span></div>
+      <div class="app">
+        <div class="app-bar">
+          <div>
+            <h1 class="page-title">Complaints</h1>
+            <p class="body-sm muted">Gulshan Block 4</p>
+          </div>
+          <span class="chip sync">Online</span>
+        </div>
+        <div class="tabs" data-tabs>
+          <button class="is-active" data-tab="tech-open">Open</button>
+          <button data-tab="tech-progress">In Progress</button>
+          <button data-tab="tech-resolved">Resolved</button>
+        </div>
+        <section class="tab-panel is-active" data-od-id="technician-open-tab" id="tech-open">
+          <button class="card complaint-card" type="button" data-open-sheet="complaint-detail">
+            <div class="between"><strong>CMP-4482</strong><span class="chip urgent">High</span></div>
+            <p class="body">Adeel Khan - PN-1024</p>
+            <div class="mini-grid">
+              <span class="mini-cell"><small>Address</small><strong>House 44, St 8</strong></span>
+              <span class="mini-cell"><small>Type</small><strong>Connectivity</strong></span>
+              <span class="mini-cell"><small>Phone</small><strong>Call</strong></span>
+              <span class="mini-cell"><small>Opened</small><strong>2h ago</strong></span>
+            </div>
+          </button>
+          <article class="card complaint-card">
+            <div class="between"><strong>CMP-4475</strong><span class="chip pending">Medium</span></div>
+            <p class="body">Sara Imran - PN-1180</p>
+            <div class="mini-grid">
+              <span class="mini-cell"><small>Address</small><strong>Block C, House 12</strong></span>
+              <span class="mini-cell"><small>Type</small><strong>Hardware</strong></span>
+            </div>
+          </article>
+        </section>
+        <section class="tab-panel" data-od-id="technician-progress-tab" id="tech-progress">
+          <article class="card complaint-card">
+            <div class="between"><strong>CMP-4410</strong><span class="chip work">Work</span></div>
+            <p class="body">Low speed after 8 PM. Router test running.</p>
+          </article>
+        </section>
+        <section class="tab-panel" data-od-id="technician-resolved-tab" id="tech-resolved">
+          <article class="card complaint-card">
+            <div class="between"><strong>CMP-4301</strong><span class="chip resolved">Resolved</span></div>
+            <p class="body">Adapter replaced. Customer confirmed.</p>
+          </article>
+        </section>
+      </div>
+      <nav class="bottom-nav" aria-label="Technician navigation">
+        <a href="09-technician-home.html"><svg viewBox="0 0 24 24" stroke-width="2"><path d="M3 10.5 12 3l9 7.5V21H4z"/></svg><span>Home</span></a>
+        <a class="is-active" href="10-technician-complaints.html"><svg viewBox="0 0 24 24" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h10"/></svg><span>Complaints</span></a>
+        <a href="#"><svg viewBox="0 0 24 24" stroke-width="2"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 7-3 7h18s-3 0-3-7"/></svg><span>Alerts</span></a>
+        <a href="staff-profile.html"><svg viewBox="0 0 24 24" stroke-width="2"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z"/><path d="M4 21a8 8 0 0 1 16 0"/></svg><span>Profile</span></a>
+      </nav>
+      <div class="sheet-backdrop" id="complaint-detail">
+        <form class="sheet stack" onsubmit="return false;">
+          <div class="sheet-handle"></div>
+          <div class="between"><h2 class="section-title" style="margin: 0;">CMP-4482</h2><button class="btn btn-ghost" type="button" data-close-sheet>Close</button></div>
+          <div class="card customer-card">
+            <div class="between"><strong>Adeel Khan</strong><span class="chip open" id="work-chip">Open</span></div>
+            <p class="body">PN-1024 - House 44, Street 8 - 0300-1234567</p>
+          </div>
+          <div class="progress"><span class="is-done"></span><span id="progress-work"></span><span id="progress-done"></span></div>
+          <p class="body">Issue: Internet disconnecting every evening.</p>
+          <button class="btn btn-cyan full" type="button" data-state="work-chip" data-status="In Progress" data-class="chip work">Start Work</button>
+          <div class="field"><label for="resolution-notes">Resolution notes</label><textarea class="textarea" id="resolution-notes" placeholder="Write clear notes"></textarea></div>
+          <div class="field"><label for="hardware-used">Hardware used</label><input class="input" id="hardware-used" placeholder="Cable, connector, adapter"></div>
+          <button class="btn btn-primary full" type="button" data-state="work-chip" data-status="Resolved" data-class="chip resolved" data-submit="Resolution saved">Resolve Complaint</button>
+        </form>
+      </div>
+      <div class="toast" data-toast></div>
+    </section>
+  </main>
+  <script src="../js/powernet.js"></script>
+</body>
+</html>

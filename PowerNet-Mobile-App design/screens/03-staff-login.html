@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PowerNet Staff Login</title>
+  <link rel="stylesheet" href="../css/powernet.css">
+</head>
+<body>
+  <main class="phone-stage">
+    <section class="phone" data-od-id="staff-login-screen" aria-label="Staff login">
+      <div class="android-status"><span>9:41</span><span class="status-icons"><span class="dot"></span><span>5G</span><span class="battery"><i></i></span></span></div>
+      <div class="app centered no-nav">
+        <div class="logo mini-logo"><span>POWER</span><span class="net">NET</span></div>
+        <h1 class="page-title" style="margin-top: 18px;">Staff login</h1>
+        <p class="body" style="margin-top: 8px;">For PowerNet field teams only.</p>
+        <form class="card glass stack-lg" style="margin-top: 28px;" onsubmit="return false;">
+          <div class="alert" data-error-card>Invalid staff credentials.</div>
+          <div class="field">
+            <label for="staff-user">Username</label>
+            <input class="input" id="staff-user" autocomplete="username" placeholder="staff username">
+          </div>
+          <div class="field">
+            <label for="staff-pass">Password</label>
+            <input class="input" id="staff-pass" type="password" autocomplete="current-password" placeholder="password">
+          </div>
+          <div class="between">
+            <span class="body-sm soft">Remember me</span>
+            <button class="toggle" type="button" data-toggle aria-pressed="false" aria-label="Remember me"><span></span></button>
+          </div>
+          <button class="btn btn-primary full" type="button" data-login-error>Login as Staff</button>
+        </form>
+        <a class="screen-note" href="02-welcome.html">Back to role entry</a>
+      </div>
+      <div class="toast" data-toast></div>
+    </section>
+  </main>
+  <script src="../js/powernet.js"></script>
+</body>
+</html>

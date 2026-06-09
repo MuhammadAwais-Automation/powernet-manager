@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PowerNet Customer Complaints</title>
+  <link rel="stylesheet" href="../css/powernet.css">
+</head>
+<body>
+  <main class="phone-stage">
+    <section class="phone" data-od-id="customer-complaints-screen" aria-label="Customer complaints">
+      <div class="android-status"><span>9:41</span><span class="status-icons"><span class="dot"></span><span>5G</span><span class="battery"><i></i></span></span></div>
+      <div class="app">
+        <div class="app-bar">
+          <div>
+            <h1 class="page-title">My Complaints</h1>
+            <p class="body-sm muted">1 open complaint</p>
+          </div>
+          <button class="btn btn-ghost" type="button" data-open-sheet="new-complaint">New</button>
+        </div>
+        <div class="stack">
+          <article class="card complaint-card">
+            <div class="between"><strong>CMP-4482</strong><span class="chip open">Awaiting</span></div>
+            <p class="body">Internet disconnecting every evening.</p>
+            <div class="mini-grid">
+              <span class="mini-cell"><small>Type</small><strong>Connectivity</strong></span>
+              <span class="mini-cell"><small>Opened</small><strong>26 May</strong></span>
+              <span class="mini-cell"><small>Technician</small><strong>Not assigned</strong></span>
+              <span class="mini-cell"><small>Notes</small><strong>-</strong></span>
+            </div>
+          </article>
+          <article class="card complaint-card">
+            <div class="between"><strong>CMP-4410</strong><span class="chip work">In Progress</span></div>
+            <p class="body">Low speed after 8 PM.</p>
+            <div class="mini-grid">
+              <span class="mini-cell"><small>Type</small><strong>Speed</strong></span>
+              <span class="mini-cell"><small>Opened</small><strong>24 May</strong></span>
+              <span class="mini-cell"><small>Technician</small><strong>Usman Ali</strong></span>
+              <span class="mini-cell"><small>Notes</small><strong>Line check today</strong></span>
+            </div>
+          </article>
+          <article class="card complaint-card">
+            <div class="between"><strong>CMP-4301</strong><span class="chip resolved">Resolved</span></div>
+            <p class="body">Router adapter replaced.</p>
+            <div class="mini-grid">
+              <span class="mini-cell"><small>Type</small><strong>Hardware</strong></span>
+              <span class="mini-cell"><small>Opened</small><strong>17 May</strong></span>
+              <span class="mini-cell"><small>Technician</small><strong>Bilal Shah</strong></span>
+              <span class="mini-cell"><small>Notes</small><strong>Closed</strong></span>
+            </div>
+          </article>
+        </div>
+      </div>
+      <button class="btn btn-primary fab" type="button" data-open-sheet="new-complaint">New Complaint</button>
+      <nav class="bottom-nav" aria-label="Customer navigation">
+        <a href="06-customer-home.html"><svg viewBox="0 0 24 24" stroke-width="2"><path d="M3 10.5 12 3l9 7.5V21H4z"/></svg><span>Home</span></a>
+        <a href="07-customer-bills.html"><svg viewBox="0 0 24 24" stroke-width="2"><path d="M7 3h10v18l-2-1-2 1-2-1-2 1-2-1z"/></svg><span>Bills</span></a>
+        <a class="is-active" href="08-customer-complaints.html"><svg viewBox="0 0 24 24" stroke-width="2"><path d="M21 15a4 4 0 0 1-4 4H7l-4 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z"/></svg><span>Complaints</span></a>
+        <a href="#"><svg viewBox="0 0 24 24" stroke-width="2"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z"/><path d="M4 21a8 8 0 0 1 16 0"/></svg><span>Profile</span></a>
+      </nav>
+      <div class="sheet-backdrop" id="new-complaint">
+        <form class="sheet stack" onsubmit="return false;">
+          <div class="sheet-handle"></div>
+          <div class="between"><h2 class="section-title" style="margin: 0;">New Complaint</h2><button class="btn btn-ghost" type="button" data-close-sheet>Close</button></div>
+          <div class="field"><label for="complaint-type">Type</label><select class="select" id="complaint-type"><option>Connectivity</option><option>Speed</option><option>Hardware</option><option>Billing</option><option>Upgrade</option><option>Other</option></select></div>
+          <div class="field"><label for="complaint-issue">Issue description</label><textarea class="textarea" id="complaint-issue" placeholder="Write the issue clearly"></textarea></div>
+          <button class="btn btn-primary full" type="button" data-submit="Complaint submitted and sent to PowerNet team">Submit Complaint</button>
+          <button class="btn btn-danger full" type="button" data-submit="Submit failed. Check network and try again.">Show Error State</button>
+        </form>
+      </div>
+      <div class="toast" data-toast></div>
+    </section>
+  </main>
+  <script src="../js/powernet.js"></script>
+</body>
+</html>

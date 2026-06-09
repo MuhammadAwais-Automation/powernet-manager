@@ -6,6 +6,7 @@ import { BarChart } from "../charts";
 import {
   getBillsPage,
   getBillingSummary,
+  getCustomerLedgerSummary,
   generateMonthlyBills,
   getBillByIdWithRelations,
   getCustomerBalanceSummary,
@@ -13,6 +14,7 @@ import {
   getBillPayments,
   type BillingBillRow,
   type BillingSummary,
+  type CustomerLedgerSummary,
   type GenerateBillsResult,
   type PaymentEventWithRelations,
 } from "@/lib/db/bills";
@@ -267,6 +269,7 @@ export default function BillingPage({
 }) {
   const [bills, setBills] = useState<BillingBillRow[]>([]);
   const [summary, setSummary] = useState<BillingSummary | null>(null);
+  const [ledgerSummary, setLedgerSummary] = useState<CustomerLedgerSummary | null>(null);
   const [totalBills, setTotalBills] = useState(0);
   const [areas, setAreas] = useState<Area[]>([]);
   const [areaFilter, setAreaFilter] = useState("");
@@ -347,7 +350,7 @@ export default function BillingPage({
     setError(null);
     try {
       const month = normalizeBillingMonth(month0);
-      const [billPage, billingSummary, areaRows] = await Promise.all([
+      const [billPage, billingSummary, areaRows, ledger] = await Promise.all([
         getBillsPage({
           month,
           page: page0,
@@ -359,10 +362,12 @@ export default function BillingPage({
         }),
         getBillingSummary(month, area0 || undefined),
         getAreas(),
+        getCustomerLedgerSummary(area0 || undefined).catch(() => null),
       ]);
       setBills(billPage.rows);
       setTotalBills(billPage.total);
       setSummary(billingSummary);
+      setLedgerSummary(ledger);
       setAreas(areaRows);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Could not load bills");
@@ -734,6 +739,97 @@ export default function BillingPage({
         ))}
       </div>
 
+      {/* ── Ledger Overview: cross-month customer-level summary ── */}
+      {ledgerSummary && (
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(3, 1fr)",
+            gap: 12,
+            marginBottom: 4,
+          }}
+        >
+          {[
+            {
+              label: "Total Outstanding",
+              value: `Rs. ${ledgerSummary.totalOutstanding.toLocaleString()}`,
+              sub: "All months combined",
+              color: "var(--color-primary)",
+              icon: "alertTri" as IconName,
+            },
+            {
+              label: "Overdue Customers",
+              value: ledgerSummary.overdueCustomers.toLocaleString(),
+              sub: "At least 1 overdue bill",
+              color: "#EF4444",
+              icon: "clock" as IconName,
+            },
+            {
+              label: "Partial Customers",
+              value: ledgerSummary.partialCustomers.toLocaleString(),
+              sub: "Partially paid across months",
+              color: "#06B6D4",
+              icon: "checkCircle" as IconName,
+            },
+          ].map((item) => (
+            <div
+              key={item.label}
+              className="card"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 14,
+                padding: "14px 18px",
+              }}
+            >
+              <div
+                style={{
+                  width: 38,
+                  height: 38,
+                  borderRadius: 10,
+                  background: `${item.color}18`,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  flexShrink: 0,
+                }}
+              >
+                <Icon name={item.icon} size={18} style={{ color: item.color }} />
+
+              </div>
+              <div style={{ minWidth: 0 }}>
+                <div
+                  style={{
+                    fontSize: 10,
+                    textTransform: "uppercase",
+                    letterSpacing: "0.06em",
+                    fontWeight: 700,
+                    color: "var(--text-muted)",
+                    marginBottom: 2,
+                  }}
+                >
+                  {item.label}
+                </div>
+                <div
+                  style={{
+                    fontSize: 17,
+                    fontWeight: 800,
+                    letterSpacing: "-0.02em",
+                    color: item.color,
+                  }}
+                  className="num"
+                >
+                  {item.value}
+                </div>
+                <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 1 }}>
+                  {item.sub}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
       <div className="billing-workspace">
         <div className="billing-table-section">
           <div className="billing-filter-row">
@@ -1044,7 +1140,7 @@ export default function BillingPage({
             <div className="card-head">
               <div>
                 <h3>Daily Collection Summary</h3>
-                <div className="sub">Selected cycle · Rs. in thousands</div>
+                <div className="sub">Selected cycle · amounts auto-scaled</div>
               </div>
               <div className="legend">
                 <div className="item">

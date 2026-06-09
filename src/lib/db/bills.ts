@@ -68,6 +68,12 @@ export type BillingSummary = {
   dailyCollections: { d: string; v: number }[];
 };
 
+export type CustomerLedgerSummary = {
+  overdueCustomers: number;
+  partialCustomers: number;
+  totalOutstanding: number;
+};
+
 export type BillsPageParams = {
   month: string;
   page: number;
@@ -217,6 +223,24 @@ export async function getRecentVisitedBills(
       .limit(limit),
   );
   return (data ?? []) as unknown as BillWithRelations[];
+}
+
+export async function getCustomerLedgerSummary(
+  areaId?: string,
+): Promise<CustomerLedgerSummary> {
+  const params: Record<string, string> = {};
+  if (areaId) params.p_area_id = areaId;
+  const { data, error } = await supabase.rpc(
+    "get_customer_ledger_summary",
+    Object.keys(params).length ? params : {},
+  );
+  if (error) throw error;
+  const raw = (data ?? {}) as Partial<CustomerLedgerSummary>;
+  return {
+    overdueCustomers: typeof raw.overdueCustomers === "number" ? raw.overdueCustomers : 0,
+    partialCustomers: typeof raw.partialCustomers === "number" ? raw.partialCustomers : 0,
+    totalOutstanding: typeof raw.totalOutstanding === "number" ? raw.totalOutstanding : 0,
+  };
 }
 
 export async function getBillsPage(
