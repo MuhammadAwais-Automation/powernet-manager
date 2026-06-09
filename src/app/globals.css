@@ -1200,3 +1200,99 @@ table.data tr.selected { background: var(--blue-50); }
 @media (min-width: 1024px) {
   .grid-dashboard-main { grid-template-columns: 1.6fr 1fr; }
 }
+
+/* Rebuilt Bill Details Modal styles */
+.bill-detail-grid-2 {
+  display: grid;
+  grid-template-columns: 1.5fr 1fr;
+  gap: 12px;
+}
+.bill-detail-grid-3 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+.bill-detail-grid-4 {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+}
+.bill-detail-card {
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+.bill-detail-card .label {
+  font-size: 10px;
+  text-transform: uppercase;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+.bill-detail-card .value {
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--text);
+}
+.bill-detail-card .subtext {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+.bill-detail-card.highlight-brand {
+  border-color: var(--brand);
+}
+.bill-detail-card.highlight-brand .value {
+  color: var(--brand);
+}
+.bill-detail-pill-container {
+  display: flex;
+  gap: 12px;
+  margin-top: 6px;
+}
+.bill-detail-pill-box {
+  flex: 1;
+  background: var(--bg-muted);
+  border-radius: 8px;
+  padding: 8px 12px;
+}
+.bill-detail-pill-box .label {
+  font-size: 9px;
+  text-transform: uppercase;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  margin-bottom: 2px;
+}
+.bill-detail-pill-box .value {
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--text);
+}
+.payment-history-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+  margin-top: 6px;
+}
+.payment-history-table th {
+  text-align: left;
+  font-weight: 600;
+  color: var(--text-muted);
+  padding: 4px 6px;
+  border-bottom: 1px solid var(--border);
+}
+.payment-history-table td {
+  padding: 6px;
+  border-bottom: 1px dashed var(--border);
+  color: var(--text);
+}
+.payment-history-table tr:last-child td {
+  border-bottom: none;
+}
+

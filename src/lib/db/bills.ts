@@ -246,19 +246,7 @@ export async function getBillsPage(
   ]);
 
   const customerIds = mergeCustomerIdFilters(searchIds, areaIds);
-  const ledgerPartialCustomerIds =
-    params.status === "partial"
-      ? await findLedgerPartialCustomerIdsForMonth(
-          params.month,
-          customerIds,
-          params.source,
-        )
-      : undefined;
-  const effectiveCustomerIds =
-    params.status === "partial"
-      ? mergeCustomerIdFilters(customerIds, ledgerPartialCustomerIds ?? [])
-      : customerIds;
-  if (effectiveCustomerIds?.length === 0) {
+  if (customerIds?.length === 0) {
     const emptyResult = { rows: [], total: 0 };
     billsPageCache[key] = {
       data: emptyResult,
@@ -266,38 +254,25 @@ export async function getBillsPage(
     };
     return emptyResult;
   }
-  if (params.status === "partial") {
-    const result = await getLedgerPartialBillsPage(params, effectiveCustomerIds ?? []);
-    billsPageCache[key] = { data: result, expiresAt: Date.now() + CACHE_MS };
-    return result;
-  }
-  if (!params.source && params.status !== "paid") {
-    const result = await getActivitySortedBillsPage(params, effectiveCustomerIds);
-    billsPageCache[key] = { data: result, expiresAt: Date.now() + CACHE_MS };
-    return result;
-  }
 
   const { data, count } = await runBillSelectWithLegacyFallback((select) => {
     let query = supabase
       .from("bills")
       .select(select, { count: "exact" })
-      .eq("month", params.month);
+      .eq("month", params.month)
+      .order("paid_at", { ascending: false, nullsFirst: false })
+      .order("created_at", { ascending: false })
+      .range(from, to);
 
     if (params.status === "unpaid") query = query.neq("status", "paid");
     else if (params.status === "partial")
-      query = query.neq("status", "paid");
+      query = query.neq("status", "paid").gt("paid_amount", 0);
     else if (params.status === "visited")
       query = query.eq("payment_method", "visit");
     else if (params.status) query = query.eq("status", params.status);
     if (params.source) query = query.eq("payment_source", params.source);
-    if (effectiveCustomerIds) query = query.in("customer_id", effectiveCustomerIds);
-    query =
-      params.status === "paid"
-        ? query
-            .order("paid_at", { ascending: false, nullsFirst: false })
-            .order("created_at", { ascending: false })
-        : query.order("created_at", { ascending: false });
-    return query.range(from, to);
+    if (customerIds) query = query.in("customer_id", customerIds);
+    return query;
   });
 
   const baseRows = (data ?? []) as unknown as BillWithRelations[];
@@ -350,160 +325,14 @@ export async function getBillingSummary(
   const cached = billingSummaryCache[key];
   if (cached && cached.expiresAt > Date.now()) return cached.data;
 
-  const areaCustomerIds = areaId
-    ? await findAreaCustomerIds(areaId, 5000)
-    : undefined;
-  if (areaCustomerIds?.length === 0) {
-    const empty = emptyBillingSummary(month);
-    billingSummaryCache[key] = {
-      data: empty,
-      expiresAt: Date.now() + CACHE_MS,
-    };
-    return empty;
-  }
+  const { data, error } = await supabase.rpc("get_billing_summary", {
+    p_month: month,
+    p_area_id: areaId || null,
+  });
 
-  const { startIso, endIso } = getBillingMonthRange(month);
-  const [
-    totalRes,
-    paidRes,
-    unpaidRes,
-    pendingRes,
-    overdueRes,
-    overdueRowsRes,
-    partialRes,
-    visitedRes,
-    summaryRowsRes,
-    paymentRowsRes,
-  ] = await Promise.all([
-    withCustomerFilter(
-      supabase
-        .from("bills")
-        .select("id", { count: "exact", head: true })
-        .eq("month", month),
-      areaCustomerIds,
-    ),
-    withCustomerFilter(
-      supabase
-        .from("bills")
-        .select("id", { count: "exact", head: true })
-        .eq("month", month)
-        .eq("status", "paid"),
-      areaCustomerIds,
-    ),
-    withCustomerFilter(
-      supabase
-        .from("bills")
-        .select("id", { count: "exact", head: true })
-        .eq("month", month)
-        .neq("status", "paid"),
-      areaCustomerIds,
-    ),
-    withCustomerFilter(
-      supabase
-        .from("bills")
-        .select("id", { count: "exact", head: true })
-        .eq("month", month)
-        .eq("status", "pending"),
-      areaCustomerIds,
-    ),
-    withCustomerFilter(
-      supabase
-        .from("bills")
-        .select("id", { count: "exact", head: true })
-        .eq("month", month)
-        .eq("status", "overdue"),
-      areaCustomerIds,
-    ),
-    withCustomerFilter(
-      supabase
-        .from("bills")
-        .select("amount, paid_amount")
-        .eq("month", month)
-        .eq("status", "overdue"),
-      areaCustomerIds,
-    ),
-    withCustomerFilter(
-      supabase
-        .from("bills")
-        .select("id", { count: "exact", head: true })
-        .eq("month", month)
-        .neq("status", "paid")
-        .gt("paid_amount", 0),
-      areaCustomerIds,
-    ),
-    withCustomerFilter(
-      supabase
-        .from("bills")
-        .select("id", { count: "exact", head: true })
-        .eq("month", month)
-        .eq("payment_method", "visit"),
-      areaCustomerIds,
-    ),
-    withCustomerFilter(
-      supabase
-        .from("bills")
-        .select("amount, paid_amount, status, paid_at")
-        .eq("month", month),
-      areaCustomerIds,
-    ),
-    withCustomerFilter(
-      supabase
-        .from("payments")
-        .select("amount, paid_at, collected_by")
-        .gte("paid_at", startIso)
-        .lt("paid_at", endIso),
-      areaCustomerIds,
-    ),
-  ]);
+  if (error) throw error;
 
-  if (totalRes.error) throw totalRes.error;
-  if (paidRes.error) throw paidRes.error;
-  if (unpaidRes.error) throw unpaidRes.error;
-  if (pendingRes.error) throw pendingRes.error;
-  if (overdueRes.error) throw overdueRes.error;
-  if (overdueRowsRes.error) throw overdueRowsRes.error;
-  if (partialRes.error) throw partialRes.error;
-  if (visitedRes.error) throw visitedRes.error;
-  if (summaryRowsRes.error) throw summaryRowsRes.error;
-  if (paymentRowsRes.error) throw paymentRowsRes.error;
-
-  const paymentSummary = buildPaymentCollectionSummary(
-    (paymentRowsRes.data ?? []) as Array<{
-      amount: number | null;
-      paid_at: string | null;
-      collected_by?: string | null;
-    }>,
-    month,
-  );
-  const ledgerPartialBills = await withTimeout(
-    countLedgerPartialBillsForMonth(month, areaCustomerIds),
-    8_000,
-    "Ledger partial count timed out",
-  ).catch(() => partialRes.count ?? 0);
-  const summary: BillingSummary = {
-    month,
-    totalBills: totalRes.count ?? 0,
-    paidBills: paidRes.count ?? 0,
-    pendingBills: pendingRes.count ?? 0,
-    partialBills: ledgerPartialBills,
-    unpaidBills: unpaidRes.count ?? 0,
-    overdueBills: overdueRes.count ?? 0,
-    visitedBills: visitedRes.count ?? 0,
-    totalBilled: sumBillAmounts(summaryRowsRes.data, "amount"),
-    totalPaid: paymentSummary.totalCollected,
-    totalRemaining: sumRemaining(summaryRowsRes.data),
-    overdueTotal: (
-      (overdueRowsRes.data ?? []) as Array<{
-        amount?: unknown;
-        paid_amount?: unknown;
-      }>
-    ).reduce(
-      (sum: number, bill) =>
-        sum + Math.max(toNumber(bill.amount) - toNumber(bill.paid_amount), 0),
-      0,
-    ),
-    dailyCollections: paymentSummary.dailyCollections,
-  };
+  const summary = data as BillingSummary;
   billingSummaryCache[key] = {
     data: summary,
     expiresAt: Date.now() + CACHE_MS,
@@ -519,6 +348,32 @@ export async function getBillsByCustomer(customerId: string): Promise<Bill[]> {
     .order("created_at", { ascending: false });
   if (error) throw error;
   return data as Bill[];
+}
+
+export async function getBillPayments(
+  billId: string,
+): Promise<PaymentEventWithRelations[]> {
+  const { data, error } = await supabase
+    .from("payments")
+    .select(`
+      id,
+      bill_id,
+      customer_id,
+      amount,
+      collected_by,
+      method,
+      source,
+      note,
+      receipt_no,
+      paid_at,
+      created_at,
+      collector:staff(id, full_name)
+    `)
+    .eq("bill_id", billId)
+    .order("paid_at", { ascending: false });
+
+  if (error) throw error;
+  return (data ?? []) as unknown as PaymentEventWithRelations[];
 }
 
 export async function getCustomerBalanceSummary(

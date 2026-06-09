@@ -10,9 +10,11 @@ import {
   getBillByIdWithRelations,
   getCustomerBalanceSummary,
   recordBillPayment,
+  getBillPayments,
   type BillingBillRow,
   type BillingSummary,
   type GenerateBillsResult,
+  type PaymentEventWithRelations,
 } from "@/lib/db/bills";
 import { getAreas } from "@/lib/db/areas";
 import {
@@ -402,6 +404,7 @@ export default function BillingPage({
   const [detailBill, setDetailBill] = useState<BillWithRelations | null>(null);
   const [detailBalance, setDetailBalance] =
     useState<CustomerBalanceSummary | null>(null);
+  const [billPayments, setBillPayments] = useState<PaymentEventWithRelations[]>([]);
   const [paymentBill, setPaymentBill] = useState<BillWithRelations | null>(
     null,
   );
@@ -433,6 +436,7 @@ export default function BillingPage({
   useEffect(() => {
     if (!detailBill) {
       setDetailBalance(null);
+      setBillPayments([]);
       return;
     }
 
@@ -452,6 +456,14 @@ export default function BillingPage({
             currentBillId: detailBill.id,
           });
         }
+      });
+
+    getBillPayments(detailBill.id)
+      .then((payments) => {
+        if (!cancelled) setBillPayments(payments);
+      })
+      .catch((err) => {
+        console.error("Failed to load bill payments:", err);
       });
 
     return () => {
@@ -1031,7 +1043,7 @@ export default function BillingPage({
         <Modal
           open={!!detailBill}
           onClose={() => setDetailBill(null)}
-          width={480}
+          width={520}
         >
           <div style={{ padding: "24px 28px" }}>
             <div
@@ -1063,401 +1075,209 @@ export default function BillingPage({
                 marginBottom: 20,
               }}
             >
-              <div className="grid-responsive-2" style={{ gap: 12 }}>
-                <div className="card card-pad" style={{ padding: "10px 14px" }}>
-                  <div
-                    className="muted"
-                    style={{
-                      fontSize: 11,
-                      textTransform: "uppercase",
-                      fontWeight: 600,
-                      letterSpacing: "0.05em",
-                    }}
-                  >
-                    Customer
-                  </div>
-                  <div style={{ fontWeight: 600, fontSize: 13, marginTop: 4 }}>
-                    {detailBill.customer?.full_name ?? "—"}
-                  </div>
-                  <div className="muted mono" style={{ fontSize: 11 }}>
-                    {getCustomerSecondaryId(detailBill.customer ?? {}) ?? ""}
-                  </div>
+              {/* Customer Info & Billing Month */}
+              <div className="bill-detail-grid-2">
+                <div className="bill-detail-card">
+                  <span className="label">Customer</span>
+                  <span className="value">{detailBill.customer?.full_name ?? "—"}</span>
+                  <span className="subtext mono">{getCustomerSecondaryId(detailBill.customer ?? {}) ?? ""}</span>
                   {detailBill.customer?.address_value && (
-                    <div
-                      className="muted"
-                      style={{ fontSize: 11, marginTop: 2 }}
-                    >
-                      {detailBill.customer.address_value}
-                    </div>
+                    <span className="subtext">{detailBill.customer.address_value}</span>
                   )}
                 </div>
-                <div className="card card-pad" style={{ padding: "10px 14px" }}>
-                  <div
-                    className="muted"
-                    style={{
-                      fontSize: 11,
-                      textTransform: "uppercase",
-                      fontWeight: 600,
-                      letterSpacing: "0.05em",
-                    }}
-                  >
-                    Billing Month
-                  </div>
-                  <div style={{ fontWeight: 600, fontSize: 13, marginTop: 4 }}>
-                    {detailBill.month}
-                  </div>
+                <div className="bill-detail-card">
+                  <span className="label">Billing Month</span>
+                  <span className="value">{detailBill.month}</span>
                 </div>
               </div>
-              <div className="grid-responsive-4" style={{ gap: 12 }}>
-                <div className="card card-pad" style={{ padding: "10px 14px" }}>
-                  <div
-                    className="muted"
-                    style={{
-                      fontSize: 11,
-                      textTransform: "uppercase",
-                      fontWeight: 600,
-                      letterSpacing: "0.05em",
-                    }}
-                  >
-                    Amount
-                  </div>
-                  <div
-                    className="num"
-                    style={{ fontWeight: 700, fontSize: 15, marginTop: 4 }}
-                  >
-                    {fmt(detailBill.amount)}
-                  </div>
+
+              {/* Amount, Paid, Remaining */}
+              <div className="bill-detail-grid-3">
+                <div className="bill-detail-card">
+                  <span className="label">Amount</span>
+                  <span className="value">{fmt(detailBill.amount)}</span>
                 </div>
-                <div className="card card-pad" style={{ padding: "10px 14px" }}>
-                  <div
-                    className="muted"
-                    style={{
-                      fontSize: 11,
-                      textTransform: "uppercase",
-                      fontWeight: 600,
-                      letterSpacing: "0.05em",
-                    }}
-                  >
-                    Paid
-                  </div>
-                  <div
-                    className="num"
-                    style={{
-                      fontWeight: 700,
-                      fontSize: 15,
-                      marginTop: 4,
-                      color: "var(--green)",
-                    }}
-                  >
-                    {fmt(detailBill.paid_amount ?? 0)}
-                  </div>
+                <div className="bill-detail-card">
+                  <span className="label">Paid</span>
+                  <span className="value" style={{ color: "var(--green)" }}>{fmt(detailBill.paid_amount ?? 0)}</span>
                 </div>
-                <div className="card card-pad" style={{ padding: "10px 14px" }}>
-                  <div
-                    className="muted"
-                    style={{
-                      fontSize: 11,
-                      textTransform: "uppercase",
-                      fontWeight: 600,
-                      letterSpacing: "0.05em",
-                    }}
-                  >
-                    Remaining
-                  </div>
-                  <div
-                    className="num"
-                    style={{
-                      fontWeight: 700,
-                      fontSize: 15,
-                      marginTop: 4,
-                      color:
-                        remainingAmount(detailBill) > 0
-                          ? "var(--amber)"
-                          : "var(--green)",
-                    }}
-                  >
+                <div className="bill-detail-card">
+                  <span className="label">Remaining</span>
+                  <span className="value" style={{ color: remainingAmount(detailBill) > 0 ? "var(--amber)" : "var(--green)" }}>
                     {fmt(remainingAmount(detailBill))}
-                  </div>
+                  </span>
                 </div>
               </div>
+
+              {/* Ledger Balance Summary */}
               {detailBalance && (
-                <div className="grid-responsive-4" style={{ gap: 12 }}>
-                  <div className="card card-pad" style={{ padding: "10px 14px" }}>
-                    <div
-                      className="muted"
-                      style={{
-                        fontSize: 11,
-                        textTransform: "uppercase",
-                        fontWeight: 600,
-                        letterSpacing: "0.05em",
-                      }}
-                    >
-                      Previous Months
-                    </div>
-                    <div
-                      className="num"
-                      style={{ fontWeight: 700, fontSize: 15, marginTop: 4 }}
-                    >
-                      {fmt(detailBalance.previousDue)}
-                    </div>
+                <div className="bill-detail-grid-4">
+                  <div className="bill-detail-card">
+                    <span className="label">Previous</span>
+                    <span className="value">{fmt(detailBalance.previousDue)}</span>
                   </div>
-                  <div className="card card-pad" style={{ padding: "10px 14px" }}>
-                    <div
-                      className="muted"
-                      style={{
-                        fontSize: 11,
-                        textTransform: "uppercase",
-                        fontWeight: 600,
-                        letterSpacing: "0.05em",
-                      }}
-                    >
-                      Current Month
-                    </div>
-                    <div
-                      className="num"
-                      style={{ fontWeight: 700, fontSize: 15, marginTop: 4 }}
-                    >
-                      {fmt(detailBalance.currentDue)}
-                    </div>
+                  <div className="bill-detail-card">
+                    <span className="label">Current</span>
+                    <span className="value">{fmt(detailBalance.currentDue)}</span>
                   </div>
-                  <div
-                    className="card card-pad"
-                    style={{ padding: "10px 14px", borderColor: "var(--brand)" }}
-                  >
-                    <div
-                      className="muted"
-                      style={{
-                        fontSize: 11,
-                        textTransform: "uppercase",
-                        fontWeight: 600,
-                        letterSpacing: "0.05em",
-                      }}
-                    >
-                      Total Payable
-                    </div>
-                    <div
-                      className="num"
-                      style={{
-                        fontWeight: 800,
-                        fontSize: 15,
-                        marginTop: 4,
-                        color: "var(--brand)",
-                      }}
-                    >
-                      {fmt(detailBalance.totalOutstanding)}
-                    </div>
+                  <div className="bill-detail-card highlight-brand">
+                    <span className="label">Total Payable</span>
+                    <span className="value">{fmt(detailBalance.totalOutstanding)}</span>
                   </div>
-                  <div className="card card-pad" style={{ padding: "10px 14px" }}>
-                    <div
-                      className="muted"
-                      style={{
-                        fontSize: 11,
-                        textTransform: "uppercase",
-                        fontWeight: 600,
-                        letterSpacing: "0.05em",
-                      }}
-                    >
-                      Open Bills
-                    </div>
-                    <div style={{ fontWeight: 700, fontSize: 15, marginTop: 4 }}>
-                      {detailBalance.openBillCount}
-                    </div>
+                  <div className="bill-detail-card">
+                    <span className="label">Open Bills</span>
+                    <span className="value">{detailBalance.openBillCount}</span>
                   </div>
                 </div>
               )}
-              {detailBill.receipt_no && (
-                <div className="card card-pad" style={{ padding: "10px 14px" }}>
-                  <div
-                    className="muted"
-                    style={{
-                      fontSize: 11,
-                      textTransform: "uppercase",
-                      fontWeight: 600,
-                      letterSpacing: "0.05em",
-                    }}
-                  >
-                    Receipt No
-                  </div>
-                  <div
-                    className="mono"
-                    style={{ fontWeight: 600, fontSize: 13, marginTop: 4 }}
-                  >
-                    {detailBill.receipt_no}
-                  </div>
-                </div>
-              )}
-              {detailBill.paid_at && (() => {
-                const paidAtDate = new Date(detailBill.paid_at);
-                const formattedDate = Number.isNaN(paidAtDate.getTime()) ? "-" : paidAtDate.toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' });
-                const formattedTime = Number.isNaN(paidAtDate.getTime()) ? "-" : paidAtDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+
+              {/* Visit details if payment_method is visit */}
+              {detailBill.payment_method === "visit" && (() => {
+                const targetPaidAt = billPayments[0]?.paid_at ?? detailBill.paid_at;
+                let paidAtDateStr = "-";
+                let paidAtTimeStr = "-";
+                if (targetPaidAt) {
+                  const d = new Date(targetPaidAt);
+                  if (!isNaN(d.getTime())) {
+                    paidAtDateStr = d.toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' });
+                    paidAtTimeStr = d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+                  }
+                }
                 return (
-                  <div className="card card-pad" style={{ padding: "10px 14px" }}>
-                    <div
-                      className="muted"
-                      style={{
-                        fontSize: 11,
-                        textTransform: "uppercase",
-                        fontWeight: 600,
-                        letterSpacing: "0.05em",
-                        marginBottom: 8,
-                      }}
-                    >
-                      Paid At
-                    </div>
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                      <div className="card" style={{ padding: "10px 14px", background: "var(--bg-muted)" }}>
-                        <div
-                          className="muted"
-                          style={{
-                            fontSize: 11,
-                            textTransform: "uppercase",
-                            fontWeight: 600,
-                            letterSpacing: "0.05em",
-                          }}
-                        >
-                          Date
-                        </div>
-                        <div style={{ fontWeight: 600, fontSize: 13, marginTop: 4 }}>
-                          {formattedDate}
-                        </div>
+                  <div className="bill-detail-card" style={{ gap: 8, borderColor: "var(--amber)" }}>
+                    <span className="label" style={{ color: "var(--amber)" }}>Visit Details</span>
+                    <div className="bill-detail-pill-container">
+                      <div className="bill-detail-pill-box">
+                        <span className="label">Visited Date</span>
+                        <span className="value">{paidAtDateStr}</span>
                       </div>
-                      <div className="card" style={{ padding: "10px 14px", background: "var(--bg-muted)" }}>
-                        <div
-                          className="muted"
-                          style={{
-                            fontSize: 11,
-                            textTransform: "uppercase",
-                            fontWeight: 600,
-                            letterSpacing: "0.05em",
-                          }}
-                        >
-                          Time
-                        </div>
-                        <div style={{ fontWeight: 600, fontSize: 13, marginTop: 4 }}>
-                          {formattedTime}
-                        </div>
+                      <div className="bill-detail-pill-box">
+                        <span className="label">Visited Time</span>
+                        <span className="value">{paidAtTimeStr}</span>
                       </div>
                     </div>
+                    {detailBill.collector && (
+                      <div style={{ marginTop: 6, fontSize: 12, color: "var(--text)" }}>
+                        <strong>Visited By: </strong>{detailBill.collector.full_name}
+                      </div>
+                    )}
+                    {detailBill.payment_note && (
+                      <div style={{ marginTop: 4, fontSize: 12, color: "var(--text)" }}>
+                        <strong>Remarks: </strong>{detailBill.payment_note}
+                      </div>
+                    )}
                   </div>
                 );
               })()}
-              {detailBill.payment_source === "office" && (
-                <div
-                  className="card card-pad"
-                  style={{ padding: "10px 14px", borderColor: "var(--green)" }}
-                >
-                  <div
-                    className="muted"
-                    style={{
-                      fontSize: 11,
-                      textTransform: "uppercase",
-                      fontWeight: 600,
-                      letterSpacing: "0.05em",
-                    }}
-                  >
-                    Payment Source
-                  </div>
-                  <div
-                    style={{
-                      fontWeight: 700,
-                      fontSize: 13,
-                      marginTop: 4,
-                      color: "var(--green)",
-                    }}
-                  >
-                    Paid in Office
-                  </div>
-                </div>
-              )}
-              {(detailBill.payment_method || detailBill.collector) && (
-                <div className="grid-responsive-2" style={{ gap: 12 }}>
-                  {detailBill.payment_method && (
-                    <div
-                      className="card card-pad"
-                      style={{ padding: "10px 14px" }}
-                    >
-                      <div
-                        className="muted"
-                        style={{
-                          fontSize: 11,
-                          textTransform: "uppercase",
-                          fontWeight: 600,
-                          letterSpacing: "0.05em",
-                        }}
-                      >
-                        {detailBill.payment_method === "visit"
-                          ? "Visit Type"
-                          : "Method"}
+
+              {/* Paid details: pills + payment details (if paid/partial and NOT a pure visit) */}
+              {detailBill.payment_method !== "visit" && (detailBill.paid_at || billPayments.length > 0) && (() => {
+                const targetPaidAt = billPayments[0]?.paid_at ?? detailBill.paid_at;
+                const targetMethod = billPayments[0]?.method ?? detailBill.payment_method;
+                const targetCollector = billPayments[0]?.collector?.full_name ?? detailBill.collector?.full_name;
+                const targetNote = billPayments[0]?.note ?? detailBill.payment_note;
+                const lastPaidAmt = billPayments[0]?.amount ?? detailBill.paid_amount ?? 0;
+                const latestReceipt = billPayments[0]?.receipt_no ?? detailBill.receipt_no;
+
+                let paidAtDateStr = "-";
+                let paidAtTimeStr = "-";
+                if (targetPaidAt) {
+                  const d = new Date(targetPaidAt);
+                  if (!isNaN(d.getTime())) {
+                    paidAtDateStr = d.toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' });
+                    paidAtTimeStr = d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+                  }
+                }
+
+                return (
+                  <>
+                    {targetPaidAt && (
+                      <div className="bill-detail-card" style={{ gap: 8 }}>
+                        <span className="label">Paid At</span>
+                        <div className="bill-detail-pill-container">
+                          <div className="bill-detail-pill-box">
+                            <span className="label">Date</span>
+                            <span className="value">{paidAtDateStr}</span>
+                          </div>
+                          <div className="bill-detail-pill-box">
+                            <span className="label">Time</span>
+                            <span className="value">{paidAtTimeStr}</span>
+                          </div>
+                        </div>
                       </div>
-                      <div
-                        style={{ fontWeight: 600, fontSize: 13, marginTop: 4 }}
-                      >
-                        {detailBill.payment_method === "visit" ? (
-                          <Badge color="amber" dot>
-                            {detailBill.payment_note ?? "Visit"}
-                          </Badge>
-                        ) : (
-                          <span style={{ textTransform: "capitalize" }}>
-                            {detailBill.payment_method}
-                          </span>
+                    )}
+
+                    {(targetMethod || targetCollector || lastPaidAmt > 0 || latestReceipt) && (
+                      <div className="bill-detail-grid-2">
+                        {targetMethod && (
+                          <div className="bill-detail-card">
+                            <span className="label">Method</span>
+                            <span className="value" style={{ textTransform: "capitalize" }}>{targetMethod}</span>
+                          </div>
+                        )}
+                        {targetCollector && (
+                          <div className="bill-detail-card">
+                            <span className="label">Collected By</span>
+                            <span className="value">{targetCollector}</span>
+                          </div>
+                        )}
+                        {lastPaidAmt > 0 && (
+                          <div className="bill-detail-card">
+                            <span className="label">Last Paid</span>
+                            <span className="value" style={{ color: "var(--green)" }}>{fmt(lastPaidAmt)}</span>
+                          </div>
+                        )}
+                        {latestReceipt && (
+                          <div className="bill-detail-card">
+                            <span className="label">Receipt No</span>
+                            <span className="value mono">{latestReceipt}</span>
+                          </div>
                         )}
                       </div>
-                    </div>
-                  )}
-                  {detailBill.collector && (
-                    <div
-                      className="card card-pad"
-                      style={{ padding: "10px 14px" }}
-                    >
-                      <div
-                        className="muted"
-                        style={{
-                          fontSize: 11,
-                          textTransform: "uppercase",
-                          fontWeight: 600,
-                          letterSpacing: "0.05em",
-                        }}
-                      >
-                        {detailBill.payment_method === "visit"
-                          ? "Visited By"
-                          : detailBill.payment_source === "customer"
-                          ? "Approved By"
-                          : "Collected By"}
+                    )}
+
+                    {targetNote && (
+                      <div className="bill-detail-card">
+                        <span className="label">Notes</span>
+                        <span className="value" style={{ fontWeight: "normal", fontSize: 13 }}>{targetNote}</span>
                       </div>
-                      <div
-                        style={{ fontWeight: 600, fontSize: 13, marginTop: 4 }}
-                      >
-                        {detailBill.collector.full_name}
-                        {detailBill.payment_source === "customer" && " (Online Receipt Approval)"}
-                        {detailBill.payment_source === "office" && " (Office)"}
-                        {detailBill.payment_source === "agent" && " (Field Recovery)"}
-                      </div>
-                    </div>
-                  )}
+                    )}
+                  </>
+                );
+              })()}
+
+              {/* Payment History List (table) */}
+              {billPayments.length > 0 && (
+                <div className="bill-detail-card">
+                  <span className="label">Payment History</span>
+                  <table className="payment-history-table">
+                    <thead>
+                      <tr>
+                        <th>Date/Time</th>
+                        <th>Amount</th>
+                        <th>Method</th>
+                        <th>Collected By</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {billPayments.map((p) => {
+                        const date = p.paid_at ? new Date(p.paid_at) : null;
+                        const formatted = date && !isNaN(date.getTime())
+                          ? `${date.toLocaleDateString("en-US", { month: "short", day: "numeric" })} ${date.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true })}`
+                          : "-";
+                        return (
+                          <tr key={p.id}>
+                            <td>{formatted}</td>
+                            <td style={{ fontWeight: 600 }}>{fmt(p.amount ?? 0)}</td>
+                            <td style={{ textTransform: "capitalize" }}>{p.method ?? "-"}</td>
+                            <td>{p.collector?.full_name ?? p.collected_by ?? "-"}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
                 </div>
               )}
-              {detailBill.payment_note &&
-                detailBill.payment_method !== "visit" && (
-                  <div
-                    className="card card-pad"
-                    style={{ padding: "10px 14px" }}
-                  >
-                    <div
-                      className="muted"
-                      style={{
-                        fontSize: 11,
-                        textTransform: "uppercase",
-                        fontWeight: 600,
-                        letterSpacing: "0.05em",
-                      }}
-                    >
-                      Notes
-                    </div>
-                    <div style={{ fontSize: 13, marginTop: 4 }}>
-                      {detailBill.payment_note}
-                    </div>
-                  </div>
-                )}
             </div>
 
             <div
