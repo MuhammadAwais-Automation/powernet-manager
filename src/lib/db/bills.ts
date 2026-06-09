@@ -222,6 +222,12 @@ export async function getRecentVisitedBills(
 export async function getBillsPage(
   params: BillsPageParams,
 ): Promise<BillsPageResult> {
+  try {
+    await supabase.rpc("transition_pending_bills_to_overdue");
+  } catch (e) {
+    console.error("Failed to transition pending bills to overdue:", e);
+  }
+
   const { from, to } = getBillRange(params.page, params.pageSize);
   const key = buildBillsPageCacheKey(params);
   if (billsPageCache[key] && billsPageCache[key].expiresAt > Date.now())
