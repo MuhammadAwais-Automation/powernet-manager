@@ -95,6 +95,7 @@ function OfficePaymentModal({
   onSaved: (notice: string, bill?: BillWithRelations | null) => void;
 }) {
   const remaining = remainingAmount(bill);
+  const ledgerOutstanding = (bill as BillingBillRow).ledger_total_outstanding ?? remaining;
   const [amount, setAmount] = useState(String(remaining));
   const [method, setMethod] = useState<PaymentMethod>("cash");
   const [paidAt, setPaidAt] = useState(() =>
@@ -164,6 +165,26 @@ function OfficePaymentModal({
             }}
           >
             {error}
+          </div>
+        )}
+        {ledgerOutstanding > remaining && (
+          <div
+            style={{
+              padding: "10px 12px",
+              borderRadius: 8,
+              background: "#fffbeb",
+              color: "#b45309",
+              border: "1px solid #fef3c7",
+              marginBottom: 12,
+              fontSize: 12.5,
+              lineHeight: "1.4",
+            }}
+          >
+            <strong>⚠️ Outstanding Dues Alert</strong>
+            <div style={{ marginTop: 2 }}>
+              This customer has previous unpaid bills. Total ledger outstanding is <strong>{fmt(ledgerOutstanding)}</strong>.
+              Please ensure you apply payments to their oldest unpaid bills first to keep ledgers aligned.
+            </div>
           </div>
         )}
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -892,16 +913,32 @@ export default function BillingPage({
                       <td className="num" style={{ color: "var(--green)" }}>
                         {fmt(b.paid_amount ?? 0)}
                       </td>
-                      <td
-                        className="num"
-                        style={{
-                          color:
-                            ledgerRemainingAmount(b) > 0
-                              ? "var(--amber)"
-                              : "var(--green)",
-                        }}
-                      >
-                        {fmt(ledgerRemainingAmount(b))}
+                      <td className="num">
+                        <div
+                          style={{
+                            fontWeight: 600,
+                            color:
+                              remainingAmount(b) > 0
+                                ? "var(--amber)"
+                                : "var(--green)",
+                          }}
+                        >
+                          {fmt(remainingAmount(b))}
+                        </div>
+                        {ledgerRemainingAmount(b) > remainingAmount(b) && (
+                          <div
+                            className="muted"
+                            style={{
+                              fontSize: 10,
+                              color: "var(--red)",
+                              marginTop: 2,
+                              whiteSpace: "nowrap",
+                            }}
+                            title={`Total outstanding across all months: ${fmt(ledgerRemainingAmount(b))}`}
+                          >
+                            +{fmt(ledgerRemainingAmount(b) - remainingAmount(b))} dues
+                          </div>
+                        )}
                       </td>
                       <td>
                         <Badge color={statusColor(statusLabel(b))} dot>
