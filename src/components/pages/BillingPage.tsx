@@ -10,6 +10,7 @@ import {
   getBillByIdWithRelations,
   getCustomerBalanceSummary,
   recordBillPayment,
+  type BillingBillRow,
   type BillingSummary,
   type GenerateBillsResult,
 } from "@/lib/db/bills";
@@ -39,6 +40,10 @@ function remainingAmount(
   return Math.max(bill.amount - (bill.paid_amount ?? 0), 0);
 }
 
+function ledgerRemainingAmount(bill: Pick<BillingBillRow, "amount" | "paid_amount" | "ledger_total_outstanding">): number {
+  return bill.ledger_total_outstanding ?? remainingAmount(bill);
+}
+
 function statusColor(status: string): "green" | "red" | "amber" | "purple" {
   if (status === "paid") return "green";
   if (status === "partial") return "purple";
@@ -66,6 +71,12 @@ function statusLabel(
   }
   const status = getBillCollectionStatus(bill);
   return status === "partial" ? "partial" : bill.status;
+}
+
+function getBillChannelSource(
+  bill: Pick<BillingBillRow, "payment_source" | "ledger_latest_source">,
+): BillingBillRow["payment_source"] {
+  return bill.payment_source ?? bill.ledger_latest_source ?? null;
 }
 
 function OfficePaymentModal({
@@ -231,7 +242,7 @@ export default function BillingPage({
   focusBillId?: string | null;
   focusToken?: number;
 }) {
-  const [bills, setBills] = useState<BillWithRelations[]>([]);
+  const [bills, setBills] = useState<BillingBillRow[]>([]);
   const [summary, setSummary] = useState<BillingSummary | null>(null);
   const [totalBills, setTotalBills] = useState(0);
   const [areas, setAreas] = useState<Area[]>([]);
@@ -873,12 +884,12 @@ export default function BillingPage({
                         className="num"
                         style={{
                           color:
-                            remainingAmount(b) > 0
+                            ledgerRemainingAmount(b) > 0
                               ? "var(--amber)"
                               : "var(--green)",
                         }}
                       >
-                        {fmt(remainingAmount(b))}
+                        {fmt(ledgerRemainingAmount(b))}
                       </td>
                       <td>
                         <Badge color={statusColor(statusLabel(b))} dot>
@@ -886,14 +897,14 @@ export default function BillingPage({
                         </Badge>
                       </td>
                       <td>
-                        {b.status === 'paid' || (b.paid_amount ?? 0) > 0 ? (
-                          b.payment_source === 'customer' ? (
+                        {Boolean(getBillChannelSource(b)) ? (
+                          getBillChannelSource(b) === 'customer' ? (
                             <Badge color="green">🌐 Online</Badge>
-                          ) : b.payment_source === 'office' ? (
+                          ) : getBillChannelSource(b) === 'office' ? (
                             <Badge color="blue">🏢 Office</Badge>
-                          ) : b.payment_source === 'agent' ? (
+                          ) : getBillChannelSource(b) === 'agent' ? (
                             <Badge color="purple">🛵 Field</Badge>
-                          ) : b.payment_source === 'manual' ? (
+                          ) : getBillChannelSource(b) === 'manual' ? (
                             <Badge color="amber">✍️ Manual</Badge>
                           ) : (
                             <span className="muted" style={{ fontSize: 11 }}>—</span>
@@ -918,7 +929,7 @@ export default function BillingPage({
                           >
                             <Icon name="fileText" size={14} />
                           </button>
-                          {remainingAmount(b) > 0 && (
+                          {ledgerRemainingAmount(b) > 0 && (
                             <button
                               className="icon-btn"
                               style={{ width: 28, height: 28 }}

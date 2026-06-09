@@ -85,6 +85,11 @@ export type BillsPageResult = {
 
 export type BillingBillRow = BillWithRelations & {
   ledger_collection_status?: DerivedBillCollectionStatus;
+  ledger_total_outstanding?: number;
+  ledger_total_paid?: number;
+  ledger_open_bill_count?: number;
+  ledger_latest_source?: PaymentSource | null;
+  ledger_activity_at?: string | null;
 };
 
 export type PaymentEventWithRelations = Payment & {
@@ -243,7 +248,11 @@ export async function getBillsPage(
   const customerIds = mergeCustomerIdFilters(searchIds, areaIds);
   const ledgerPartialCustomerIds =
     params.status === "partial"
-      ? await findLedgerPartialCustomerIdsForMonth(params.month, customerIds)
+      ? await findLedgerPartialCustomerIdsForMonth(
+          params.month,
+          customerIds,
+          params.source,
+        )
       : undefined;
   const effectiveCustomerIds =
     params.status === "partial"
@@ -267,9 +276,7 @@ export async function getBillsPage(
     let query = supabase
       .from("bills")
       .select(select, { count: "exact" })
-      .eq("month", params.month)
-      .order("created_at", { ascending: false })
-      .range(from, to);
+      .eq("month", params.month);
 
     if (params.status === "unpaid") query = query.neq("status", "paid");
     else if (params.status === "partial")
@@ -279,7 +286,13 @@ export async function getBillsPage(
     else if (params.status) query = query.eq("status", params.status);
     if (params.source) query = query.eq("payment_source", params.source);
     if (effectiveCustomerIds) query = query.in("customer_id", effectiveCustomerIds);
-    return query;
+    query =
+      params.status === "paid"
+        ? query
+            .order("paid_at", { ascending: false, nullsFirst: false })
+            .order("created_at", { ascending: false })
+        : query.order("created_at", { ascending: false });
+    return query.range(from, to);
   });
 
   const baseRows = (data ?? []) as unknown as BillWithRelations[];
@@ -719,8 +732,9 @@ function sumRemaining(rows: unknown): number {
 async function findLedgerPartialCustomerIdsForMonth(
   month: string,
   customerIds?: string[],
+  source?: string,
 ): Promise<string[]> {
-  const paidCustomerIds = await findCustomersWithAnyPaidBill(customerIds);
+  const paidCustomerIds = await findCustomersWithAnyPaidBill(customerIds, source);
   if (paidCustomerIds.size === 0) return [];
   const openRows = await fetchOpenBillRowsForMonth<{ customer_id: string }>(
     month,
@@ -757,16 +771,26 @@ async function annotateRowsWithLedgerStatuses(
   const byCustomer = new Map<
     string,
     Array<{
+      id?: string;
+      month?: string;
       amount: number;
       paid_amount: number | null;
       status: "pending" | "paid" | "overdue";
+      payment_source?: PaymentSource | null;
+      paid_at?: string | null;
+      created_at?: string | null;
     }>
   >();
   (data as Array<{
     customer_id: string;
+    id?: string;
+    month?: string;
     amount: number;
     paid_amount: number | null;
     status: "pending" | "paid" | "overdue";
+    payment_source?: PaymentSource | null;
+    paid_at?: string | null;
+    created_at?: string | null;
   }>).forEach((bill) => {
     const group = byCustomer.get(bill.customer_id) ?? [];
     group.push(bill);
@@ -776,9 +800,24 @@ async function annotateRowsWithLedgerStatuses(
   return rows.map((row) => {
     const customerBills = byCustomer.get(row.customer_id);
     if (!customerBills) return row;
+    const balance = buildCustomerBalanceSummary(customerBills, row.month);
+    const latestPaidBill = customerBills
+      .filter((bill) => (bill.paid_amount ?? 0) > 0 || bill.status === "paid")
+      .sort((a, b) =>
+        getLedgerActivityAt(b).localeCompare(getLedgerActivityAt(a)),
+      )[0];
+    const ledgerActivityAt = customerBills.reduce((latest, bill) => {
+      const activityAt = getLedgerActivityAt(bill);
+      return activityAt > latest ? activityAt : latest;
+    }, "");
     return {
       ...row,
       ledger_collection_status: getCustomerLedgerCollectionStatus(customerBills),
+      ledger_total_outstanding: balance.totalOutstanding,
+      ledger_total_paid: balance.totalPaid,
+      ledger_open_bill_count: balance.openBillCount,
+      ledger_latest_source: row.payment_source ?? latestPaidBill?.payment_source ?? null,
+      ledger_activity_at: ledgerActivityAt || null,
     };
   });
 }
@@ -795,11 +834,16 @@ async function getLedgerPartialBillsPage(
     created_at: string | null;
   }>(params.month, {
     customerIds: partialCustomerIds,
-    source: params.source,
     select: "id, customer_id, created_at",
   });
+  const ledgerRows = await fetchBillLedgerRowsForCustomers(
+    Array.from(new Set(openRows.map((row) => row.customer_id).filter(Boolean))),
+  );
+  const activityByCustomer = buildLatestActivityByCustomer(ledgerRows);
   const sortedRows = openRows.sort((a, b) =>
-    (b.created_at ?? "").localeCompare(a.created_at ?? ""),
+    (activityByCustomer.get(b.customer_id) ?? b.created_at ?? "").localeCompare(
+      activityByCustomer.get(a.customer_id) ?? a.created_at ?? "",
+    ),
   );
   const pageIds = sortedRows.slice(from, to + 1).map((row) => row.id);
   if (pageIds.length === 0) return { rows: [], total: sortedRows.length };
@@ -858,10 +902,11 @@ async function fetchOpenBillRowsForMonth<T extends { customer_id: string }>(
 
 async function findCustomersWithAnyPaidBill(
   customerIds?: string[],
+  source?: string,
 ): Promise<Set<string>> {
   if (customerIds?.length === 0) return new Set();
   if (!customerIds || customerIds.length > 500) {
-    const paidCustomerIds = await findAllCustomersWithAnyPaidBill();
+    const paidCustomerIds = await findAllCustomersWithAnyPaidBill(source);
     if (!customerIds) return paidCustomerIds;
     const allowedCustomerIds = new Set(customerIds);
     return new Set(
@@ -874,12 +919,16 @@ async function findCustomersWithAnyPaidBill(
   const paidCustomerIds = new Set<string>();
   for (const chunk of chunkArray(customerIds, POSTGREST_IN_CHUNK_SIZE)) {
     for (let from = 0; ; from += SUPABASE_PAGE_SIZE) {
-      const { data, error } = await supabase
+      let query = supabase
         .from("bills")
         .select("customer_id")
         .gt("paid_amount", 0)
-        .in("customer_id", chunk)
-        .range(from, from + SUPABASE_PAGE_SIZE - 1);
+        .in("customer_id", chunk);
+      if (source) query = query.eq("payment_source", source);
+      const { data, error } = await query.range(
+        from,
+        from + SUPABASE_PAGE_SIZE - 1,
+      );
       if (error) throw error;
       const page = (data ?? []) as Array<{ customer_id: string | null }>;
       page.forEach((row) => {
@@ -891,14 +940,20 @@ async function findCustomersWithAnyPaidBill(
   return paidCustomerIds;
 }
 
-async function findAllCustomersWithAnyPaidBill(): Promise<Set<string>> {
+async function findAllCustomersWithAnyPaidBill(
+  source?: string,
+): Promise<Set<string>> {
   const paidCustomerIds = new Set<string>();
   for (let from = 0; ; from += SUPABASE_PAGE_SIZE) {
-    const { data, error } = await supabase
+    let query = supabase
       .from("bills")
       .select("customer_id")
-      .gt("paid_amount", 0)
-      .range(from, from + SUPABASE_PAGE_SIZE - 1);
+      .gt("paid_amount", 0);
+    if (source) query = query.eq("payment_source", source);
+    const { data, error } = await query.range(
+      from,
+      from + SUPABASE_PAGE_SIZE - 1,
+    );
     if (error) throw error;
     const page = (data ?? []) as Array<{ customer_id: string | null }>;
     page.forEach((row) => {
@@ -914,22 +969,32 @@ async function fetchBillLedgerRowsForCustomers(
 ): Promise<
   Array<{
     customer_id: string;
+    id: string;
+    month: string;
     amount: number;
     paid_amount: number | null;
     status: "pending" | "paid" | "overdue";
+    payment_source: PaymentSource | null;
+    paid_at: string | null;
+    created_at: string | null;
   }>
 > {
   const rows: Array<{
     customer_id: string;
+    id: string;
+    month: string;
     amount: number;
     paid_amount: number | null;
     status: "pending" | "paid" | "overdue";
+    payment_source: PaymentSource | null;
+    paid_at: string | null;
+    created_at: string | null;
   }> = [];
   for (const chunk of chunkArray(customerIds, POSTGREST_IN_CHUNK_SIZE)) {
     for (let from = 0; ; from += SUPABASE_PAGE_SIZE) {
       const { data, error } = await supabase
         .from("bills")
-        .select("customer_id, amount, paid_amount, status")
+        .select("id, customer_id, month, amount, paid_amount, status, payment_source, paid_at, created_at")
         .in("customer_id", chunk)
         .range(from, from + SUPABASE_PAGE_SIZE - 1);
       if (error) throw error;
@@ -939,6 +1004,29 @@ async function fetchBillLedgerRowsForCustomers(
     }
   }
   return rows;
+}
+
+function buildLatestActivityByCustomer(
+  rows: Array<{
+    customer_id: string;
+    paid_at?: string | null;
+    created_at?: string | null;
+  }>,
+): Map<string, string> {
+  const latestByCustomer = new Map<string, string>();
+  rows.forEach((row) => {
+    const activityAt = getLedgerActivityAt(row);
+    const current = latestByCustomer.get(row.customer_id) ?? "";
+    if (activityAt > current) latestByCustomer.set(row.customer_id, activityAt);
+  });
+  return latestByCustomer;
+}
+
+function getLedgerActivityAt(row: {
+  paid_at?: string | null;
+  created_at?: string | null;
+}): string {
+  return row.paid_at ?? row.created_at ?? "";
 }
 
 function chunkArray<T>(values: T[], size: number): T[][] {
