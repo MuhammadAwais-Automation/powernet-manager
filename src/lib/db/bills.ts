@@ -4,7 +4,6 @@ import {
   buildCustomerBalanceSummary,
   buildPaymentCollectionSummary,
   getCustomerLedgerCollectionStatus,
-  getLedgerPartialCustomerIds,
   normalizeBillingMonth,
   type DerivedBillCollectionStatus,
   type CustomerBalanceSummary,
@@ -118,6 +117,8 @@ let billingSummaryCache: Record<
   { data: BillingSummary; expiresAt: number }
 > = {};
 const CACHE_MS = 60_000;
+const SUPABASE_PAGE_SIZE = 1000;
+const POSTGREST_IN_CHUNK_SIZE = 100;
 const CUSTOMER_SEARCH_LIMIT = 250;
 export const BILL_PAGE_SELECT = `
   id,
@@ -256,6 +257,11 @@ export async function getBillsPage(
     };
     return emptyResult;
   }
+  if (params.status === "partial") {
+    const result = await getLedgerPartialBillsPage(params, effectiveCustomerIds ?? []);
+    billsPageCache[key] = { data: result, expiresAt: Date.now() + CACHE_MS };
+    return result;
+  }
 
   const { data, count } = await runBillSelectWithLegacyFallback((select) => {
     let query = supabase
@@ -276,9 +282,12 @@ export async function getBillsPage(
     return query;
   });
 
-  const rows = await annotateRowsWithLedgerStatuses(
-    (data ?? []) as unknown as BillWithRelations[],
-  );
+  const baseRows = (data ?? []) as unknown as BillWithRelations[];
+  const rows = await withTimeout(
+    annotateRowsWithLedgerStatuses(baseRows),
+    5_000,
+    "Ledger status annotation timed out",
+  ).catch(() => baseRows);
 
   const result = {
     rows,
@@ -448,10 +457,11 @@ export async function getBillingSummary(
     }>,
     month,
   );
-  const ledgerPartialBills = await countLedgerPartialBillsForMonth(
-    month,
-    areaCustomerIds,
-  );
+  const ledgerPartialBills = await withTimeout(
+    countLedgerPartialBillsForMonth(month, areaCustomerIds),
+    8_000,
+    "Ledger partial count timed out",
+  ).catch(() => partialRes.count ?? 0);
   const summary: BillingSummary = {
     month,
     totalBills: totalRes.count ?? 0,
@@ -710,34 +720,14 @@ async function findLedgerPartialCustomerIdsForMonth(
   month: string,
   customerIds?: string[],
 ): Promise<string[]> {
-  if (customerIds?.length === 0) return [];
-  let openQuery = supabase
-    .from("bills")
-    .select("customer_id")
-    .eq("month", month)
-    .neq("status", "paid");
-  if (customerIds) openQuery = openQuery.in("customer_id", customerIds);
-
-  const { data: openRows, error: openError } = await openQuery;
-  if (openError) throw openError;
-  const openCustomerIds = Array.from(
-    new Set((openRows ?? []).map((row) => row.customer_id).filter(Boolean)),
+  const paidCustomerIds = await findCustomersWithAnyPaidBill(customerIds);
+  if (paidCustomerIds.size === 0) return [];
+  const openRows = await fetchOpenBillRowsForMonth<{ customer_id: string }>(
+    month,
+    { customerIds: Array.from(paidCustomerIds), select: "customer_id" },
   );
-  if (openCustomerIds.length === 0) return [];
-
-  const { data: ledgerRows, error: ledgerError } = await supabase
-    .from("bills")
-    .select("customer_id, amount, paid_amount, status")
-    .in("customer_id", openCustomerIds);
-  if (ledgerError) throw ledgerError;
-
-  return getLedgerPartialCustomerIds(
-    (ledgerRows ?? []) as Array<{
-      customer_id: string;
-      amount: number;
-      paid_amount: number | null;
-      status: "pending" | "paid" | "overdue";
-    }>,
+  return Array.from(
+    new Set((openRows ?? []).map((row) => row.customer_id).filter(Boolean)),
   );
 }
 
@@ -745,20 +735,13 @@ async function countLedgerPartialBillsForMonth(
   month: string,
   customerIds?: string[],
 ): Promise<number> {
-  const partialCustomerIds = await findLedgerPartialCustomerIdsForMonth(
+  const paidCustomerIds = await findCustomersWithAnyPaidBill(customerIds);
+  if (paidCustomerIds.size === 0) return 0;
+  const openRows = await fetchOpenBillRowsForMonth<{ customer_id: string }>(
     month,
-    customerIds,
+    { customerIds: Array.from(paidCustomerIds), select: "customer_id" },
   );
-  if (partialCustomerIds.length === 0) return 0;
-
-  const { count, error } = await supabase
-    .from("bills")
-    .select("id", { count: "exact", head: true })
-    .eq("month", month)
-    .neq("status", "paid")
-    .in("customer_id", partialCustomerIds);
-  if (error) throw error;
-  return count ?? 0;
+  return openRows.length;
 }
 
 async function annotateRowsWithLedgerStatuses(
@@ -769,11 +752,7 @@ async function annotateRowsWithLedgerStatuses(
   );
   if (customerIds.length === 0) return rows;
 
-  const { data, error } = await supabase
-    .from("bills")
-    .select("customer_id, amount, paid_amount, status")
-    .in("customer_id", customerIds);
-  if (error) throw error;
+  const data = await fetchBillLedgerRowsForCustomers(customerIds);
 
   const byCustomer = new Map<
     string,
@@ -783,7 +762,7 @@ async function annotateRowsWithLedgerStatuses(
       status: "pending" | "paid" | "overdue";
     }>
   >();
-  ((data ?? []) as Array<{
+  (data as Array<{
     customer_id: string;
     amount: number;
     paid_amount: number | null;
@@ -802,6 +781,172 @@ async function annotateRowsWithLedgerStatuses(
       ledger_collection_status: getCustomerLedgerCollectionStatus(customerBills),
     };
   });
+}
+
+async function getLedgerPartialBillsPage(
+  params: BillsPageParams,
+  partialCustomerIds: string[],
+): Promise<BillsPageResult> {
+  if (partialCustomerIds.length === 0) return { rows: [], total: 0 };
+  const { from, to } = getBillRange(params.page, params.pageSize);
+  const openRows = await fetchOpenBillRowsForMonth<{
+    id: string;
+    customer_id: string;
+    created_at: string | null;
+  }>(params.month, {
+    customerIds: partialCustomerIds,
+    source: params.source,
+    select: "id, customer_id, created_at",
+  });
+  const sortedRows = openRows.sort((a, b) =>
+    (b.created_at ?? "").localeCompare(a.created_at ?? ""),
+  );
+  const pageIds = sortedRows.slice(from, to + 1).map((row) => row.id);
+  if (pageIds.length === 0) return { rows: [], total: sortedRows.length };
+
+  const { data } = await runBillSelectWithLegacyFallback((select) =>
+    supabase
+      .from("bills")
+      .select(select)
+      .in("id", pageIds)
+      .order("created_at", { ascending: false }),
+  );
+  const baseRows = (data ?? []) as unknown as BillWithRelations[];
+  const rows = await withTimeout(
+    annotateRowsWithLedgerStatuses(baseRows),
+    5_000,
+    "Ledger status annotation timed out",
+  ).catch(() => baseRows);
+  return { rows, total: sortedRows.length };
+}
+
+async function fetchOpenBillRowsForMonth<T extends { customer_id: string }>(
+  month: string,
+  options: {
+    customerIds?: string[];
+    select: string;
+    source?: string;
+  },
+): Promise<T[]> {
+  if (options.customerIds?.length === 0) return [];
+  const rows: T[] = [];
+  const chunks = options.customerIds
+    ? chunkArray(options.customerIds, POSTGREST_IN_CHUNK_SIZE)
+    : [undefined];
+
+  for (const chunk of chunks) {
+    for (let from = 0; ; from += SUPABASE_PAGE_SIZE) {
+      let query = supabase
+        .from("bills")
+        .select(options.select)
+        .eq("month", month)
+        .neq("status", "paid")
+        .range(from, from + SUPABASE_PAGE_SIZE - 1);
+      if (options.source) query = query.eq("payment_source", options.source);
+      if (chunk) query = query.in("customer_id", chunk);
+
+      const { data, error } = await query;
+      if (error) throw error;
+      const page = (data ?? []) as unknown as T[];
+      rows.push(...page);
+      if (page.length < SUPABASE_PAGE_SIZE) break;
+    }
+  }
+
+  return rows;
+}
+
+async function findCustomersWithAnyPaidBill(
+  customerIds?: string[],
+): Promise<Set<string>> {
+  if (customerIds?.length === 0) return new Set();
+  if (!customerIds || customerIds.length > 500) {
+    const paidCustomerIds = await findAllCustomersWithAnyPaidBill();
+    if (!customerIds) return paidCustomerIds;
+    const allowedCustomerIds = new Set(customerIds);
+    return new Set(
+      Array.from(paidCustomerIds).filter((customerId) =>
+        allowedCustomerIds.has(customerId),
+      ),
+    );
+  }
+
+  const paidCustomerIds = new Set<string>();
+  for (const chunk of chunkArray(customerIds, POSTGREST_IN_CHUNK_SIZE)) {
+    for (let from = 0; ; from += SUPABASE_PAGE_SIZE) {
+      const { data, error } = await supabase
+        .from("bills")
+        .select("customer_id")
+        .gt("paid_amount", 0)
+        .in("customer_id", chunk)
+        .range(from, from + SUPABASE_PAGE_SIZE - 1);
+      if (error) throw error;
+      const page = (data ?? []) as Array<{ customer_id: string | null }>;
+      page.forEach((row) => {
+        if (row.customer_id) paidCustomerIds.add(row.customer_id);
+      });
+      if (page.length < SUPABASE_PAGE_SIZE) break;
+    }
+  }
+  return paidCustomerIds;
+}
+
+async function findAllCustomersWithAnyPaidBill(): Promise<Set<string>> {
+  const paidCustomerIds = new Set<string>();
+  for (let from = 0; ; from += SUPABASE_PAGE_SIZE) {
+    const { data, error } = await supabase
+      .from("bills")
+      .select("customer_id")
+      .gt("paid_amount", 0)
+      .range(from, from + SUPABASE_PAGE_SIZE - 1);
+    if (error) throw error;
+    const page = (data ?? []) as Array<{ customer_id: string | null }>;
+    page.forEach((row) => {
+      if (row.customer_id) paidCustomerIds.add(row.customer_id);
+    });
+    if (page.length < SUPABASE_PAGE_SIZE) break;
+  }
+  return paidCustomerIds;
+}
+
+async function fetchBillLedgerRowsForCustomers(
+  customerIds: string[],
+): Promise<
+  Array<{
+    customer_id: string;
+    amount: number;
+    paid_amount: number | null;
+    status: "pending" | "paid" | "overdue";
+  }>
+> {
+  const rows: Array<{
+    customer_id: string;
+    amount: number;
+    paid_amount: number | null;
+    status: "pending" | "paid" | "overdue";
+  }> = [];
+  for (const chunk of chunkArray(customerIds, POSTGREST_IN_CHUNK_SIZE)) {
+    for (let from = 0; ; from += SUPABASE_PAGE_SIZE) {
+      const { data, error } = await supabase
+        .from("bills")
+        .select("customer_id, amount, paid_amount, status")
+        .in("customer_id", chunk)
+        .range(from, from + SUPABASE_PAGE_SIZE - 1);
+      if (error) throw error;
+      const page = (data ?? []) as typeof rows;
+      rows.push(...page);
+      if (page.length < SUPABASE_PAGE_SIZE) break;
+    }
+  }
+  return rows;
+}
+
+function chunkArray<T>(values: T[], size: number): T[][] {
+  const chunks: T[][] = [];
+  for (let index = 0; index < values.length; index += size) {
+    chunks.push(values.slice(index, index + size));
+  }
+  return chunks;
 }
 
 async function findAreaCustomerIds(
@@ -832,18 +977,36 @@ async function findBillingCustomerIds(
   search: string,
   limit: number,
 ): Promise<string[]> {
-  const safeSearch = search.replaceAll(",", " ");
+  const searchTerms = buildCustomerSearchTerms(search);
+  if (searchTerms.length === 0) return [];
+  const filters = searchTerms
+    .flatMap((term) => [
+      `full_name.ilike.%${term}%`,
+      `customer_code.ilike.%${term}%`,
+      `username.ilike.%${term}%`,
+    ])
+    .join(",");
   const { data, error } = await supabase
     .from("customers")
     .select("id")
-    .or(
-      `full_name.ilike.%${safeSearch}%,customer_code.ilike.%${safeSearch}%,username.ilike.%${safeSearch}%`,
-    )
+    .or(filters)
     .order("customer_code")
     .limit(limit);
 
   if (error) throw error;
   return Array.from(new Set((data ?? []).map((row) => row.id).filter(Boolean)));
+}
+
+function buildCustomerSearchTerms(search: string): string[] {
+  const raw = search
+    .replace(/[,%()]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  const spaced = raw.replace(/[-_/]+/g, " ").replace(/\s+/g, " ").trim();
+  const compact = raw.replace(/[-_/\s]+/g, "").trim();
+  return Array.from(new Set([raw, spaced, compact])).filter(
+    (term) => term.length >= 2,
+  );
 }
 
 export type PaymentVerificationWithRelations = {

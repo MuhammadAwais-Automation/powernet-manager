@@ -50,7 +50,11 @@ export function normalizeBillStatusFilter(tab: BillingTab): BillStatusFilter {
 }
 
 export function normalizeBillingSearch(search?: string): string | undefined {
-  const normalized = search?.trim().replace(/\s+/g, " ");
+  const normalized = search
+    ?.trim()
+    .replace(/[,%()]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
   return normalized && normalized.length >= 2 ? normalized : undefined;
 }
 

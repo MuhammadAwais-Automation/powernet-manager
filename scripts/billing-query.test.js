@@ -41,6 +41,7 @@ assert.strictEqual(query.normalizeBillStatusFilter('Unpaid'), 'unpaid')
 
 assert.strictEqual(query.normalizeBillingSearch('  CUST-001  '), 'CUST-001')
 assert.strictEqual(query.normalizeBillingSearch(' Awais   Khan '), 'Awais Khan')
+assert.strictEqual(query.normalizeBillingSearch(' Saif, Ullah (old) '), 'Saif Ullah old')
 assert.strictEqual(query.normalizeBillingSearch('a'), undefined)
 assert.strictEqual(query.normalizeBillingSearch('   '), undefined)
 
