@@ -271,6 +271,11 @@ export async function getBillsPage(
     billsPageCache[key] = { data: result, expiresAt: Date.now() + CACHE_MS };
     return result;
   }
+  if (!params.source && params.status !== "paid") {
+    const result = await getActivitySortedBillsPage(params, effectiveCustomerIds);
+    billsPageCache[key] = { data: result, expiresAt: Date.now() + CACHE_MS };
+    return result;
+  }
 
   const { data, count } = await runBillSelectWithLegacyFallback((select) => {
     let query = supabase
@@ -862,6 +867,133 @@ async function getLedgerPartialBillsPage(
     "Ledger status annotation timed out",
   ).catch(() => baseRows);
   return { rows, total: sortedRows.length };
+}
+
+async function getActivitySortedBillsPage(
+  params: BillsPageParams,
+  customerIds?: string[],
+): Promise<BillsPageResult> {
+  const { from, to } = getBillRange(params.page, params.pageSize);
+  const candidateRows = await fetchBillActivityRowsForMonth(params, customerIds);
+  if (candidateRows.length === 0) return { rows: [], total: 0 };
+
+  const activityByCustomer = await fetchPaymentActivityByCustomer(
+    Array.from(
+      new Set(candidateRows.map((row) => row.customer_id).filter(Boolean)),
+    ),
+  );
+  const sortedRows = candidateRows.sort((a, b) =>
+    getBillActivityAt(b, activityByCustomer).localeCompare(
+      getBillActivityAt(a, activityByCustomer),
+    ),
+  );
+  const pageIds = sortedRows.slice(from, to + 1).map((row) => row.id);
+  if (pageIds.length === 0) return { rows: [], total: sortedRows.length };
+
+  const { data } = await runBillSelectWithLegacyFallback((select) =>
+    supabase
+      .from("bills")
+      .select(select)
+      .in("id", pageIds),
+  );
+  const rowsById = new Map(
+    ((data ?? []) as unknown as BillWithRelations[]).map((row) => [row.id, row]),
+  );
+  const orderedRows = pageIds
+    .map((id) => rowsById.get(id))
+    .filter(Boolean) as BillWithRelations[];
+  const rows = await withTimeout(
+    annotateRowsWithLedgerStatuses(orderedRows),
+    5_000,
+    "Ledger status annotation timed out",
+  ).catch(() => orderedRows);
+  return { rows, total: sortedRows.length };
+}
+
+async function fetchBillActivityRowsForMonth(
+  params: BillsPageParams,
+  customerIds?: string[],
+): Promise<
+  Array<{
+    id: string;
+    customer_id: string;
+    paid_at: string | null;
+    created_at: string | null;
+  }>
+> {
+  const chunks = customerIds
+    ? chunkArray(customerIds, POSTGREST_IN_CHUNK_SIZE)
+    : [undefined];
+  const rows: Array<{
+    id: string;
+    customer_id: string;
+    paid_at: string | null;
+    created_at: string | null;
+  }> = [];
+
+  for (const chunk of chunks) {
+    for (let from = 0; ; from += SUPABASE_PAGE_SIZE) {
+      let query = supabase
+        .from("bills")
+        .select("id, customer_id, paid_at, created_at")
+        .eq("month", params.month)
+        .range(from, from + SUPABASE_PAGE_SIZE - 1);
+      if (params.status === "unpaid") query = query.neq("status", "paid");
+      else if (params.status === "visited") query = query.eq("payment_method", "visit");
+      else if (params.status) query = query.eq("status", params.status);
+      if (chunk) query = query.in("customer_id", chunk);
+
+      const { data, error } = await query;
+      if (error) throw error;
+      const page = (data ?? []) as typeof rows;
+      rows.push(...page);
+      if (page.length < SUPABASE_PAGE_SIZE) break;
+    }
+  }
+
+  return rows;
+}
+
+async function fetchPaymentActivityByCustomer(
+  customerIds: string[],
+): Promise<Map<string, string>> {
+  const activityByCustomer = new Map<string, string>();
+  for (const chunk of chunkArray(customerIds, POSTGREST_IN_CHUNK_SIZE)) {
+    for (let from = 0; ; from += SUPABASE_PAGE_SIZE) {
+      const { data, error } = await supabase
+        .from("payments")
+        .select("customer_id, paid_at, created_at")
+        .in("customer_id", chunk)
+        .range(from, from + SUPABASE_PAGE_SIZE - 1);
+      if (error) throw error;
+      const page = (data ?? []) as Array<{
+        customer_id: string | null;
+        paid_at: string | null;
+        created_at: string | null;
+      }>;
+      page.forEach((payment) => {
+        if (!payment.customer_id) return;
+        const activityAt = payment.paid_at ?? payment.created_at ?? "";
+        const current = activityByCustomer.get(payment.customer_id) ?? "";
+        if (activityAt > current) {
+          activityByCustomer.set(payment.customer_id, activityAt);
+        }
+      });
+      if (page.length < SUPABASE_PAGE_SIZE) break;
+    }
+  }
+  return activityByCustomer;
+}
+
+function getBillActivityAt(
+  bill: {
+    customer_id: string;
+    paid_at?: string | null;
+    created_at?: string | null;
+  },
+  activityByCustomer: Map<string, string>,
+): string {
+  return activityByCustomer.get(bill.customer_id) ?? bill.paid_at ?? bill.created_at ?? "";
 }
 
 async function fetchOpenBillRowsForMonth<T extends { customer_id: string }>(
