@@ -1296,3 +1296,38 @@ table.data tr.selected { background: var(--blue-50); }
   border-bottom: none;
 }
 
+/* Responsive layout for bill details modal contents */
+.bill-details-layout {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 20px;
+  margin-bottom: 20px;
+}
+
+.bill-details-ledger-grid,
+.bill-details-info-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+@media (min-width: 768px) {
+  .bill-details-layout {
+    grid-template-columns: 1fr 1.1fr;
+  }
+}
+
+@media (max-width: 480px) {
+  .bill-detail-grid-2 {
+    grid-template-columns: 1fr;
+  }
+  .bill-detail-grid-3 {
+    grid-template-columns: 1fr;
+  }
+  .bill-details-ledger-grid,
+  .bill-details-info-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+

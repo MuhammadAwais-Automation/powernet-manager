@@ -1178,36 +1178,22 @@ export default function BillingPage({
           onClose={() => setDetailBill(null)}
           width={800}
         >
-          <div style={{ padding: "24px 28px" }}>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                marginBottom: 20,
-              }}
-            >
-              <div>
-                <div style={{ fontWeight: 700, fontSize: 16 }}>
-                  Bill Details
-                </div>
-                <div className="muted" style={{ fontSize: 12 }}>
-                  #{detailBill.id.slice(0, 8).toUpperCase()}
-                </div>
+          <div className="modal-head">
+            <div>
+              <div style={{ fontWeight: 700, fontSize: 16 }}>
+                Bill Details
               </div>
-              <Badge color={statusColor(statusLabel(detailBill, detailBalance))} dot>
-                {statusLabel(detailBill, detailBalance)}
-              </Badge>
+              <div className="muted" style={{ fontSize: 12 }}>
+                #{detailBill.id.slice(0, 8).toUpperCase()}
+              </div>
             </div>
+            <Badge color={statusColor(statusLabel(detailBill, detailBalance))} dot>
+              {statusLabel(detailBill, detailBalance)}
+            </Badge>
+          </div>
 
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "1fr 1.1fr",
-                gap: 20,
-                marginBottom: 20,
-              }}
-            >
+          <div className="modal-body" style={{ padding: "20px 24px" }}>
+            <div className="bill-details-layout">
               {/* Left Column: Customer Profile + Amount Stats + Ledger */}
               <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                 {/* Customer Profile Card */}
@@ -1295,7 +1281,7 @@ export default function BillingPage({
 
                 {/* Ledger Balance Summary (2x2 Grid) */}
                 {detailBalance && (
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                  <div className="bill-details-ledger-grid">
                     <div className="bill-detail-card">
                       <span className="label">Previous Dues</span>
                       <span className="value">{fmt(detailBalance.previousDue)}</span>
@@ -1395,7 +1381,7 @@ export default function BillingPage({
                       )}
 
                       {(targetMethod || targetCollector || lastPaidAmt > 0 || latestReceipt) && (
-                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                        <div className="bill-details-info-grid">
                           {targetMethod && (
                             <div className="bill-detail-card">
                               <span className="label">Method</span>
@@ -1467,49 +1453,47 @@ export default function BillingPage({
                 )}
               </div>
             </div>
+          </div>
 
-            <div
-              style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}
+          <div className="modal-foot">
+            <button
+              className="btn btn-secondary"
+              onClick={() => setDetailBill(null)}
             >
+              Close
+            </button>
+            {remainingAmount(detailBill) > 0 && (
               <button
                 className="btn btn-secondary"
-                onClick={() => setDetailBill(null)}
+                onClick={() => setPaymentBill(detailBill)}
               >
-                Close
+                <Icon name="cash" size={14} />
+                Record Payment
               </button>
-              {remainingAmount(detailBill) > 0 && (
-                <button
-                  className="btn btn-secondary"
-                  onClick={() => setPaymentBill(detailBill)}
-                >
-                  <Icon name="cash" size={14} />
-                  Record Payment
-                </button>
-              )}
-              <button
-                className="btn btn-primary"
-                onClick={() => {
-                  const b = detailBill;
-                  const balance = detailBalance ?? {
-                    currentDue: remainingAmount(b),
-                    previousDue: 0,
-                    totalOutstanding: remainingAmount(b),
-                    totalPaid: b.paid_amount ?? 0,
-                    openBillCount: remainingAmount(b) > 0 ? 1 : 0,
-                    currentBillId: b.id,
-                  };
-                  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Receipt ${b.receipt_no ?? b.id.slice(0, 8)}</title><style>body{font-family:sans-serif;padding:32px;max-width:400px;margin:auto}h2{margin-bottom:4px}p{margin:4px 0;font-size:14px}.row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #eee}.label{color:#888;font-size:12px}</style></head><body><h2>Payment Receipt</h2><p class="label">#${(b.receipt_no ?? b.id.slice(0, 8)).toUpperCase()}</p><div class="row"><span class="label">Customer</span><span>${b.customer?.full_name ?? "-"} (${b.customer?.customer_code ?? ""})</span></div><div class="row"><span class="label">Month</span><span>${b.month}</span></div><div class="row"><span class="label">Current Month</span><span>Rs. ${balance.currentDue.toLocaleString()}</span></div><div class="row"><span class="label">Previous Months</span><span>Rs. ${balance.previousDue.toLocaleString()}</span></div><div class="row"><span class="label">Total Payable</span><span>Rs. ${balance.totalOutstanding.toLocaleString()}</span></div><div class="row"><span class="label">Paid This Bill</span><span>Rs. ${(b.paid_amount ?? 0).toLocaleString()}</span></div><div class="row"><span class="label">Status</span><span>${statusLabel(b, balance)}</span></div>${b.payment_method ? `<div class="row"><span class="label">Method</span><span>${b.payment_method}</span></div>` : ""}${b.collector ? `<div class="row"><span class="label">Collected By</span><span>${b.collector.full_name}</span></div>` : ""}<script>window.onload=()=>window.print()</script></body></html>`;
-                  const w = window.open("", "_blank");
-                  if (w) {
-                    w.document.write(html);
-                    w.document.close();
-                  }
-                }}
-              >
-                <Icon name="download" size={14} />
-                Print Receipt
-              </button>
-            </div>
+            )}
+            <button
+              className="btn btn-primary"
+              onClick={() => {
+                const b = detailBill;
+                const balance = detailBalance ?? {
+                  currentDue: remainingAmount(b),
+                  previousDue: 0,
+                  totalOutstanding: remainingAmount(b),
+                  totalPaid: b.paid_amount ?? 0,
+                  openBillCount: remainingAmount(b) > 0 ? 1 : 0,
+                  currentBillId: b.id,
+                };
+                const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Receipt ${b.receipt_no ?? b.id.slice(0, 8)}</title><style>body{font-family:sans-serif;padding:32px;max-width:400px;margin:auto}h2{margin-bottom:4px}p{margin:4px 0;font-size:14px}.row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #eee}.label{color:#888;font-size:12px}</style></head><body><h2>Payment Receipt</h2><p class="label">#${(b.receipt_no ?? b.id.slice(0, 8)).toUpperCase()}</p><div class="row"><span class="label">Customer</span><span>${b.customer?.full_name ?? "-"} (${b.customer?.customer_code ?? ""})</span></div><div class="row"><span class="label">Month</span><span>${b.month}</span></div><div class="row"><span class="label">Current Month</span><span>Rs. ${balance.currentDue.toLocaleString()}</span></div><div class="row"><span class="label">Previous Months</span><span>Rs. ${balance.previousDue.toLocaleString()}</span></div><div class="row"><span class="label">Total Payable</span><span>Rs. ${balance.totalOutstanding.toLocaleString()}</span></div><div class="row"><span class="label">Paid This Bill</span><span>Rs. ${(b.paid_amount ?? 0).toLocaleString()}</span></div><div class="row"><span class="label">Status</span><span>${statusLabel(b, balance)}</span></div>${b.payment_method ? `<div class="row"><span class="label">Method</span><span>${b.payment_method}</span></div>` : ""}${b.collector ? `<div class="row"><span class="label">Collected By</span><span>${b.collector.full_name}</span></div>` : ""}<script>window.onload=()=>window.print()</script></body></html>`;
+                const w = window.open("", "_blank");
+                if (w) {
+                  w.document.write(html);
+                  w.document.close();
+                }
+              }}
+            >
+              <Icon name="download" size={14} />
+              Print Receipt
+            </button>
           </div>
         </Modal>
       )}
