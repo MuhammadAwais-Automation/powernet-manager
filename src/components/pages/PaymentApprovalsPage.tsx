@@ -54,6 +54,13 @@ function ApprovalDrawer({
 
   if (!verification) return null;
 
+  const c = verification.customer;
+  const addrLabel = c?.address_type === 'quarter'
+    ? `Quarter / Room ${c.address_value ?? ''}`
+    : c?.address_type === 'house'
+    ? `House / Plot ${c.address_value ?? ''}`
+    : c?.address_value ?? null;
+
   const handleApprove = async () => {
     setBusy(true);
     setError(null);
@@ -143,7 +150,7 @@ function ApprovalDrawer({
           }}>
             <Icon name="checkCircle" size={16} style={{ marginTop: 2 }} />
             <div>
-              <div style={{ fontWeight: 700 }}>Receipt Approved & Verified</div>
+              <div style={{ fontWeight: 700 }}>Receipt Approved &amp; Verified</div>
               <div style={{ fontSize: 11, opacity: 0.85, marginTop: 2 }}>
                 Reviewed by {verification.reviewer?.full_name ?? 'Administrator'} on {new Date(verification.reviewed_at!).toLocaleString()}
               </div>
@@ -174,7 +181,41 @@ function ApprovalDrawer({
           </div>
         )}
 
-        {/* Verification Context Card */}
+        {/* Customer Profile Card */}
+        {c && (
+          <div className="card card-pad" style={{ marginBottom: 14 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+              <strong style={{ fontSize: 14 }}>Customer Profile</strong>
+              <span style={{ 
+                fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 99,
+                background: c.status === 'active' ? 'var(--green-bg, #f0fdf4)' : 'var(--red-bg, #fef2f2)',
+                color: c.status === 'active' ? 'var(--green, #15803d)' : 'var(--red, #b91c1c)',
+              }}>
+                {(c.status ?? 'unknown').toUpperCase()}
+              </span>
+            </div>
+            <InfoRow label="Full Name" value={c.full_name} />
+            {c.father_name && <InfoRow label="Father's Name" value={c.father_name} />}
+            {c.gender && <InfoRow label="Gender" value={c.gender} />}
+            {c.cnic && <InfoRow label="CNIC" value={<span className="mono">{c.cnic}</span>} mono />}
+            <InfoRow label="Phone" value={<span className="mono">{c.phone}</span>} />
+            {c.whatsapp && <InfoRow label="WhatsApp" value={<span className="mono">{c.whatsapp}</span>} />}
+            {c.email && <InfoRow label="Email" value={c.email} />}
+            {addrLabel && <InfoRow label="Address" value={addrLabel} />}
+            {c.house_id && <InfoRow label="House ID" value={<span className="mono">{c.house_id}</span>} mono />}
+            {c.area && <InfoRow label="Area" value={`${c.area.name} (${c.area.code})`} />}
+            {c.onu_number && <InfoRow label="ONU Number" value={<span className="mono">{c.onu_number}</span>} mono />}
+            {c.package && <InfoRow label="Package" value={`${c.package.name} — ${c.package.speed_mbps} Mbps — Rs. ${c.package.default_price.toLocaleString()}`} />}
+            {c.iptv !== null && <InfoRow label="IPTV" value={c.iptv ? '✓ Yes' : 'No'} />}
+            {c.connection_date && <InfoRow label="Connected Since" value={new Date(c.connection_date).toLocaleDateString()} />}
+            {c.profession && <InfoRow label="Profession" value={c.profession} />}
+            {c.rank_or_position && <InfoRow label="Rank / Position" value={c.rank_or_position} />}
+            {c.unit && <InfoRow label="Unit" value={c.unit} />}
+            {c.remarks && <InfoRow label="Remarks" value={c.remarks} />}
+          </div>
+        )}
+
+        {/* Payment Transaction Details Card */}
         <div className="card card-pad" style={{ marginBottom: 14 }}>
           <div className="row gap-sm" style={{ justifyContent: 'space-between', marginBottom: 8 }}>
             <strong style={{ fontSize: 14 }}>Payment Transaction Details</strong>

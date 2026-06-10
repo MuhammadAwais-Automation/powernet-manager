@@ -188,11 +188,27 @@ export type BillWithRelations = Bill & {
     | "username"
     | "house_id"
     | "full_name"
+    | "father_name"
+    | "cnic"
+    | "phone"
+    | "whatsapp"
+    | "email"
     | "package_id"
     | "area_id"
     | "address_type"
     | "address_value"
-  > | null;
+    | "onu_number"
+    | "status"
+    | "iptv"
+    | "connection_date"
+    | "profession"
+    | "rank_or_position"
+    | "unit"
+    | "remarks"
+  > & {
+    area: Pick<Area, "id" | "name" | "code"> | null;
+    package: Pick<Package, "id" | "name" | "speed_mbps" | "default_price"> | null;
+  } | null;
   collector: Pick<Staff, "id" | "full_name"> | null;
 };
 

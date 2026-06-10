@@ -1208,17 +1208,66 @@ export default function BillingPage({
                 marginBottom: 20,
               }}
             >
-              {/* Left Column: Customer details, Month, Amount Stats, Ledger */}
+              {/* Left Column: Customer Profile + Amount Stats + Ledger */}
               <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                {/* Customer Info & Billing Month */}
+                {/* Customer Profile Card */}
+                {detailBill.customer && (() => {
+                  const c = detailBill.customer!;
+                  const addrType = c.address_type as string;
+                  const addrLabel = addrType === 'quarter'
+                    ? `Quarter / Room ${c.address_value ?? ''}`
+                    : addrType === 'house'
+                    ? `House / Plot ${c.address_value ?? ''}`
+                    : c.address_value ?? null;
+                  return (
+                    <div className="bill-detail-card" style={{ gap: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                        <span className="label">Customer Profile</span>
+                        {c.status && (
+                          <span style={{
+                            fontSize: 9, fontWeight: 700, padding: '2px 7px', borderRadius: 99,
+                            background: c.status === 'active' ? 'var(--green-bg, #f0fdf4)' : 'var(--red-bg, #fef2f2)',
+                            color: c.status === 'active' ? 'var(--green, #15803d)' : 'var(--red, #b91c1c)',
+                            textTransform: 'uppercase'
+                          }}>{c.status}</span>
+                        )}
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+                        {([
+                          ['Name', c.full_name],
+                          c.father_name ? ["Father's Name", c.father_name] : null,
+                          c.cnic ? ['CNIC', c.cnic] : null,
+                          c.phone ? ['Phone', c.phone] : null,
+                          c.whatsapp ? ['WhatsApp', c.whatsapp] : null,
+                          c.email ? ['Email', c.email] : null,
+                          c.area ? ['Area', `${c.area.name} (${c.area.code})`] : null,
+                          addrLabel ? ['Address', addrLabel] : null,
+                          c.house_id ? ['House ID', c.house_id] : null,
+                          c.onu_number ? ['ONU Number', c.onu_number] : null,
+                          c.package ? ['Package', `${c.package.name} · ${c.package.speed_mbps} Mbps`] : null,
+                          c.iptv ? ['IPTV', 'Yes'] : null,
+                          c.connection_date ? ['Connected Since', new Date(c.connection_date).toLocaleDateString()] : null,
+                          c.profession ? ['Profession', c.profession] : null,
+                          (c.rank_or_position || c.unit) ? ['Rank / Unit', [c.rank_or_position, c.unit].filter(Boolean).join(', ')] : null,
+                          c.remarks ? ['Remarks', c.remarks] : null,
+                        ] as (string[] | null)[]).filter((r): r is string[] => r !== null).map(([label, val]) => (
+                          <div key={label} style={{ display: 'grid', gridTemplateColumns: '100px 1fr', gap: 6, padding: '5px 0', borderBottom: '1px solid var(--border)', alignItems: 'start' }}>
+                            <span style={{ fontSize: 11, color: 'var(--text-muted)', lineHeight: '1.4' }}>{label}</span>
+                            <span style={{ fontSize: 12, fontWeight: 500, wordBreak: 'break-word', lineHeight: '1.4' }}>{val}</span>
+                          </div>
+                        ))}
+
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* Billing Month */}
                 <div className="bill-detail-grid-2">
                   <div className="bill-detail-card">
                     <span className="label">Customer</span>
                     <span className="value">{detailBill.customer?.full_name ?? "—"}</span>
                     <span className="subtext mono">{getCustomerSecondaryId(detailBill.customer ?? {}) ?? ""}</span>
-                    {detailBill.customer?.address_value && (
-                      <span className="subtext">{detailBill.customer.address_value}</span>
-                    )}
                   </div>
                   <div className="bill-detail-card">
                     <span className="label">Billing Month</span>

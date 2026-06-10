@@ -145,7 +145,15 @@ export const BILL_PAGE_SELECT = `
   payment_source,
   payment_note,
   created_at,
-  customer:customers(id, customer_code, username, house_id, full_name, package_id, area_id, address_type, address_value),
+  customer:customers(
+    id, customer_code, username, house_id, full_name,
+    father_name, cnic, phone, whatsapp, email,
+    package_id, area_id, address_type, address_value,
+    onu_number, status, iptv, connection_date,
+    profession, rank_or_position, unit, remarks,
+    area:areas(id, name, code),
+    package:packages(id, name, speed_mbps, default_price)
+  ),
   collector:staff(id, full_name)
 `;
 
@@ -162,7 +170,15 @@ const BILL_PAGE_SELECT_LEGACY = `
   payment_method,
   payment_note,
   created_at,
-  customer:customers(id, customer_code, username, house_id, full_name, package_id, area_id, address_type, address_value),
+  customer:customers(
+    id, customer_code, username, house_id, full_name,
+    father_name, cnic, phone, whatsapp, email,
+    package_id, area_id, address_type, address_value,
+    onu_number, status, iptv, connection_date,
+    profession, rank_or_position, unit, remarks,
+    area:areas(id, name, code),
+    package:packages(id, name, speed_mbps, default_price)
+  ),
   collector:staff(id, full_name)
 `;
 
@@ -1130,7 +1146,25 @@ export type PaymentVerificationWithRelations = {
   customer: {
     customer_code: string;
     full_name: string;
+    father_name: string | null;
+    gender: string | null;
+    cnic: string | null;
     phone: string;
+    whatsapp: string | null;
+    email: string | null;
+    address_type: string | null;
+    address_value: string | null;
+    house_id: string | null;
+    onu_number: string | null;
+    connection_date: string | null;
+    status: string | null;
+    iptv: boolean | null;
+    profession: string | null;
+    rank_or_position: string | null;
+    unit: string | null;
+    remarks: string | null;
+    area: { name: string; code: string } | null;
+    package: { name: string; speed_mbps: number; default_price: number } | null;
   } | null;
   bill: {
     month: string;
@@ -1165,7 +1199,15 @@ export async function getPaymentVerifications(
       reviewed_by,
       reviewed_at,
       created_at,
-      customer:customers(customer_code, full_name, phone),
+      customer:customers(
+        customer_code, full_name, father_name, gender,
+        cnic, phone, whatsapp, email,
+        address_type, address_value, house_id, onu_number,
+        connection_date, status, iptv,
+        profession, rank_or_position, unit, remarks,
+        area:areas(name, code),
+        package:packages(name, speed_mbps, default_price)
+      ),
       bill:bills(month, amount, paid_amount),
       reviewer:staff!reviewed_by(id, full_name)
     `)
