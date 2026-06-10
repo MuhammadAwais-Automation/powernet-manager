@@ -151,7 +151,7 @@ export const BILL_PAGE_SELECT = `
     package_id, area_id, address_type, address_value,
     onu_number, status, iptv, connection_date,
     profession, rank_or_position, unit, remarks,
-    area:areas(id, name, code),
+    area:areas(id, name, code, type),
     package:packages(id, name, speed_mbps, default_price)
   ),
   collector:staff(id, full_name)
@@ -176,7 +176,7 @@ const BILL_PAGE_SELECT_LEGACY = `
     package_id, area_id, address_type, address_value,
     onu_number, status, iptv, connection_date,
     profession, rank_or_position, unit, remarks,
-    area:areas(id, name, code),
+    area:areas(id, name, code, type),
     package:packages(id, name, speed_mbps, default_price)
   ),
   collector:staff(id, full_name)

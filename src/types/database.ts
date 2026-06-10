@@ -206,7 +206,7 @@ export type BillWithRelations = Bill & {
     | "unit"
     | "remarks"
   > & {
-    area: Pick<Area, "id" | "name" | "code"> | null;
+    area: Pick<Area, "id" | "name" | "code" | "type"> | null;
     package: Pick<Package, "id" | "name" | "speed_mbps" | "default_price"> | null;
   } | null;
   collector: Pick<Staff, "id" | "full_name"> | null;

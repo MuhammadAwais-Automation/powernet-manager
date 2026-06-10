@@ -48,6 +48,11 @@ function ledgerRemainingAmount(bill: Pick<BillingBillRow, "amount" | "paid_amoun
   return bill.ledger_total_outstanding ?? remainingAmount(bill);
 }
 
+function getBillDueDate(month: string, areaType?: string | null): string {
+  const dueDay = areaType === "garrison" ? 5 : 10;
+  return `${month}-${String(dueDay).padStart(2, "0")}`;
+}
+
 function statusColor(status: string): "green" | "red" | "amber" | "purple" {
   if (status === "paid") return "green";
   if (status === "partial") return "purple";
@@ -1248,8 +1253,8 @@ export default function BillingPage({
                   );
                 })()}
 
-                {/* Billing Month */}
-                <div className="bill-detail-grid-2">
+                {/* Billing Month & Due Date */}
+                <div className="bill-detail-grid-3">
                   <div className="bill-detail-card">
                     <span className="label">Customer</span>
                     <span className="value">{detailBill.customer?.full_name ?? "—"}</span>
@@ -1258,6 +1263,12 @@ export default function BillingPage({
                   <div className="bill-detail-card">
                     <span className="label">Billing Month</span>
                     <span className="value">{detailBill.month}</span>
+                  </div>
+                  <div className="bill-detail-card">
+                    <span className="label">Due Date</span>
+                    <span className="value" style={{ color: detailBill.status === "overdue" ? "#dc2626" : undefined }}>
+                      {getBillDueDate(detailBill.month, detailBill.customer?.area?.type)}
+                    </span>
                   </div>
                 </div>
 

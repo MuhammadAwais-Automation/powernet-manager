@@ -1048,10 +1048,10 @@ export default function ComplaintsPage({
   });
 
   const unassignedComplaints = filteredComplaints.filter(
-    (c) => c.assigned_to === null || c.assigned_to === "",
+    (c) => (c.assigned_to === null || c.assigned_to === "") && (c.team_id === null || c.team_id === ""),
   );
   const assignedComplaints = filteredComplaints.filter(
-    (c) => c.assigned_to !== null && c.assigned_to !== "",
+    (c) => (c.assigned_to !== null && c.assigned_to !== "") || (c.team_id !== null && c.team_id !== ""),
   );
 
   const byStatus = {
