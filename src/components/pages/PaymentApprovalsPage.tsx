@@ -152,7 +152,7 @@ function ApprovalDrawer({
             <div>
               <div style={{ fontWeight: 700 }}>Receipt Approved &amp; Verified</div>
               <div style={{ fontSize: 11, opacity: 0.85, marginTop: 2 }}>
-                Reviewed by {verification.reviewer?.full_name ?? 'Administrator'} on {new Date(verification.reviewed_at!).toLocaleString()}
+                Reviewed by {verification.reviewer?.full_name ?? 'Administrator'} on {verification.reviewed_at ? new Date(verification.reviewed_at).toLocaleString() : '—'}
               </div>
             </div>
           </div>
@@ -175,7 +175,7 @@ function ApprovalDrawer({
             <div>
               <div style={{ fontWeight: 700 }}>Receipt Rejected</div>
               <div style={{ fontSize: 11, opacity: 0.85, marginTop: 2 }}>
-                Reviewed by {verification.reviewer?.full_name ?? 'Administrator'} on {new Date(verification.reviewed_at!).toLocaleString()}
+                Reviewed by {verification.reviewer?.full_name ?? 'Administrator'} on {verification.reviewed_at ? new Date(verification.reviewed_at).toLocaleString() : '—'}
               </div>
             </div>
           </div>
@@ -205,7 +205,7 @@ function ApprovalDrawer({
             {c.house_id && <InfoRow label="House ID" value={<span className="mono">{c.house_id}</span>} mono />}
             {c.area && <InfoRow label="Area" value={`${c.area.name} (${c.area.code})`} />}
             {c.onu_number && <InfoRow label="ONU Number" value={<span className="mono">{c.onu_number}</span>} mono />}
-            {c.package && <InfoRow label="Package" value={`${c.package.name} — ${c.package.speed_mbps} Mbps — Rs. ${c.package.default_price.toLocaleString()}`} />}
+            {c.package && <InfoRow label="Package" value={`${c.package.name} — ${c.package.speed_mbps} Mbps — Rs. ${(c.package.default_price ?? 0).toLocaleString()}`} />}
             {c.iptv !== null && <InfoRow label="IPTV" value={c.iptv ? '✓ Yes' : 'No'} />}
             {c.connection_date && <InfoRow label="Connected Since" value={new Date(c.connection_date).toLocaleDateString()} />}
             {c.profession && <InfoRow label="Profession" value={c.profession} />}
@@ -221,21 +221,23 @@ function ApprovalDrawer({
             <strong style={{ fontSize: 14 }}>Payment Transaction Details</strong>
             <Badge color={methodMeta.color} dot>{methodMeta.label}</Badge>
           </div>
-          <InfoRow label="Amount Paid" value={<strong style={{ color: 'var(--green)' }}>Rs. {verification.amount.toLocaleString()}</strong>} />
+          <InfoRow label="Amount Paid" value={<strong style={{ color: 'var(--green)' }}>Rs. {(verification.amount ?? 0).toLocaleString()}</strong>} />
           <InfoRow label="Method" value={methodMeta.label} />
           <InfoRow label="Remarks / Ref ID" value={<span className="mono">{verification.customer_remarks || 'None'}</span>} />
           <InfoRow label="Submission Date" value={new Date(verification.created_at).toLocaleString()} />
         </div>
 
         {/* Bill Context Card */}
-        <div className="card card-pad" style={{ marginBottom: 14 }}>
-          <strong style={{ fontSize: 14 }}>Bill Context</strong>
-          <div style={{ height: 8 }} />
-          <InfoRow label="Bill Month" value={verification.bill?.month} mono />
-          <InfoRow label="Total Billed" value={`Rs. ${verification.bill?.amount.toLocaleString()}`} />
-          <InfoRow label="Already Paid" value={`Rs. ${verification.bill?.paid_amount.toLocaleString()}`} />
-          <InfoRow label="Remaining Balance" value={`Rs. ${((verification.bill?.amount ?? 0) - (verification.bill?.paid_amount ?? 0)).toLocaleString()}`} />
-        </div>
+        {verification.bill && (
+          <div className="card card-pad" style={{ marginBottom: 14 }}>
+            <strong style={{ fontSize: 14 }}>Bill Context</strong>
+            <div style={{ height: 8 }} />
+            <InfoRow label="Bill Month" value={verification.bill.month} mono />
+            <InfoRow label="Total Billed" value={`Rs. ${(verification.bill.amount ?? 0).toLocaleString()}`} />
+            <InfoRow label="Already Paid" value={`Rs. ${(verification.bill.paid_amount ?? 0).toLocaleString()}`} />
+            <InfoRow label="Remaining Balance" value={`Rs. ${((verification.bill.amount ?? 0) - (verification.bill.paid_amount ?? 0)).toLocaleString()}`} />
+          </div>
+        )}
 
         {/* Cloudinary Receipt Card */}
         <div className="card card-pad" style={{ marginBottom: 14 }}>
@@ -475,7 +477,7 @@ export default function PaymentApprovalsPage({
                   </td>
                   <td className="mono">{item.bill?.month}</td>
                   <td><Badge color={methodMeta.color} dot>{methodMeta.label}</Badge></td>
-                  <td style={{ fontWeight: 600 }}>Rs. {item.amount.toLocaleString()}</td>
+                  <td style={{ fontWeight: 600 }}>Rs. {(item.amount ?? 0).toLocaleString()}</td>
                   <td className="mono" style={{ fontSize: 12 }}>{item.customer_remarks || '—'}</td>
                   <td className="muted" style={{ fontSize: 12 }}>
                     {activeTab === 'pending' 
