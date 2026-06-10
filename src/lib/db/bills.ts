@@ -274,25 +274,15 @@ export async function getBillsPage(
     return billsPageCache[key].data;
 
   const search = normalizeBillingSearch(params.search);
-  const [searchIds, areaIds] = await Promise.all([
-    search
-      ? withTimeout(
-          findBillingCustomerIds(search, CUSTOMER_SEARCH_LIMIT),
-          15_000,
-          "Customer search timed out",
-        )
-      : undefined,
-    params.areaId
-      ? withTimeout(
-          findAreaCustomerIds(params.areaId, 5000),
-          15_000,
-          "Area filter timed out",
-        )
-      : undefined,
-  ]);
+  const searchIds = search
+    ? await withTimeout(
+        findBillingCustomerIds(search, CUSTOMER_SEARCH_LIMIT),
+        15_000,
+        "Customer search timed out",
+      )
+    : undefined;
 
-  const customerIds = mergeCustomerIdFilters(searchIds, areaIds);
-  if (customerIds?.length === 0) {
+  if (searchIds?.length === 0) {
     const emptyResult = { rows: [], total: 0 };
     billsPageCache[key] = {
       data: emptyResult,
@@ -301,7 +291,11 @@ export async function getBillsPage(
     return emptyResult;
   }
 
-  const { data, count } = await runBillSelectWithLegacyFallback((select) => {
+  const { data, count } = await runBillSelectWithLegacyFallback((selectStr) => {
+    let select = selectStr;
+    if (params.areaId) {
+      select = select.replace("customer:customers(", "customer:customers!inner(");
+    }
     let query = supabase
       .from("bills")
       .select(select, { count: "exact" })
@@ -317,7 +311,13 @@ export async function getBillsPage(
       query = query.eq("payment_method", "visit");
     else if (params.status) query = query.eq("status", params.status);
     if (params.source) query = query.eq("payment_source", params.source);
-    if (customerIds) query = query.in("customer_id", customerIds);
+    
+    if (params.areaId) {
+      query = query.eq("customer.area_id", params.areaId);
+    }
+    if (searchIds) {
+      query = query.in("customer_id", searchIds);
+    }
     return query;
   });
 
@@ -1070,29 +1070,6 @@ function chunkArray<T>(values: T[], size: number): T[][] {
   return chunks;
 }
 
-async function findAreaCustomerIds(
-  areaId: string,
-  limit: number,
-): Promise<string[]> {
-  const { data, error } = await supabase
-    .from("customers")
-    .select("id")
-    .eq("area_id", areaId)
-    .limit(limit);
-  if (error) throw error;
-  return (data ?? []).map((row) => row.id).filter(Boolean);
-}
-
-function mergeCustomerIdFilters(
-  a: string[] | undefined,
-  b: string[] | undefined,
-): string[] | undefined {
-  if (a === undefined && b === undefined) return undefined;
-  if (a === undefined) return b;
-  if (b === undefined) return a;
-  const setB = new Set(b);
-  return a.filter((id) => setB.has(id));
-}
 
 async function findBillingCustomerIds(
   search: string,
