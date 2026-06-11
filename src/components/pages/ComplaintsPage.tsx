@@ -476,12 +476,26 @@ function ComplaintModal({
   onSaved: () => void;
 }) {
   const [assignedEntity, setAssignedEntity] = useState(
-    complaint.assigned_to
-      ? `staff:${complaint.assigned_to}`
-      : complaint.team_id
-        ? `team:${complaint.team_id}`
+    complaint.team_id
+      ? `team:${complaint.team_id}`
+      : complaint.assigned_to
+        ? `staff:${complaint.assigned_to}`
         : ""
   );
+  const assignedTeam = complaint.team_id
+    ? teams.find((t) => t.id === complaint.team_id) ?? complaint.team
+    : null;
+  const assignedStaff =
+    !complaint.team_id && complaint.assigned_to
+      ? staff.find((s) => s.id === complaint.assigned_to) ?? complaint.technician
+      : null;
+  const assignedLabel = assignedTeam
+    ? assignedTeam.name
+    : assignedStaff
+      ? assignedStaff.full_name
+      : "";
+  const assignedKind = assignedTeam ? "team" : assignedStaff ? "staff" : null;
+
   const [status, setStatus] = useState(complaint.status);
   const [priority, setPriority] = useState<ComplaintPriority>(
     complaint.priority,
@@ -506,20 +520,19 @@ function ComplaintModal({
     try {
       let assignedToId: string | null = null;
       let teamId: string | null = null;
-      if (assignedEntity.startsWith("staff:")) {
-        assignedToId = assignedEntity.substring(6);
-      } else if (assignedEntity.startsWith("team:")) {
+      if (assignedEntity.startsWith("team:")) {
         teamId = assignedEntity.substring(5);
+      } else if (assignedEntity.startsWith("staff:")) {
+        assignedToId = assignedEntity.substring(6);
       }
 
-      const assignedAt =
-        (assignedToId || teamId) && !(complaint.assigned_to || complaint.team_id)
-          ? new Date().toISOString()
-          : !(assignedToId || teamId)
-            ? null
-            : complaint.assigned_at;
-
-      const newlyAssigned = (assignedToId || teamId) && !(complaint.assigned_to || complaint.team_id);
+      const hasAssignment = !!(assignedToId || teamId);
+      const newlyAssigned = hasAssignment && !(complaint.assigned_to || complaint.team_id);
+      const assignedAt = newlyAssigned
+        ? new Date().toISOString()
+        : !hasAssignment
+          ? null
+          : complaint.assigned_at;
       const effectiveStatus = newlyAssigned ? "open" : status;
 
       const inProgressAt =
@@ -537,7 +550,7 @@ function ComplaintModal({
             : complaint.resolved_at;
 
       await updateComplaint(complaint.id, {
-        assigned_to: assignedToId,
+        assigned_to: teamId ? null : assignedToId,
         team_id: teamId,
         assigned_at: assignedAt,
         in_progress_at: inProgressAt,
@@ -761,7 +774,7 @@ function ComplaintModal({
           >
             <Icon name="key" size={14} />
             <span>
-              Complaint is assigned to active board. Priority and Technician/Team
+              Complaint is assigned to active board. Priority and assignee
               fields are now locked.
             </span>
           </div>
@@ -842,10 +855,8 @@ function ComplaintModal({
           </div>
           <div className={`tl-item ${assignedEntity ? "done" : ""}`}>
             <div className="ttl">
-              {assignedEntity.startsWith("staff:") ? (
-                `Assigned to ${staff.find((s) => s.id === assignedEntity.substring(6))?.full_name ?? "Technician"}`
-              ) : assignedEntity.startsWith("team:") ? (
-                `Assigned to ${teams.find((t) => t.id === assignedEntity.substring(5))?.name ?? "Team"}`
+              {assignedLabel ? (
+                `Assigned to ${assignedLabel}${assignedKind === "team" ? " team" : ""}`
               ) : (
                 "Awaiting assignment"
               )}
@@ -1447,15 +1458,15 @@ export default function ComplaintsPage({
                         }}
                       >
                         <div className="assignee">
-                          {c.technician ? (
-                            <>
-                              <Avatar name={c.technician.full_name} size={20} />
-                              <span>{c.technician.full_name}</span>
-                            </>
-                          ) : c.team ? (
+                          {c.team ? (
                             <>
                               <Avatar name={c.team.name} size={20} />
                               <span style={{ color: 'var(--color-primary)', fontWeight: 600 }}>{c.team.name}</span>
+                            </>
+                          ) : c.technician ? (
+                            <>
+                              <Avatar name={c.technician.full_name} size={20} />
+                              <span>{c.technician.full_name}</span>
                             </>
                           ) : (
                             <span style={{ fontStyle: "italic" }}>
@@ -1509,7 +1520,7 @@ export default function ComplaintsPage({
                     <span style={{ fontSize: 12 }}>{priLabel[c.priority]}</span>
                   </td>
                   <td>
-                    {c.technician?.full_name ?? c.team?.name ?? (
+                    {c.team?.name ?? c.technician?.full_name ?? (
                       <span className="muted" style={{ fontStyle: "italic" }}>
                         Unassigned
                       </span>
