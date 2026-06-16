@@ -1,57 +1,64 @@
+<div align="center">
+
 # PowerNet Manager
 
-ISP operations dashboard for customer management, billing, complaints, staff operations, and field-service reporting.
+### ISP operations dashboard for customers, billing, staff, complaints, and reports.
 
-PowerNet Manager was built as a production-grade admin dashboard for an internet service provider workflow. It connects a Next.js dashboard with Supabase, role-based access, real-time operational views, billing flows, and staff/customer management.
+![Next.js](https://img.shields.io/badge/Next.js-15-111111?style=flat-square&logo=nextdotjs)
+![TypeScript](https://img.shields.io/badge/TypeScript-React-111111?style=flat-square&logo=typescript)
+![Supabase](https://img.shields.io/badge/Supabase-PostgreSQL-111111?style=flat-square&logo=supabase)
+![Status](https://img.shields.io/badge/Portfolio--safe-Public%20Showcase-111111?style=flat-square)
 
-## Highlights
+</div>
 
-- Admin dashboard for ISP operations
-- Customer CRM with search, status tracking, packages, areas, and service details
-- Billing and payment recovery workflows
-- Complaint intake, assignment, priority tracking, and resolution status
-- Staff roles for admin, technician, recovery agent, helper, and related field workflows
-- Reports for revenue, billing, complaints, customer growth, and area-level operations
-- Supabase Auth, PostgreSQL tables, RPC functions, and typed data access
+PowerNet Manager is a production-grade admin dashboard built for an internet service provider workflow. It connects customer CRM, billing, complaints, staff roles, reports, and Supabase-backed data operations in one dashboard.
 
-## Tech Stack
+## At a Glance
+
+| Area | Details |
+|---|---|
+| Product type | ISP management and operations dashboard |
+| Users | Admins, technicians, recovery agents, helpers |
+| Backend | Supabase Auth, PostgreSQL, RPC functions, typed data access |
+| Frontend | Next.js 15, React, TypeScript, responsive dashboard UI |
+| Showcase value | Real business workflow design, role access, reporting, and operational CRUD |
+
+## What It Proves
+
+| Capability | Example in this project |
+|---|---|
+| Business dashboard engineering | Customer, billing, complaint, staff, and reporting modules |
+| Role-based access | Admin, technician, recovery agent, helper workflows |
+| Database-backed operations | Supabase tables, RPC calls, auth, and server-side admin client |
+| Field-service thinking | Complaint assignment, payment recovery, area/package/customer tracking |
+| Production hygiene | Environment-based secrets, portfolio-safe public tree, generated artifacts excluded |
+
+## Product Surface
+
+- Customer CRM with search, service details, packages, areas, and status tracking.
+- Billing and payment recovery workflows for operational teams.
+- Complaint intake, assignment, priority handling, and resolution status.
+- Staff management for admin and field-service roles.
+- Reports for revenue, billing, complaints, customer growth, and area-level operations.
+
+## Stack
 
 | Layer | Technology |
 |---|---|
-| Frontend | Next.js 15, React, TypeScript |
-| Backend | Supabase, PostgreSQL, PostgREST, RPC |
-| Auth | Supabase Auth with role-based access |
-| UI | Custom CSS, responsive dashboard layout |
-| Charts | Custom SVG chart components |
-| Deployment | Vercel-ready Next.js app |
+| App | Next.js 15, React, TypeScript |
+| Data | Supabase, PostgreSQL, PostgREST, RPC |
+| Auth | Supabase Auth with role-aware access |
+| UI | Custom responsive dashboard components |
+| Deployment | Vercel-ready Next.js build |
 
-## Role-Based Access
-
-| Role | Purpose |
-|---|---|
-| Admin | Full dashboard access and system management |
-| Technician | Complaint and assigned field work |
-| Recovery Agent | Billing and payment recovery |
-| Helper | Limited operational support access |
-
-## Project Structure
+## Project Map
 
 ```text
 src/
-  app/                  Next.js shell
-  components/
-    App.tsx             Main dashboard shell
-    charts.tsx          Custom dashboard charts
-    ui.tsx              Shared UI primitives
-    auth/               Login and access-control UI
-    pages/              Dashboard modules
-  lib/
-    supabase.ts         Supabase anon client
-    supabase-admin.ts   Server-side admin client
-    auth/               Auth helpers
-    db/                 Data access modules
-  types/
-    database.ts         Shared database types
+  app/                  Next.js app shell and API routes
+  components/           Dashboard shell, charts, UI, auth, pages
+  lib/                  Supabase clients, auth helpers, data modules
+  types/                Shared database types
 scripts/
   sql/                  Database migrations and RPC scripts
 docs/
@@ -88,9 +95,9 @@ npm run lint
 npm run start
 ```
 
-## Notes
+## Portfolio Note
 
-This repository is a portfolio-safe code showcase. Operational secrets, local environment files, generated analysis artifacts, and private development notes are excluded from the public tree.
+This public repository is prepared as a portfolio-safe code showcase. Operational secrets, local environment files, generated analysis artifacts, and private development notes are excluded.
 
 ## License
 
