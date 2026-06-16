@@ -53,3 +53,13 @@ skills-lock.json
 # local tmp directories
 .tmp-*
 
+# generated/local analysis artifacts
+graphify-out/
+scratch/
+.codex-voice-analysis/
+docs/superpowers/
+.clinerules/
+.cursor/
+.opencode/
+.windsurf/
+
