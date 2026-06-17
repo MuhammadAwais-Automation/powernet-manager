@@ -7,8 +7,11 @@ import {
   approvePaymentVerification,
   rejectPaymentVerification,
   getPaymentVerificationCounts,
+  getVerificationBillRemaining,
+  isStalePaymentVerification,
   type PaymentVerificationWithRelations,
 } from '@/lib/db/bills';
+import { getErrorMessage } from '@/lib/utils';
 import { useNotifications } from '@/lib/notifications/notifications-context';
 
 const METHOD_META: Record<string, { label: string; color: string }> = {
@@ -61,7 +64,18 @@ function ApprovalDrawer({
     ? `House / Plot ${c.address_value ?? ''}`
     : c?.address_value ?? null;
 
+  const methodMeta = METHOD_META[verification.method] || { label: verification.method, color: 'muted' };
+  const isReadOnly = verification.status !== 'pending' || staffRole !== 'admin';
+  const billRemaining = getVerificationBillRemaining(verification);
+  const isStale = verification.status === 'pending' && isStalePaymentVerification(verification);
+  const staleRejectNote =
+    'Bill was already fully paid before this receipt was submitted. Duplicate submission closed.';
+
   const handleApprove = async () => {
+    if (isStale) {
+      setError('This bill is already fully paid. Reject this duplicate receipt instead.');
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
@@ -69,7 +83,7 @@ function ApprovalDrawer({
       onProcessed();
       onClose();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Approval failed');
+      setError(getErrorMessage(e, 'Approval failed'));
     } finally {
       setBusy(false);
     }
@@ -79,18 +93,31 @@ function ApprovalDrawer({
     setBusy(true);
     setError(null);
     try {
-      await rejectPaymentVerification(verification.id, staffId, reviewNote || 'Rejected after administrative review');
+      const note = reviewNote || (isStale ? staleRejectNote : 'Rejected after administrative review');
+      await rejectPaymentVerification(verification.id, staffId, note);
       onProcessed();
       onClose();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Rejection failed');
+      setError(getErrorMessage(e, 'Rejection failed'));
     } finally {
       setBusy(false);
     }
   };
 
-  const methodMeta = METHOD_META[verification.method] || { label: verification.method, color: 'muted' };
-  const isReadOnly = verification.status !== 'pending' || staffRole !== 'admin';
+  const handleRejectStale = async () => {
+    setReviewNote(staleRejectNote);
+    setBusy(true);
+    setError(null);
+    try {
+      await rejectPaymentVerification(verification.id, staffId, staleRejectNote);
+      onProcessed();
+      onClose();
+    } catch (e) {
+      setError(getErrorMessage(e, 'Rejection failed'));
+    } finally {
+      setBusy(false);
+    }
+  };
 
   return (
     <>
@@ -124,6 +151,29 @@ function ApprovalDrawer({
               <div style={{ fontWeight: 700 }}>Admin Review Only</div>
               <div style={{ fontSize: 11, opacity: 0.85, marginTop: 2 }}>
                 Reviewing and verifying customer receipts is restricted strictly to Administrators.
+              </div>
+            </div>
+          </div>
+        )}
+        {isStale && (
+          <div style={{
+            padding: '12px 14px',
+            borderRadius: 8,
+            background: 'var(--red-bg, #fef2f2)',
+            color: 'var(--red, #b91c1c)',
+            border: '1px solid rgba(185, 28, 28, 0.25)',
+            marginBottom: 14,
+            fontSize: 13,
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: 10,
+          }}>
+            <Icon name="alertTri" size={16} style={{ marginTop: 2 }} />
+            <div>
+              <div style={{ fontWeight: 700 }}>Duplicate Receipt — Bill Already Paid</div>
+              <div style={{ fontSize: 11, opacity: 0.85, marginTop: 2 }}>
+                This bill has Rs. {(verification.bill?.paid_amount ?? 0).toLocaleString()} paid of Rs. {(verification.bill?.amount ?? 0).toLocaleString()}.
+                Approval is blocked. Reject this stale submission to clear the queue.
               </div>
             </div>
           </div>
@@ -235,7 +285,11 @@ function ApprovalDrawer({
             <InfoRow label="Bill Month" value={verification.bill.month} mono />
             <InfoRow label="Total Billed" value={`Rs. ${(verification.bill.amount ?? 0).toLocaleString()}`} />
             <InfoRow label="Already Paid" value={`Rs. ${(verification.bill.paid_amount ?? 0).toLocaleString()}`} />
-            <InfoRow label="Remaining Balance" value={`Rs. ${((verification.bill.amount ?? 0) - (verification.bill.paid_amount ?? 0)).toLocaleString()}`} />
+            <InfoRow label="Remaining Balance" value={
+              <strong style={{ color: billRemaining <= 0 ? 'var(--red, #dc2626)' : undefined }}>
+                Rs. {billRemaining.toLocaleString()}
+              </strong>
+            } />
           </div>
         )}
 
@@ -310,6 +364,15 @@ function ApprovalDrawer({
           <button className="btn btn-secondary" onClick={onClose} style={{ marginLeft: 'auto' }}>
             Close
           </button>
+        ) : isStale ? (
+          <>
+            <button className="btn btn-secondary" onClick={onClose} disabled={busy}>
+              Close
+            </button>
+            <button className="btn btn-primary" onClick={handleRejectStale} disabled={busy} style={{ marginLeft: 'auto' }}>
+              <Icon name="ban" size={14} /> {busy ? 'Processing...' : 'Reject Duplicate'}
+            </button>
+          </>
         ) : (
           <>
             <button className="btn btn-secondary" onClick={handleReject} disabled={busy}>
@@ -358,7 +421,7 @@ export default function PaymentApprovalsPage({
         setVerifications(data);
         setCounts(cnts);
       })
-      .catch((e) => setError(e instanceof Error ? e.message : 'Could not load payment approvals queue'))
+      .catch((e) => setError(getErrorMessage(e, 'Could not load payment approvals queue')))
       .finally(() => {
         if (!silent) setLoading(false);
       });
@@ -464,6 +527,7 @@ export default function PaymentApprovalsPage({
               </tr>
             ) : verifications.map((item) => {
               const methodMeta = METHOD_META[item.method] || { label: item.method, color: 'muted' };
+              const stale = activeTab === 'pending' && isStalePaymentVerification(item);
               return (
                 <tr key={item.id} className="clickable" onClick={() => setSelected(item)}>
                   <td>
@@ -472,6 +536,9 @@ export default function PaymentApprovalsPage({
                       <div>
                         <div className="nm">{item.customer?.full_name ?? 'Unknown'}</div>
                         <div className="sub mono">{item.customer?.customer_code}</div>
+                        {stale && (
+                          <Badge color="red" dot>Bill already paid</Badge>
+                        )}
                       </div>
                     </div>
                   </td>

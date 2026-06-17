@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase";
+import { getErrorMessage } from "@/lib/utils";
 import { withTimeout } from "@/lib/async/with-timeout";
 import {
   buildCustomerBalanceSummary,
@@ -1147,12 +1148,30 @@ export type PaymentVerificationWithRelations = {
     month: string;
     amount: number;
     paid_amount: number;
+    status?: string;
   } | null;
   reviewer?: {
     id: string;
     full_name: string;
   } | null;
 };
+
+export function getVerificationBillRemaining(
+  verification: Pick<PaymentVerificationWithRelations, "bill" | "amount">,
+): number {
+  const bill = verification.bill;
+  if (!bill) return 0;
+  return Math.max((bill.amount ?? 0) - (bill.paid_amount ?? 0), 0);
+}
+
+export function isStalePaymentVerification(
+  verification: Pick<PaymentVerificationWithRelations, "bill" | "amount">,
+): boolean {
+  const bill = verification.bill;
+  if (!bill) return true;
+  if (bill.status === "paid") return true;
+  return getVerificationBillRemaining(verification) <= 0;
+}
 
 export async function getPendingPaymentVerifications(): Promise<PaymentVerificationWithRelations[]> {
   return getPaymentVerifications("pending");
@@ -1185,7 +1204,7 @@ export async function getPaymentVerifications(
         area:areas(name, code),
         package:packages(name, speed_mbps, default_price)
       ),
-      bill:bills(month, amount, paid_amount),
+      bill:bills(month, amount, paid_amount, status),
       reviewer:staff!reviewed_by(id, full_name)
     `)
     .eq("status", status)
@@ -1205,7 +1224,9 @@ export async function approvePaymentVerification(
     p_reviewer_id: reviewerId,
     p_review_note: reviewNote ?? null,
   });
-  if (error) throw error;
+  if (error) {
+    throw new Error(getErrorMessage(error, "Could not approve payment verification"));
+  }
   clearBillsCache();
 }
 
@@ -1224,7 +1245,9 @@ export async function rejectPaymentVerification(
     })
     .eq("id", id);
 
-  if (error) throw error;
+  if (error) {
+    throw new Error(getErrorMessage(error, "Could not reject payment verification"));
+  }
 }
 
 export async function getPaymentVerificationCounts(): Promise<{
