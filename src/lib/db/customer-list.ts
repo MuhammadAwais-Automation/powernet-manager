@@ -21,6 +21,7 @@ const CUSTOMER_LIST_SELECT = `
   cnic,
   phone,
   status,
+  is_tdc,
   due_amount,
   connection_date,
   area:areas(id, name),
@@ -50,7 +51,8 @@ export async function getCustomerList(params: CustomerListParams): Promise<{
 
   if (params.areaId) query = query.eq('area_id', params.areaId)
   if (params.packageId) query = query.eq('package_id', params.packageId)
-  if (params.status) query = query.eq('status', params.status)
+  if (params.status === 'tdc') query = query.eq('is_tdc', true)
+  else if (params.status) query = query.eq('status', params.status)
   if (params.iptv === true) query = query.eq('iptv', true)
   if (params.connectedBefore) query = query.lte('connection_date', params.connectedBefore)
   if (params.connectedAfter) query = query.gte('connection_date', params.connectedAfter)

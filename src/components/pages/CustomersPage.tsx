@@ -12,6 +12,10 @@ import { useAuth } from '@/lib/auth/auth-context';
 import { getBillCollectionStatus } from '@/lib/billing/core';
 import type { CustomerWithRelations, Area, Package, CustomerStatus, Bill, CustomerListRow } from '@/types/database';
 
+function customerDisplayStatus(c: { status: CustomerStatus; is_tdc?: boolean }): CustomerStatus {
+  return c.is_tdc ? 'tdc' : c.status;
+}
+
 // ── Add Customer Drawer ──────────────────────────────────────────────────────
 
 function AddCustomerDrawer({
@@ -35,7 +39,7 @@ function AddCustomerDrawer({
     area_id:           editTarget?.area_id               ?? '',
     connection_date:   editTarget?.connection_date        ?? '',
     due_amount:        editTarget?.due_amount?.toString() ?? '',
-    status:            (editTarget?.status                ?? 'active') as CustomerStatus,
+    status:            (editTarget?.is_tdc ? 'tdc' : (editTarget?.status ?? 'active')) as CustomerStatus,
     onu_number:        editTarget?.onu_number             ?? '',
     remarks:           editTarget?.remarks               ?? '',
     disconnected_date: editTarget?.disconnected_date      ?? '',
@@ -313,7 +317,7 @@ function CustomerDetail({
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px',
                       background: 'var(--bg-muted)', borderRadius: 10, marginBottom: 16,
                       border: '1px solid var(--border)' }}>
-          <Badge color={statusColor(customer.status)} dot>{customer.status.toUpperCase()}</Badge>
+          <Badge color={statusColor(customerDisplayStatus(customer))} dot>{customerDisplayStatus(customer).toUpperCase()}</Badge>
           {customer.iptv && <Badge color="purple" dot>IPTV</Badge>}
           {customer.due_amount
             ? <span style={{ marginLeft: 'auto', fontSize: 13, fontWeight: 600, fontFamily: 'JetBrains Mono, monospace' }}>
@@ -623,7 +627,7 @@ export default function CustomersPage() {
       const headers = ['Customer Code', 'Full Name', 'CNIC', 'Phone', 'Area', 'Package', 'Status', 'Due Amount'];
       const rows = all.map(c => [
         esc(c.customer_code), esc(c.full_name), esc(c.cnic), esc(c.phone),
-        esc(c.area?.name), esc(c.package?.name), esc(c.status), esc(c.due_amount),
+        esc(c.area?.name), esc(c.package?.name), esc(customerDisplayStatus(c)), esc(c.due_amount),
       ].join(','));
       const csv = [headers.join(','), ...rows].join('\n');
       const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -784,9 +788,14 @@ export default function CustomersPage() {
                 <td>{c.package?.name ?? '—'}</td>
                 <td className="mono muted" style={{ fontSize: 12 }}>{c.connection_date ?? '—'}</td>
                 <td>
-                  <Badge color={c.status === 'active' ? 'green' : c.status === 'free' ? 'blue' : c.status === 'suspended' ? 'amber' : 'red'} dot>
-                    {c.status}
+                  {(() => {
+                    const displayStatus = customerDisplayStatus(c);
+                    return (
+                  <Badge color={displayStatus === 'active' ? 'green' : displayStatus === 'free' ? 'blue' : displayStatus === 'suspended' || displayStatus === 'tdc' ? 'amber' : 'red'} dot>
+                    {displayStatus}
                   </Badge>
+                    );
+                  })()}
                 </td>
                 <td className="mono" style={{ fontSize: 12 }}>
                   {c.due_amount ? `Rs. ${c.due_amount.toLocaleString()}` : '—'}

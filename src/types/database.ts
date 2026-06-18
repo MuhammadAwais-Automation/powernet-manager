@@ -48,6 +48,7 @@ export type Customer = {
   due_amount: number | null;
   onu_number: string | null;
   status: CustomerStatus;
+  is_tdc?: boolean;
   disconnected_date: string | null;
   reconnected_date: string | null;
   remarks: string | null;
@@ -68,6 +69,7 @@ export type CustomerListRow = Pick<
   | "cnic"
   | "phone"
   | "status"
+  | "is_tdc"
   | "due_amount"
   | "connection_date"
 > & {
