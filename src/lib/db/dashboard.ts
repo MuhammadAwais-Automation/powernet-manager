@@ -25,11 +25,14 @@ export type DashboardStats = {
 };
 
 export type ActivityItem = {
+  kind: "payment" | "complaint" | "customer";
   icon: "dollar" | "alertTri" | "user";
   color: string;
   lead: string;
   amt: string;
   when: string;
+  service?: "internet" | "cable";
+  priority?: "low" | "medium" | "high";
 };
 
 type RecentPaymentRow = {
@@ -90,27 +93,34 @@ export async function getRecentActivity(): Promise<ActivityItem[]> {
   if (activityCache && activityCache.expiresAt > Date.now())
     return activityCache.value;
 
-  const [paymentsRes, complaintsRes, customersRes] = await Promise.all([
-    supabase
-      .from("payments")
-      .select("amount, paid_at, source, customer:customers(full_name)")
-      .order("paid_at", { ascending: false })
-      .limit(3),
-    supabase
-      .from("complaints")
-      .select(
-        "complaint_code, issue, priority, opened_at, customer:customers(full_name)",
-      )
-      .order("opened_at", { ascending: false })
-      .limit(3),
-    supabase
-      .from("customers")
-      .select("full_name, created_at, area:areas(name), package:packages(name)")
-      .order("created_at", { ascending: false })
-      .limit(3),
-  ]);
+  const [paymentsRes, cablePaymentsRes, complaintsRes, customersRes] =
+    await Promise.all([
+      supabase
+        .from("payments")
+        .select("amount, paid_at, source, customer:customers(full_name)")
+        .order("paid_at", { ascending: false })
+        .limit(3),
+      supabase
+        .from("cable_payments")
+        .select("amount, paid_at, customer:customers(full_name)")
+        .order("paid_at", { ascending: false })
+        .limit(3),
+      supabase
+        .from("complaints")
+        .select(
+          "complaint_code, issue, priority, opened_at, customer:customers(full_name)",
+        )
+        .order("opened_at", { ascending: false })
+        .limit(3),
+      supabase
+        .from("customers")
+        .select("full_name, created_at, area:areas(name), package:packages(name)")
+        .order("created_at", { ascending: false })
+        .limit(3),
+    ]);
 
   if (paymentsRes.error) throw paymentsRes.error;
+  if (cablePaymentsRes.error) throw cablePaymentsRes.error;
   if (complaintsRes.error) throw complaintsRes.error;
   if (customersRes.error) throw customersRes.error;
 
@@ -119,26 +129,39 @@ export async function getRecentActivity(): Promise<ActivityItem[]> {
 
   ((paymentsRes.data ?? []) as unknown as RecentPaymentRow[]).forEach((p) => {
     items.push({
+      kind: "payment",
       icon: "dollar",
       color: "green",
+      service: "internet",
       lead: `Payment received from ${p.customer?.full_name ?? "-"}`,
       amt: `Rs. ${(p.amount ?? 0).toLocaleString()}`,
       when: formatRelative(p.paid_at),
       ts: p.paid_at ?? "",
     });
   });
+  ((cablePaymentsRes.data ?? []) as unknown as RecentPaymentRow[]).forEach(
+    (p) => {
+      items.push({
+        kind: "payment",
+        icon: "dollar",
+        color: "green",
+        service: "cable",
+        lead: `Cable payment from ${p.customer?.full_name ?? "-"}`,
+        amt: `Rs. ${(p.amount ?? 0).toLocaleString()}`,
+        when: formatRelative(p.paid_at),
+        ts: p.paid_at ?? "",
+      });
+    },
+  );
   ((complaintsRes.data ?? []) as unknown as RecentComplaintRow[]).forEach(
     (c) => {
       items.push({
+        kind: "complaint",
         icon: "alertTri",
         color: c.priority === "high" ? "red" : "amber",
-        lead: `Complaint ${c.complaint_code} - ${c.issue}`,
-        amt:
-          c.priority === "high"
-            ? "High"
-            : c.priority === "medium"
-              ? "Medium"
-              : "Low",
+        priority: c.priority,
+        lead: `Complaint ${c.complaint_code} — ${c.issue}`,
+        amt: "",
         when: formatRelative(c.opened_at),
         ts: c.opened_at ?? "",
       });
@@ -146,9 +169,10 @@ export async function getRecentActivity(): Promise<ActivityItem[]> {
   );
   ((customersRes.data ?? []) as unknown as RecentCustomerRow[]).forEach((c) => {
     items.push({
+      kind: "customer",
       icon: "user",
       color: "blue",
-      lead: `New customer ${c.full_name} - ${c.area?.name ?? "-"}`,
+      lead: `New customer ${c.full_name} — ${c.area?.name ?? "-"}`,
       amt: c.package?.name ?? "-",
       when: formatRelative(c.created_at),
       ts: c.created_at ?? "",
@@ -157,7 +181,8 @@ export async function getRecentActivity(): Promise<ActivityItem[]> {
 
   const value = items
     .sort((a, b) => new Date(b.ts).getTime() - new Date(a.ts).getTime())
-    .slice(0, 5);
+    .slice(0, 5)
+    .map(({ ts: _ts, ...rest }) => rest);
 
   activityCache = { value, expiresAt: Date.now() + ACTIVITY_CACHE_MS };
   return value;

@@ -1,6 +1,6 @@
 'use client';
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import Icon from './Icon';
+import Icon, { type IconName } from './Icon';
 import DashboardPage from './pages/DashboardPage';
 import CustomersPage from './pages/CustomersPage';
 import CustomerRequestsPage from './pages/CustomerRequestsPage';
@@ -24,6 +24,7 @@ import { NAV_BY_ROLE, DEFAULT_PAGE_BY_ROLE, canAccessPage, VALID_PAGE_IDS, type 
 import { initials } from '@/lib/utils';
 import type { Staff } from '@/types/database';
 import { globalSearch, type SearchResult } from '@/lib/search';
+import { Drawer } from './ui';
 
 import { supabase } from '@/lib/supabase';
 
@@ -32,17 +33,26 @@ type NotificationFocus =
   | { page: 'complaints'; id: string; requestId: number }
   | { page: 'customer_requests'; id: string; requestId: number }
 
-const ALL_NAV: { id: PageId; label: string; icon: string }[] = [
-  { id: 'dashboard',  label: 'Dashboard',          icon: 'grid' },
-  { id: 'customers',  label: 'Customers',          icon: 'users' },
-  { id: 'customer_requests', label: 'Customer Requests', icon: 'fileText' },
-  { id: 'payment_approvals', label: 'Payment Approvals', icon: 'check' },
-  { id: 'billing',    label: 'Billing & Payments', icon: 'card' },
-  { id: 'cable',      label: 'Cable',              icon: 'signal' },
-  { id: 'complaints', label: 'Complaints',         icon: 'alert' },
-  { id: 'staff',      label: 'Staff Management',   icon: 'briefcase' },
-  { id: 'areas',      label: 'Areas & Sectors',    icon: 'pin' },
-  { id: 'reports',    label: 'Reports',            icon: 'chart' },
+type NavEntry = { id: PageId; label: string; icon: IconName };
+
+const NAV_BY_ID: Record<PageId, NavEntry> = {
+  dashboard:  { id: 'dashboard',  label: 'Dashboard',          icon: 'grid' },
+  customers:  { id: 'customers',  label: 'Customers',          icon: 'users' },
+  customer_requests: { id: 'customer_requests', label: 'Customer Requests', icon: 'fileText' },
+  payment_approvals: { id: 'payment_approvals', label: 'Payment Approvals', icon: 'check' },
+  billing:    { id: 'billing',    label: 'Billing & Payments', icon: 'card' },
+  cable:      { id: 'cable',      label: 'Cable',              icon: 'tv' },
+  complaints: { id: 'complaints', label: 'Complaints',         icon: 'alert' },
+  staff:      { id: 'staff',      label: 'Staff Management',   icon: 'briefcase' },
+  areas:      { id: 'areas',      label: 'Areas & Sectors',    icon: 'pin' },
+  reports:    { id: 'reports',    label: 'Reports',            icon: 'chart' },
+  settings:   { id: 'settings',   label: 'Settings',           icon: 'settings' },
+};
+
+const NAV_GROUPS: { label: string; items: PageId[] }[] = [
+  { label: 'Operations', items: ['dashboard', 'customers', 'customer_requests', 'billing', 'cable', 'complaints', 'staff'] },
+  { label: 'Collections', items: ['payment_approvals'] },
+  { label: 'Analytics', items: ['areas', 'reports'] },
 ];
 
 const PAGE_META: Record<PageId, { title: string; sub: string }> = {
@@ -64,6 +74,63 @@ const ROLE_LABEL_SHORT: Record<string, string> = {
   complaint_manager: 'Complaint Manager',
 };
 
+function NavLinks({ active, setActive, allowedNav, badges, onNavigate }: {
+  active: PageId;
+  setActive: (id: PageId) => void;
+  allowedNav: PageId[];
+  badges: Record<string, number>;
+  onNavigate?: () => void;
+}) {
+  const handleClick = (id: PageId) => {
+    setActive(id);
+    onNavigate?.();
+  };
+
+  return (
+    <>
+      {NAV_GROUPS.map((group) => {
+        const items = group.items
+          .map((id) => NAV_BY_ID[id])
+          .filter((n) => allowedNav.includes(n.id));
+        if (items.length === 0) return null;
+        return (
+          <React.Fragment key={group.label}>
+            <div className="sidebar-section-label">{group.label}</div>
+            {items.map((n) => {
+              const badgeVal = badges[n.id];
+              return (
+                <button
+                  key={n.id}
+                  type="button"
+                  className={`sidebar-link ${active === n.id ? 'active' : ''}`}
+                  onClick={() => handleClick(n.id)}
+                >
+                  <Icon name={n.icon} size={17} />
+                  <span>{n.label}</span>
+                  {badgeVal && badgeVal > 0 ? <span className="count">{badgeVal}</span> : null}
+                </button>
+              );
+            })}
+          </React.Fragment>
+        );
+      })}
+      {allowedNav.includes('settings') && (
+        <>
+          <div className="sidebar-section-label" style={{ paddingTop: 8 }}>System</div>
+          <button
+            type="button"
+            className={`sidebar-link ${active === 'settings' ? 'active' : ''}`}
+            onClick={() => handleClick('settings')}
+          >
+            <Icon name="settings" size={17} />
+            <span>Settings</span>
+          </button>
+        </>
+      )}
+    </>
+  );
+}
+
 function Sidebar({ active, setActive, allowedNav, staffName, staffRole, onLogout, badges }: {
   active: PageId;
   setActive: (id: PageId) => void;
@@ -73,8 +140,6 @@ function Sidebar({ active, setActive, allowedNav, staffName, staffRole, onLogout
   onLogout: () => void;
   badges: Record<string, number>;
 }) {
-  const visibleMain = ALL_NAV.filter(n => allowedNav.includes(n.id));
-  const showSettings = allowedNav.includes('settings');
   return (
     <aside className="sidebar">
       <div className="sidebar-brand" style={{ paddingLeft: 4 }}>
@@ -87,29 +152,8 @@ function Sidebar({ active, setActive, allowedNav, staffName, staffRole, onLogout
         </div>
       </div>
 
-      <div className="sidebar-section-label">Main</div>
       <nav className="sidebar-nav">
-        {visibleMain.map(n => {
-          const badgeVal = badges[n.id];
-          return (
-            <button key={n.id} type="button" className={`sidebar-link ${active === n.id ? 'active' : ''}`}
-              onClick={() => setActive(n.id)}>
-              <Icon name={n.icon as 'grid' | 'users' | 'fileText' | 'card' | 'signal' | 'alert' | 'briefcase' | 'pin' | 'chart' | 'check'} size={17} />
-              <span>{n.label}</span>
-              {badgeVal && badgeVal > 0 ? <span className="count">{badgeVal}</span> : null}
-            </button>
-          );
-        })}
-        {showSettings && (
-          <>
-            <div style={{ height: 8 }} />
-            <div className="sidebar-section-label" style={{ padding: '8px 12px 6px' }}>System</div>
-            <button type="button" className={`sidebar-link ${active === 'settings' ? 'active' : ''}`}
-              onClick={() => setActive('settings')}>
-              <Icon name="settings" size={17} /><span>Settings</span>
-            </button>
-          </>
-        )}
+        <NavLinks active={active} setActive={setActive} allowedNav={allowedNav} badges={badges} />
       </nav>
 
       <div className="sidebar-user">
@@ -126,16 +170,26 @@ function Sidebar({ active, setActive, allowedNav, staffName, staffRole, onLogout
   );
 }
 
-function Topbar({ meta, isDark, onToggleTheme, searchValue, onSearchChange, onSearchFocus }: {
+function Topbar({ meta, isDark, onToggleTheme, searchValue, onSearchChange, onSearchFocus, onOpenMobileNav }: {
   meta: { title: string; sub: string };
   isDark: boolean;
   onToggleTheme: () => void;
   searchValue?: string;
   onSearchChange?: (v: string) => void;
   onSearchFocus?: () => void;
+  onOpenMobileNav?: () => void;
 }) {
   return (
     <header className="topbar">
+      <button
+        type="button"
+        className="icon-btn mobile-nav-btn"
+        title="Menu"
+        onClick={onOpenMobileNav}
+        aria-label="Open navigation menu"
+      >
+        <Icon name="menu" size={18} />
+      </button>
       <div>
         <div className="topbar-title">{meta.title}</div>
         <div className="topbar-sub">{meta.sub}</div>
@@ -188,6 +242,7 @@ function ShellContent({ staff, logout }: {
     return 'dashboard';
   });
   const [isDark, setIsDark] = useState(false);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [notificationFocus, setNotificationFocus] = useState<NotificationFocus | null>(null);
   
   const {
@@ -207,7 +262,6 @@ function ShellContent({ staff, logout }: {
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchLoading, setSearchLoading] = useState(false);
 
-  // Load theme from localStorage on mount
   useEffect(() => {
     try {
       const savedTheme = localStorage.getItem('powernet_theme');
@@ -231,7 +285,6 @@ function ShellContent({ staff, logout }: {
     });
   }, []);
 
-  // Track counts
   useEffect(() => {
     supabase
       .from('payment_verifications')
@@ -252,7 +305,6 @@ function ShellContent({ staff, logout }: {
       });
   }, [customerRequestsVersion]);
 
-  // Global search debounce + results
   useEffect(() => {
     const q = searchQuery.trim();
     if (q.length < 2) {
@@ -273,7 +325,6 @@ function ShellContent({ staff, logout }: {
     return () => window.clearTimeout(t);
   }, [searchQuery]);
 
-  // Keyboard: ⌘K/Ctrl+K focus search, Esc close results
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
@@ -292,7 +343,6 @@ function ShellContent({ staff, logout }: {
     return () => window.removeEventListener('keydown', onKey);
   }, [searchOpen]);
 
-  // Calculate unread counts
   const unreadBilling = useMemo(() => {
     return items.filter(item => item.kind === 'billing' && !item.read).length;
   }, [items]);
@@ -301,7 +351,6 @@ function ShellContent({ staff, logout }: {
     return items.filter(item => item.kind === 'complaint' && !item.read).length;
   }, [items]);
 
-  // Mark page kind notifications as read when active
   useEffect(() => {
     if (active === 'billing') {
       markKindRead('billing');
@@ -388,8 +437,8 @@ function ShellContent({ staff, logout }: {
           searchValue={searchQuery}
           onSearchChange={setSearchQuery}
           onSearchFocus={() => { if (searchResults.length > 0) setSearchOpen(true); }}
+          onOpenMobileNav={() => setMobileNavOpen(true)}
         />
-        {/* Global search results dropdown */}
         {searchOpen && searchResults.length > 0 && (
           <div
             className="global-search-dropdown"
@@ -446,7 +495,7 @@ function ShellContent({ staff, logout }: {
             <>
               {canAccessPage(staff.role, 'dashboard') && (
                 <div style={{ display: active === 'dashboard' ? 'contents' : 'none' }}>
-                  <DashboardPage refreshToken={dashboardRefreshToken} />
+                  <DashboardPage refreshToken={dashboardRefreshToken} onNavigate={handlePageChange} />
                 </div>
               )}
               {canAccessPage(staff.role, 'customers') && (
@@ -519,6 +568,24 @@ function ShellContent({ staff, logout }: {
           )}
         </div>
       </main>
+      <Drawer open={mobileNavOpen} onClose={() => setMobileNavOpen(false)} width={280}>
+        <div style={{ padding: '16px 14px 8px' }}>
+          <div style={{ fontSize: 20, fontWeight: 800, letterSpacing: '-0.02em', marginBottom: 4 }}>
+            <span style={{ color: 'var(--text)' }}>POWER</span>
+            <span style={{ color: 'var(--brand)' }}>NET</span>
+          </div>
+          <div style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>ISP Solution</div>
+        </div>
+        <nav className="sidebar-nav" style={{ padding: '0 8px' }}>
+          <NavLinks
+            active={active}
+            setActive={handlePageChange}
+            allowedNav={allowedNav}
+            badges={badges}
+            onNavigate={() => setMobileNavOpen(false)}
+          />
+        </nav>
+      </Drawer>
       <NotificationDrawer onOpenNotification={handleNotificationOpen} />
       <PaymentToastContainer onOpenNotification={handleNotificationOpen} />
     </div>

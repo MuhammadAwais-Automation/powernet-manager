@@ -9,17 +9,21 @@ export function RevenueLineChart({
   height = 260,
   color = 'var(--brand)',
   color2 = '#3B82F6',
+  showCableLegend = true,
 }: {
   data: { m: string; v: number }[];
   data2?: { m: string; v: number }[];
   height?: number;
   color?: string;
   color2?: string;
+  showCableLegend?: boolean;
 }) {
   const w = 560, h = height;
   const pad = { l: 44, r: 20, t: 24, b: 32 };
   const innerW = w - pad.l - pad.r, innerH = h - pad.t - pad.b;
-  const vals = [...data.map(d => d.v), ...(data2?.map(d => d.v) ?? [])];
+  const cableHasData = data2?.some((d) => d.v > 0) ?? false;
+  const showCableLine = Boolean(data2?.length) && cableHasData;
+  const vals = [...data.map(d => d.v), ...(showCableLine ? data2!.map(d => d.v) : [])];
   const rawMax = Math.max(...vals);
   const maxVal = Number.isFinite(rawMax) && rawMax > 0 ? rawMax : 50;
   const max = Math.ceil(maxVal / 50) * 50 + 50;
@@ -28,7 +32,7 @@ export function RevenueLineChart({
   const points = data.map((d, i) => [x(i), y(d.v)] as [number, number]);
   const line = points.map((p, i) => (i === 0 ? 'M' : 'L') + p[0] + ',' + p[1]).join(' ');
   const area = line + ` L ${x(data.length - 1)},${pad.t + innerH} L ${x(0)},${pad.t + innerH} Z`;
-  const points2 = data2?.map((d, i) => [x(i), y(d.v)] as [number, number]) ?? [];
+  const points2 = showCableLine ? data2!.map((d, i) => [x(i), y(d.v)] as [number, number]) : [];
   const line2 = points2.map((p, i) => (i === 0 ? 'M' : 'L') + p[0] + ',' + p[1]).join(' ');
   const ticks = [0, Math.round(max / 2), max];
 
@@ -47,7 +51,7 @@ export function RevenueLineChart({
         </g>
       ))}
       <path d={area} fill="url(#revGrad)" />
-      {line2 && (
+      {showCableLine && line2 && (
         <path d={line2} fill="none" stroke={color2} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" strokeDasharray="6 4" />
       )}
       <path d={line} fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
@@ -63,7 +67,7 @@ export function RevenueLineChart({
           )}
         </g>
       ))}
-      {data2 && points2.length > 0 && (
+      {showCableLegend && data2 && data2.length > 0 && (
         <g transform={`translate(${w - pad.r - 120}, ${pad.t})`}>
           <rect x="0" y="0" width="110" height="42" rx="6" fill="var(--bg-muted)" stroke="var(--border)" />
           <line x1="10" y1="14" x2="28" y2="14" stroke={color} strokeWidth="2.5" />
