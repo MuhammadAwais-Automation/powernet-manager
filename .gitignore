@@ -63,3 +63,10 @@ docs/superpowers/
 .opencode/
 .windsurf/
 
+.env*
+
+# Firebase service account (never commit)
+firebase-service-account.json
+
+# local CLI tools
+/tools/gh/

@@ -9,6 +9,7 @@ export type CustomerListParams = {
   packageId?: string
   status?: CustomerStatus
   iptv?: boolean
+  hasCable?: boolean
   connectedBefore?: string
   connectedAfter?: string
 }
@@ -24,6 +25,9 @@ const CUSTOMER_LIST_SELECT = `
   is_tdc,
   due_amount,
   connection_date,
+  has_cable,
+  has_internet,
+  iptv,
   area:areas(id, name),
   package:packages(id, name)
 `
@@ -54,6 +58,7 @@ export async function getCustomerList(params: CustomerListParams): Promise<{
   if (params.status === 'tdc') query = query.eq('is_tdc', true)
   else if (params.status) query = query.eq('status', params.status)
   if (params.iptv === true) query = query.eq('iptv', true)
+  if (params.hasCable === true) query = query.eq('has_cable', true)
   if (params.connectedBefore) query = query.lte('connection_date', params.connectedBefore)
   if (params.connectedAfter) query = query.gte('connection_date', params.connectedAfter)
 

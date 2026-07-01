@@ -1,9 +1,10 @@
 import { supabase } from "@/lib/supabase";
-import type { ReportChartPoint } from "@/lib/reports/core";
+import type { ReportChartPoint, ServiceType } from "@/lib/reports/core";
 import {
   normalizeAreaFilter,
   normalizeCurrencyChartForThousands,
   normalizeReportMonth,
+  normalizeServiceType,
   toChartThousands,
 } from "@/lib/reports/core";
 
@@ -44,23 +45,32 @@ export function clearReportsCache() {
   reportsCache = {};
 }
 
+export type { ServiceType } from "@/lib/reports/core";
+
 export async function getReportsSummary(
   month: string,
   areaId?: string,
+  serviceType: ServiceType = "both",
 ): Promise<ReportsSummary> {
   const reportMonth = normalizeReportMonth(month);
   const scopeArea = normalizeAreaFilter(areaId);
-  const key = JSON.stringify({ month: reportMonth, areaId: scopeArea });
+  const scopeService = normalizeServiceType(serviceType);
+  const key = JSON.stringify({
+    month: reportMonth,
+    areaId: scopeArea,
+    serviceType: scopeService,
+  });
   const cached = reportsCache[key];
   if (cached && cached.expiresAt > Date.now()) return cached.data;
 
   const { data, error } = await supabase.rpc("get_reports_summary", {
     p_month: reportMonth,
     p_area_id: scopeArea ?? null,
+    p_service_type: scopeService,
   });
 
   const summary = error
-    ? await getReportsSummaryFallback(reportMonth, scopeArea)
+    ? await getReportsSummaryFallback(reportMonth, scopeArea, scopeService)
     : normalizeReportsSummary(data, reportMonth);
   reportsCache[key] = { data: summary, expiresAt: Date.now() + CACHE_MS };
   return summary;
@@ -69,30 +79,75 @@ export async function getReportsSummary(
 async function getReportsSummaryFallback(
   reportMonth: string,
   areaId?: string,
+  serviceType: ServiceType = "both",
 ): Promise<ReportsSummary> {
   const months = getRecentMonths(reportMonth, 6);
-  const [billRows, paymentRows, complaintRows, customerRows] = await Promise.all([
-    fetchAllRows<BillReportRow>(
-      "bills",
-      "amount, paid_amount, status, paid_at, month, collected_by, customer:customers(area_id, area:areas(name)), collector:staff(full_name)",
-    ),
-    fetchAllRows<PaymentReportRow>(
-      "payments",
-      "amount, paid_at, collected_by, customer:customers(area_id, area:areas(name)), collector:staff(full_name)",
-    ),
+  const includeInternet = serviceType === "internet" || serviceType === "both";
+  const includeCable = serviceType === "cable" || serviceType === "both";
+
+  const [
+    billRows,
+    cableBillRows,
+    paymentRows,
+    cablePaymentRows,
+    complaintRows,
+    customerRows,
+  ] = await Promise.all([
+    includeInternet
+      ? fetchAllRows<BillReportRow>(
+          "bills",
+          "amount, paid_amount, status, paid_at, month, collected_by, customer:customers(area_id, area:areas(name)), collector:staff(full_name)",
+        )
+      : Promise.resolve([]),
+    includeCable
+      ? fetchAllRows<CableBillReportRow>(
+          "cable_bills",
+          "amount, paid_amount, status, paid_at, month, collected_by, customer:customers(area_id, area:areas(name)), collector:staff(full_name)",
+        )
+      : Promise.resolve([]),
+    includeInternet
+      ? fetchAllRows<PaymentReportRow>(
+          "payments",
+          "amount, paid_at, collected_by, customer:customers(area_id, area:areas(name)), collector:staff(full_name)",
+        )
+      : Promise.resolve([]),
+    includeCable
+      ? fetchAllRows<PaymentReportRow>(
+          "cable_payments",
+          "amount, paid_at, collected_by, customer:customers(area_id, area:areas(name)), collector:staff(full_name)",
+        )
+      : Promise.resolve([]),
     fetchAllRows<ComplaintReportRow>(
       "complaints",
       "status, opened_at, resolved_at, customer:customers(area_id)",
     ),
-    fetchAllRows<CustomerReportRow>("customers", "id, area_id, status, created_at"),
+    fetchAllRows<CustomerReportRow>(
+      "customers",
+      "id, area_id, status, created_at, has_internet, has_cable",
+    ),
   ]);
 
-  const scopedBills = billRows.filter(
+  const unifiedBills: BillReportRow[] = [
+    ...billRows,
+    ...cableBillRows.map((bill) => ({
+      amount: bill.amount,
+      paid_amount: bill.paid_amount,
+      status: bill.status,
+      paid_at: bill.paid_at,
+      month: bill.month,
+      collected_by: bill.collected_by,
+      customer: bill.customer,
+      collector: bill.collector,
+    })),
+  ];
+  const unifiedPayments = [...paymentRows, ...cablePaymentRows];
+
+  const scopedBills = unifiedBills.filter(
     (bill) =>
       bill.month === reportMonth &&
       (!areaId || bill.customer?.area_id === areaId),
   );
-  const scopedPayments = paymentRows.filter(
+  const scopedPayments = unifiedPayments.filter(
     (payment) =>
       getMonth(payment.paid_at) === reportMonth &&
       (!areaId || payment.customer?.area_id === areaId),
@@ -102,9 +157,12 @@ async function getReportsSummaryFallback(
       getMonth(complaint.opened_at) === reportMonth &&
       (!areaId || complaint.customer?.area_id === areaId),
   );
-  const scopedCustomers = customerRows.filter(
-    (customer) => !areaId || customer.area_id === areaId,
-  );
+  const scopedCustomers = customerRows.filter((customer) => {
+    if (areaId && customer.area_id !== areaId) return false;
+    if (serviceType === "internet") return customer.has_internet === true;
+    if (serviceType === "cable") return customer.has_cable === true;
+    return true;
+  });
 
   const revenue = scopedBills.reduce((sum, bill) => sum + toNumber(bill.amount), 0);
   const collections = scopedPayments.reduce(
@@ -126,7 +184,7 @@ async function getReportsSummaryFallback(
 
   const revenueMonths = months.map((month) => ({
     d: monthLabel(month),
-    v: billRows
+    v: unifiedBills
       .filter((bill) => bill.month === month && (!areaId || bill.customer?.area_id === areaId))
       .reduce((sum, bill) => sum + toNumber(bill.amount), 0),
   }));
@@ -159,24 +217,20 @@ async function getReportsSummaryFallback(
     })),
     customersMonths: months.map((month) => ({
       d: monthLabel(month),
-      v: customerRows.filter(
+      v: scopedCustomers.filter(
         (customer) =>
           getMonth(customer.created_at) <= month &&
-          customer.status !== "disconnected" &&
-          (!areaId || customer.area_id === areaId),
+          customer.status !== "disconnected",
       ).length,
     })),
     customerGrowthMonths: months.map((month) => {
-      const created = customerRows.filter(
-        (customer) =>
-          getMonth(customer.created_at) === month &&
-          (!areaId || customer.area_id === areaId),
+      const created = scopedCustomers.filter(
+        (customer) => getMonth(customer.created_at) === month,
       ).length;
-      const disconnected = customerRows.filter(
+      const disconnected = scopedCustomers.filter(
         (customer) =>
           customer.status === "disconnected" &&
-          getMonth(customer.created_at) === month &&
-          (!areaId || customer.area_id === areaId),
+          getMonth(customer.created_at) === month,
       ).length;
       return { d: monthLabel(month), v: created - disconnected };
     }),
@@ -276,15 +330,19 @@ type ComplaintReportRow = {
   customer: { area_id: string | null } | null;
 };
 
+type CableBillReportRow = BillReportRow;
+
 type CustomerReportRow = {
   id: string;
   area_id: string | null;
   status: string | null;
   created_at: string | null;
+  has_internet?: boolean | null;
+  has_cable?: boolean | null;
 };
 
 async function fetchAllRows<T extends Record<string, unknown>>(
-  table: "bills" | "payments" | "complaints" | "customers",
+  table: "bills" | "cable_bills" | "payments" | "cable_payments" | "complaints" | "customers",
   select: string,
 ): Promise<T[]> {
   const rows: T[] = [];

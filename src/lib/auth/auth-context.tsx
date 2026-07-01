@@ -19,7 +19,7 @@ type AuthContextValue = {
 
 const AuthContext = createContext<AuthContextValue | null>(null)
 
-async function fetchStaffByAuthId(authUserId: string): Promise<Staff | null> {
+async function fetchStaffByAuthId(authUserId: string): Promise<{ staff: Staff | null; queryError?: string }> {
   const { data, error } = await withTimeout(
     supabase
       .from('staff')
@@ -29,8 +29,9 @@ async function fetchStaffByAuthId(authUserId: string): Promise<Staff | null> {
     AUTH_TIMEOUT_MS,
     'Staff lookup timed out'
   )
-  if (error || !data) return null
-  return data as Staff
+  if (error) return { staff: null, queryError: error.message }
+  if (!data) return { staff: null }
+  return { staff: data as Staff }
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -41,7 +42,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     let active = true
 
     async function acceptSessionUser(authUserId: string) {
-      const s = await fetchStaffByAuthId(authUserId)
+      const { staff: s } = await fetchStaffByAuthId(authUserId)
       if (!active) return
       if (!s || !isDashboardRole(s.role) || !s.is_active) {
         await withTimeout(supabase.auth.signOut(), AUTH_TIMEOUT_MS, 'Sign out timed out').catch(() => undefined)
@@ -89,7 +90,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setStaff(prev => {
             if (prev?.auth_user_id === session.user.id) return prev
             // Different user arrived silently (edge case) — fetch without loading spinner
-            fetchStaffByAuthId(session.user.id).then(s => {
+            fetchStaffByAuthId(session.user.id).then(({ staff: s }) => {
               if (!active) return
               if (!s || !isDashboardRole(s.role) || !s.is_active) {
                 supabase.auth.signOut().catch(() => undefined)
@@ -135,7 +136,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (error || !data.session) {
       return { ok: false, error: 'Invalid credentials' }
     }
-    const s = await fetchStaffByAuthId(data.session.user.id)
+    const { staff: s, queryError } = await fetchStaffByAuthId(data.session.user.id)
+    if (queryError) {
+      await supabase.auth.signOut().catch(() => undefined)
+      return { ok: false, error: 'Could not load staff profile. Try again or contact admin.' }
+    }
     if (!s) {
       await supabase.auth.signOut().catch(() => undefined)
       return { ok: false, error: 'Account not found, contact admin' }

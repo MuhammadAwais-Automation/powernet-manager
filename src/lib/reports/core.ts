@@ -1,3 +1,21 @@
+export type ServiceType = "internet" | "cable" | "both";
+
+export const SERVICE_TYPES: { value: ServiceType; label: string }[] = [
+  { value: "both", label: "All Services" },
+  { value: "internet", label: "Internet" },
+  { value: "cable", label: "Cable" },
+];
+
+export function normalizeServiceType(value?: string | null): ServiceType {
+  const normalized = value?.trim().toLowerCase();
+  if (normalized === "internet" || normalized === "cable") return normalized;
+  return "both";
+}
+
+export function getServiceTypeLabel(value: ServiceType): string {
+  return SERVICE_TYPES.find((item) => item.value === value)?.label ?? "All Services";
+}
+
 export type ReportType = "Revenue" | "Collections" | "Complaints" | "Customers";
 
 export type ReportChartPoint = {

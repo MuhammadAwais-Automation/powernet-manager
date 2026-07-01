@@ -6,6 +6,7 @@ export type PageId =
   | 'customer_requests'
   | 'payment_approvals'
   | 'billing'
+  | 'cable'
   | 'complaints'
   | 'staff'
   | 'areas'
@@ -13,7 +14,7 @@ export type PageId =
   | 'settings'
 
 export const NAV_BY_ROLE: Record<StaffRole, PageId[]> = {
-  admin:             ['dashboard', 'customers', 'customer_requests', 'payment_approvals', 'billing', 'complaints', 'staff', 'areas', 'reports', 'settings'],
+  admin:             ['dashboard', 'customers', 'customer_requests', 'payment_approvals', 'billing', 'cable', 'complaints', 'staff', 'areas', 'reports', 'settings'],
   complaint_manager: ['complaints', 'customers'],
   technician:        [],
   recovery_agent:    [],
@@ -39,5 +40,5 @@ export function isDashboardRole(role: StaffRole): boolean {
 }
 
 export const VALID_PAGE_IDS = new Set<string>([
-  'dashboard', 'customers', 'customer_requests', 'payment_approvals', 'billing', 'complaints', 'staff', 'areas', 'reports', 'settings',
+  'dashboard', 'customers', 'customer_requests', 'payment_approvals', 'billing', 'cable', 'complaints', 'staff', 'areas', 'reports', 'settings',
 ])

@@ -1330,4 +1330,13 @@ table.data tr.selected { background: var(--blue-50); }
   }
 }
 
+/* Global search dropdown */
+.global-search-dropdown {
+  font-size: 13px;
+}
+.global-search-dropdown button:focus {
+  outline: 1px solid var(--color-primary);
+  background: var(--bg-muted) !important;
+}
+
 

@@ -106,3 +106,92 @@ export async function createComplaint(
   clearComplaintsCache()
   return data as Complaint
 }
+
+export type GlobalComplaintHit = {
+  id: string;
+  complaint_code: string;
+  issue: string;
+  status: string;
+  priority: string;
+  customerName: string;
+};
+
+export async function searchComplaints(q: string, limit = 5): Promise<GlobalComplaintHit[]> {
+  const safe = (q || '').trim().replace(/[%,'"()]/g, ' ').replace(/\s+/g, ' ').trim();
+  if (!safe || safe.length < 2) return [];
+
+  const hits: GlobalComplaintHit[] = [];
+
+  // by code
+  try {
+    const { data: codeRows } = await supabase
+      .from('complaints')
+      .select('id, complaint_code, issue, status, priority, customer:customers(full_name)')
+      .ilike('complaint_code', `%${safe}%`)
+      .order('opened_at', { ascending: false })
+      .limit(limit);
+    (codeRows ?? []).forEach((r: Record<string, unknown>) => {
+      const c = (r.customer as Record<string, unknown>) || {};
+      hits.push({
+        id: r.id as string,
+        complaint_code: r.complaint_code as string,
+        issue: (r.issue as string) || '',
+        status: r.status as string,
+        priority: r.priority as string,
+        customerName: (c.full_name as string) || '',
+      });
+    });
+  } catch {}
+
+  if (hits.length >= limit) return hits.slice(0, limit);
+
+  // by issue text
+  try {
+    const { data: issueRows } = await supabase
+      .from('complaints')
+      .select('id, complaint_code, issue, status, priority, customer:customers(full_name)')
+      .or(`issue.ilike.%${safe}%`)
+      .order('opened_at', { ascending: false })
+      .limit(limit - hits.length);
+    (issueRows ?? []).forEach((r: Record<string, unknown>) => {
+      if (hits.some(h => h.id === r.id)) return;
+      const c = (r.customer as Record<string, unknown>) || {};
+      hits.push({
+        id: r.id as string,
+        complaint_code: r.complaint_code as string,
+        issue: (r.issue as string) || '',
+        status: r.status as string,
+        priority: r.priority as string,
+        customerName: (c.full_name as string) || '',
+      });
+    });
+  } catch {}
+
+  // customer name match -> their complaints
+  try {
+    const custs = await import('./customers').then(m => m.searchCustomers(safe, 8));
+    if (custs.length) {
+      const cids = (custs as { id: string }[]).map((c) => c.id);
+      const { data: cRows } = await supabase
+        .from('complaints')
+        .select('id, complaint_code, issue, status, priority, customer:customers(full_name)')
+        .in('customer_id', cids)
+        .order('opened_at', { ascending: false })
+        .limit(3);
+      (cRows ?? []).forEach((r: Record<string, unknown>) => {
+        if (hits.some(h => h.id === r.id)) return;
+        const c = (r.customer as Record<string, unknown>) || {};
+        hits.push({
+          id: r.id as string,
+          complaint_code: r.complaint_code as string,
+          issue: (r.issue as string) || '',
+          status: r.status as string,
+          priority: r.priority as string,
+          customerName: (c.full_name as string) || '',
+        });
+      });
+    }
+  } catch {}
+
+  return hits.slice(0, limit);
+}

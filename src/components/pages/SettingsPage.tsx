@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from "react";
 import Icon, { type IconName } from "../Icon";
 import { Switch } from "../ui";
+import { getCableSettings, updateCableMonthlyPrice } from "@/lib/db/cable-settings";
 
 // Notification types matching NotificationPreferences
 const notificationTypes = [
@@ -17,9 +18,15 @@ const notificationTypes = [
 export default function SettingsPage() {
   const [success, setSuccess] = useState<string | null>(null);
   const [notifications, setNotifications] = useState<Record<string, boolean>>({});
+  const [cablePrice, setCablePrice] = useState("");
+  const [savingCablePrice, setSavingCablePrice] = useState(false);
+  const [cablePriceError, setCablePriceError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Load persisted settings
+    getCableSettings()
+      .then((settings) => setCablePrice(String(settings.monthly_price || "")))
+      .catch(() => {});
+
     const savedNotifs = localStorage.getItem("notification_settings");
     if (savedNotifs) {
       setNotifications(JSON.parse(savedNotifs));
@@ -45,6 +52,24 @@ export default function SettingsPage() {
   const showSuccessAlert = (message: string) => {
     setSuccess(message);
     setTimeout(() => setSuccess(null), 3000);
+  };
+
+  const saveCablePrice = async () => {
+    const value = Number(cablePrice);
+    if (!Number.isFinite(value) || value < 0) {
+      setCablePriceError("Enter a valid monthly cable price.");
+      return;
+    }
+    setSavingCablePrice(true);
+    setCablePriceError(null);
+    try {
+      await updateCableMonthlyPrice(Math.round(value));
+      showSuccessAlert("Cable monthly price updated.");
+    } catch (e: unknown) {
+      setCablePriceError(e instanceof Error ? e.message : "Could not save cable price.");
+    } finally {
+      setSavingCablePrice(false);
+    }
   };
 
   return (
@@ -79,7 +104,38 @@ export default function SettingsPage() {
         </div>
       )}
 
-      <div style={{ maxWidth: 800 }}>
+      <div style={{ maxWidth: 800, display: "flex", flexDirection: "column", gap: 20 }}>
+        <div className="card card-pad" style={{ borderRadius: "var(--radius)", padding: 24 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, borderBottom: "1px solid var(--border)", paddingBottom: 16, marginBottom: 20 }}>
+            <span style={{ display: "inline-flex", padding: 8, borderRadius: "50%", background: "var(--brand-50)", color: "var(--brand-600)" }}>
+              <Icon name="signal" size={20} />
+            </span>
+            <div>
+              <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600 }}>Cable Billing</h3>
+              <p className="muted" style={{ margin: "2px 0 0", fontSize: 12 }}>Fixed monthly price applied to all active cable subscribers</p>
+            </div>
+          </div>
+          <div style={{ display: "flex", gap: 12, alignItems: "flex-end", flexWrap: "wrap" }}>
+            <div style={{ flex: 1, minWidth: 220 }}>
+              <label className="muted" style={{ fontSize: 11, fontWeight: 600, display: "block", marginBottom: 6 }}>Monthly Cable Price (PKR)</label>
+              <input
+                className="select"
+                type="number"
+                min={0}
+                value={cablePrice}
+                onChange={(e) => setCablePrice(e.target.value)}
+                placeholder="e.g. 500"
+              />
+            </div>
+            <button className="btn btn-primary" onClick={saveCablePrice} disabled={savingCablePrice}>
+              {savingCablePrice ? "Saving…" : "Save Cable Price"}
+            </button>
+          </div>
+          {cablePriceError && (
+            <div style={{ marginTop: 12, fontSize: 13, color: "var(--red, #dc2626)" }}>{cablePriceError}</div>
+          )}
+        </div>
+
         <div className="card card-pad" style={{ borderRadius: "var(--radius)", padding: 24 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12, borderBottom: "1px solid var(--border)", paddingBottom: 16, marginBottom: 20 }}>
             <span style={{ display: "inline-flex", padding: 8, borderRadius: "50%", background: "var(--brand-50)", color: "var(--brand-600)" }}>

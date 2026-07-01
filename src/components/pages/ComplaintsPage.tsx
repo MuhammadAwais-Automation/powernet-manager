@@ -21,6 +21,7 @@ import type {
   ComplaintStatus,
   TeamWithMembers,
 } from "@/types/database";
+import { COMPLAINT_TYPES, formatComplaintType } from "@/lib/complaints/types";
 
 function LogComplaintModal({
   onClose,
@@ -41,7 +42,7 @@ function LogComplaintModal({
     useState<CustomerSearchResult | null>(null);
   const [form, setForm] = useState({
     issue: "",
-    type: "connectivity" as ComplaintType,
+    type: "fiber_issue" as ComplaintType,
     priority: "medium" as ComplaintPriority,
     assigned_to: "", // Holds "staff:ID" or "team:ID"
     status: "open" as ComplaintStatus,
@@ -362,12 +363,9 @@ function LogComplaintModal({
                 }))
               }
             >
-              <option value="connectivity">Connectivity</option>
-              <option value="speed">Speed</option>
-              <option value="hardware">Hardware</option>
-              <option value="billing">Billing</option>
-              <option value="upgrade">Upgrade</option>
-              <option value="other">Other</option>
+              {COMPLAINT_TYPES.map((t) => (
+                <option key={t.value} value={t.value}>{t.label}</option>
+              ))}
             </select>
           </div>
           <div className="field">
@@ -1212,12 +1210,9 @@ export default function ComplaintsPage({
           onChange={(e) => setFilterType(e.target.value)}
         >
           <option value="all">All types</option>
-          <option value="connectivity">Connectivity</option>
-          <option value="speed">Speed</option>
-          <option value="hardware">Hardware</option>
-          <option value="billing">Billing</option>
-          <option value="upgrade">Upgrade</option>
-          <option value="other">Other</option>
+          {COMPLAINT_TYPES.map((t) => (
+            <option key={t.value} value={t.value}>{t.label}</option>
+          ))}
         </select>
         <select
           className="select"

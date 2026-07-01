@@ -132,6 +132,7 @@ export interface StaffActivity {
     method: string
     note: string | null
     receipt_no: string
+    receipt_url: string | null
     paid_at: string
     bill: {
       amount: number
@@ -153,6 +154,7 @@ export interface StaffActivity {
     paid_amount: number
     paid_at: string | null
     payment_note: string | null
+    promised_date: string | null
     customer: {
       id: string
       customer_code: string
@@ -215,6 +217,7 @@ export async function getStaffActivity(staffId: string, dateStr: string): Promis
       method,
       note,
       receipt_no,
+      receipt_url,
       paid_at,
       bill:bills(amount, paid_amount, status),
       customer:customers(
@@ -240,6 +243,7 @@ export async function getStaffActivity(staffId: string, dateStr: string): Promis
       paid_amount,
       paid_at,
       payment_note,
+      promised_date,
       customer:customers(
         id,
         customer_code,

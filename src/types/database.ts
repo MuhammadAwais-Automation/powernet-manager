@@ -41,6 +41,8 @@ export type Customer = {
   email: string | null;
   package_id: string | null;
   iptv: boolean;
+  has_cable: boolean;
+  has_internet: boolean;
   address_type: AddressType;
   address_value: string | null;
   area_id: string | null;
@@ -72,9 +74,87 @@ export type CustomerListRow = Pick<
   | "is_tdc"
   | "due_amount"
   | "connection_date"
+  | "has_cable"
+  | "has_internet"
+  | "iptv"
 > & {
   area: Pick<Area, "id" | "name"> | null;
   package: Pick<Package, "id" | "name"> | null;
+};
+
+export type CableListRow = Pick<
+  Customer,
+  | "id"
+  | "customer_code"
+  | "username"
+  | "full_name"
+  | "cnic"
+  | "phone"
+  | "status"
+  | "is_tdc"
+  | "connection_date"
+  | "has_internet"
+> & {
+  area: Pick<Area, "id" | "name"> | null;
+};
+
+export type CableSettings = {
+  id: number;
+  monthly_price: number;
+  updated_at: string;
+};
+
+export type CableBillStatus = "pending" | "paid" | "overdue";
+
+export type CableBill = {
+  id: string;
+  customer_id: string;
+  amount: number;
+  paid_amount: number;
+  month: string;
+  status: CableBillStatus;
+  collected_by: string | null;
+  paid_at: string | null;
+  receipt_no: string | null;
+  payment_method: PaymentMethod | null;
+  payment_source: PaymentSource | null;
+  payment_note: string | null;
+  created_at: string;
+};
+
+export type CableBillWithRelations = CableBill & {
+  customer: Pick<
+    Customer,
+    | "id"
+    | "customer_code"
+    | "full_name"
+    | "phone"
+    | "cnic"
+    | "house_id"
+    | "area_id"
+    | "has_internet"
+    | "has_cable"
+    | "status"
+    | "address_type"
+    | "address_value"
+  > & {
+    area: Pick<Area, "id" | "name" | "code" | "type"> | null;
+  } | null;
+  collector: Pick<Staff, "id" | "full_name"> | null;
+};
+
+export type CablePayment = {
+  id: string;
+  cable_bill_id: string;
+  customer_id: string;
+  amount: number;
+  collected_by: string | null;
+  method: PaymentMethod;
+  source: PaymentSource | null;
+  note: string | null;
+  receipt_no: string;
+  paid_at: string;
+  created_at: string;
 };
 
 export type NewCustomer = Omit<
@@ -179,6 +259,7 @@ export type Bill = {
   payment_method: PaymentMethod | null;
   payment_source: PaymentSource | null;
   payment_note: string | null;
+  promised_date: string | null;
   created_at: string;
 };
 
@@ -233,6 +314,7 @@ export type Payment = {
   source: PaymentSource | null;
   note: string | null;
   receipt_no: string;
+  receipt_url: string | null;
   paid_at: string;
   created_at: string;
 };
@@ -255,12 +337,16 @@ export type TeamWithMembers = Team & {
 };
 
 export type ComplaintType =
+  | "fiber_issue"
+  | "no_internet"
+  | "device_issue"
+  | "payment_issue"
+  | "other"
   | "connectivity"
   | "speed"
   | "hardware"
   | "billing"
-  | "upgrade"
-  | "other";
+  | "upgrade";
 export type ComplaintPriority = "low" | "medium" | "high";
 export type ComplaintStatus = "open" | "in_progress" | "resolved";
 

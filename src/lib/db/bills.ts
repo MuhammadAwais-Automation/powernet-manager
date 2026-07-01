@@ -23,6 +23,7 @@ import type {
   PaymentMethod,
   PaymentSource,
 } from "@/types/database";
+import { searchCustomers } from "./customers";
 
 export type GenerateBillsResult = {
   month: string;
@@ -32,6 +33,8 @@ export type GenerateBillsResult = {
   zeroAmount: number;
 };
 
+export type RemainderAction = "leave" | "carry_forward";
+
 export type RecordPaymentInput = {
   billId: string;
   amount: number;
@@ -40,6 +43,8 @@ export type RecordPaymentInput = {
   source?: PaymentSource;
   paidAt?: string | null;
   note?: string | null;
+  receiptUrl?: string | null;
+  remainderAction?: RemainderAction;
 };
 
 export type RecordPaymentResult = {
@@ -145,6 +150,7 @@ export const BILL_PAGE_SELECT = `
   payment_method,
   payment_source,
   payment_note,
+  promised_date,
   created_at,
   customer:customers(
     id, customer_code, username, house_id, full_name,
@@ -170,6 +176,7 @@ const BILL_PAGE_SELECT_LEGACY = `
   receipt_no,
   payment_method,
   payment_note,
+  promised_date,
   created_at,
   customer:customers(
     id, customer_code, username, house_id, full_name,
@@ -412,6 +419,7 @@ export async function getBillPayments(
       source,
       note,
       receipt_no,
+      receipt_url,
       paid_at,
       created_at,
       collector:staff(id, full_name)
@@ -486,6 +494,8 @@ export async function recordBillPayment(
     p_source: input.source ?? "office",
     p_paid_at: input.paidAt ?? null,
     p_note: input.note ?? null,
+    p_receipt_url: input.receiptUrl ?? null,
+    p_remainder_action: input.remainderAction ?? "leave",
   });
   if (isMissingNewRecordPaymentSignature(error)) {
     const legacy = await supabase.rpc("record_bill_payment", {
@@ -1072,7 +1082,7 @@ function chunkArray<T>(values: T[], size: number): T[][] {
 }
 
 
-async function findBillingCustomerIds(
+export async function findBillingCustomerIds(
   search: string,
   limit: number,
 ): Promise<string[]> {
@@ -1269,4 +1279,76 @@ export async function getPaymentVerificationCounts(): Promise<{
     else if (r.status === "rejected") counts.rejected++;
   });
   return counts;
+}
+
+export type GlobalBillHit = {
+  id: string;
+  month: string;
+  amount: number;
+  status: string;
+  customerName: string;
+  customerCode: string | null;
+  receiptNo: string | null;
+};
+
+export async function searchBills(q: string, limit = 5): Promise<GlobalBillHit[]> {
+  const safe = (q || '').trim().replace(/[%,'"()]/g, ' ').replace(/\s+/g, ' ').trim();
+  if (!safe || safe.length < 2) return [];
+
+  const hits: GlobalBillHit[] = [];
+
+  // 1. direct receipt match (fast)
+  try {
+    const { data: recRows } = await supabase
+      .from('bills')
+      .select('id, month, amount, status, receipt_no, customer:customers(full_name, customer_code)')
+      .ilike('receipt_no', `%${safe}%`)
+      .order('created_at', { ascending: false })
+      .limit(limit);
+    (recRows ?? []).forEach((r: Record<string, unknown>) => {
+      const c = (r.customer as Record<string, unknown>) || {};
+      hits.push({
+        id: r.id as string,
+        month: r.month as string,
+        amount: Number(r.amount) || 0,
+        status: r.status as string,
+        customerName: (c.full_name as string) || '',
+        customerCode: (c.customer_code as string) || null,
+        receiptNo: (r.receipt_no as string) || null,
+      });
+    });
+  } catch {}
+
+  if (hits.length >= limit) return hits.slice(0, limit);
+
+  // 2. customer match via existing search -> recent bills for those customers
+  try {
+    const custs = await searchCustomers(safe, 12);
+    if (custs.length) {
+      const ids = custs.map(c => c.id);
+      const { data: billRows } = await supabase
+        .from('bills')
+        .select('id, month, amount, status, receipt_no, customer:customers(full_name, customer_code)')
+        .in('customer_id', ids)
+        .order('created_at', { ascending: false })
+        .limit(Math.max(3, limit - hits.length));
+      (billRows ?? []).forEach((r: Record<string, unknown>) => {
+        if (hits.some(h => h.id === r.id)) return;
+        const c = (r.customer as Record<string, unknown>) || {};
+        hits.push({
+          id: r.id as string,
+          month: r.month as string,
+          amount: Number(r.amount) || 0,
+          status: r.status as string,
+          customerName: (c.full_name as string) || '',
+          customerCode: (c.customer_code as string) || null,
+          receiptNo: (r.receipt_no as string) || null,
+        });
+      });
+    }
+  } catch {}
+
+  // 3. fallback ilike on payment_note or receipt (already covered)
+
+  return hits.slice(0, limit);
 }

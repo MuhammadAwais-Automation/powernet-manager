@@ -16,8 +16,10 @@ import {
   buildCsv,
   getCurrentReportMonth,
   getReportChart,
+  getServiceTypeLabel,
   normalizeReportMonth,
   type ReportType,
+  type ServiceType,
 } from "@/lib/reports/core";
 import type { Area } from "@/types/database";
 
@@ -74,6 +76,7 @@ function buildReportRows(
   summary: ReportsSummary,
   report: ReportType,
   areaName: string,
+  serviceLabel: string,
 ) {
   const chart = getReportChart(summary, report);
 
@@ -81,6 +84,7 @@ function buildReportRows(
     ["PowerNet Manager Report"],
     ["Month", summary.month],
     ["Area", areaName],
+    ["Service", serviceLabel],
     ["Report", report],
     [],
     ["Metric", "Value"],
@@ -164,6 +168,7 @@ export default function ReportsPage() {
   const [summary, setSummary] = useState<ReportsSummary | null>(null);
   const [areas, setAreas] = useState<Area[]>([]);
   const [areaFilter, setAreaFilter] = useState("");
+  const [serviceFilter, setServiceFilter] = useState<ServiceType>("both");
   const [areaStats, setAreaStats] = useState<AreaConnectionStats[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -262,7 +267,7 @@ export default function ReportsPage() {
       setSummary(null);
       try {
         const [data, connStats] = await Promise.all([
-          getReportsSummary(reportMonth, areaFilter || undefined),
+          getReportsSummary(reportMonth, areaFilter || undefined, serviceFilter),
           getAreaConnectionStats(),
         ]);
         if (active) setSummary(data);
@@ -279,7 +284,7 @@ export default function ReportsPage() {
     return () => {
       active = false;
     };
-  }, [reportMonth, areaFilter, reloadToken]);
+  }, [reportMonth, areaFilter, serviceFilter, reloadToken]);
 
   const handlePeriodChange = (value: string) => {
     const nextPeriod = value as Period;
@@ -305,9 +310,10 @@ export default function ReportsPage() {
     const areaName = areaFilter
       ? (areas.find((a) => a.id === areaFilter)?.name ?? "selected-area")
       : "All Areas";
-    const csv = buildCsv(buildReportRows(summary, report, areaName));
+    const serviceLabel = getServiceTypeLabel(serviceFilter);
+    const csv = buildCsv(buildReportRows(summary, report, areaName, serviceLabel));
     downloadTextFile(
-      `powernet-${report.toLowerCase()}-${summary.month}-${areaName.toLowerCase().replace(/\s+/g, "-")}.csv`,
+      `powernet-${report.toLowerCase()}-${summary.month}-${serviceLabel.toLowerCase().replace(/\s+/g, "-")}-${areaName.toLowerCase().replace(/\s+/g, "-")}.csv`,
       csv,
       "text/csv;charset=utf-8",
     );
@@ -387,6 +393,7 @@ export default function ReportsPage() {
   const areaName = areaFilter
     ? (areas.find((a) => a.id === areaFilter)?.name ?? "Selected Area")
     : "All Areas";
+  const serviceLabel = getServiceTypeLabel(serviceFilter);
   const stats: {
     label: string;
     value: string;
@@ -432,7 +439,7 @@ export default function ReportsPage() {
           <h1>Reports</h1>
           <p>
             Live analytics and exports across revenue, collections, complaints
-            and customer growth
+            and customer growth · {serviceLabel}
           </p>
         </div>
         <div className="row gap-sm">
@@ -444,6 +451,16 @@ export default function ReportsPage() {
             onChange={(e) => handleMonthChange(e.target.value)}
             style={{ width: 150 }}
           />
+          <select
+            className="select"
+            value={serviceFilter}
+            onChange={(e) => setServiceFilter(e.target.value as ServiceType)}
+            style={{ width: 150 }}
+          >
+            <option value="both">All Services</option>
+            <option value="internet">Internet</option>
+            <option value="cable">Cable</option>
+          </select>
           <select
             className="select"
             value={areaFilter}

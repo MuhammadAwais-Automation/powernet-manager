@@ -90,7 +90,7 @@ export default function DashboardPage({ refreshToken = 0 }: { refreshToken?: num
     {
       key: 'unpaid', label: 'Unpaid Bills',
       value: s.unpaidBills.toLocaleString(),
-      sub: 'pending + overdue',
+      sub: `${s.unpaidInternetBills} internet · ${s.unpaidCableBills} cable`,
       icon: 'alertTri', accent: '#EF4444',
       spark: [
         s.unpaidBills + 10, s.unpaidBills + 8, s.unpaidBills + 5,
@@ -100,14 +100,14 @@ export default function DashboardPage({ refreshToken = 0 }: { refreshToken?: num
     {
       key: 'revenue', label: 'Monthly Revenue',
       value: fmt(s.monthlyRevenue),
-      sub: 'this month (paid)',
+      sub: `${fmt(s.monthlyInternetRevenue)} internet · ${fmt(s.monthlyCableRevenue)} cable`,
       icon: 'dollar', accent: '#F5A623',
       spark: s.revenueByMonth.map(r => r.v),
     },
     {
       key: 'expected', label: 'Expected Revenue',
       value: fmt(s.expectedRevenue),
-      sub: `${fmt(s.pendingRevenue)} pending`,
+      sub: `${fmt(s.expectedInternetRevenue)} internet · ${fmt(s.expectedCableRevenue)} cable · ${fmt(s.pendingRevenue)} pending`,
       icon: 'fileText', accent: '#3B82F6',
       spark: s.revenueByMonth.map(r => r.v),
     },
@@ -197,11 +197,14 @@ export default function DashboardPage({ refreshToken = 0 }: { refreshToken?: num
           <div className="card-head">
             <div>
               <h3>Monthly Revenue</h3>
-              <div className="sub">Last 6 months, Rs. thousands (paid bills)</div>
+              <div className="sub">Last 6 months, Rs. thousands (collected) · internet + cable</div>
             </div>
           </div>
           <div className="card-pad" style={{ paddingTop: 8 }}>
-            <RevenueLineChart data={s.revenueByMonth} />
+            <RevenueLineChart
+              data={s.revenueByMonthInternet.length > 0 ? s.revenueByMonthInternet : s.revenueByMonth}
+              data2={s.revenueByMonthCable}
+            />
           </div>
         </div>
 

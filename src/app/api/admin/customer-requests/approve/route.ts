@@ -118,6 +118,8 @@ export async function POST(req: Request) {
       email: signup.email,
       package_id: signup.package_id,
       iptv: false,
+      has_cable: false,
+      has_internet: true,
       address_type: 'id_number',
       address_value: signup.house_id,
       area_id: signup.area_id,

@@ -4,7 +4,8 @@ export type BillingTab =
   | "Paid"
   | "Overdue"
   | "Partial"
-  | "Visited";
+  | "Visited"
+  | "CallToAction";
 export type BillStatus = "pending" | "paid" | "overdue";
 export type BillStatusFilter =
   | BillStatus
@@ -46,6 +47,7 @@ export function normalizeBillStatusFilter(tab: BillingTab): BillStatusFilter {
   if (tab === "Unpaid") return "unpaid";
   if (tab === "Partial") return "partial";
   if (tab === "Visited") return "visited";
+  if (tab === "CallToAction") return "visited";
   return undefined;
 }
 

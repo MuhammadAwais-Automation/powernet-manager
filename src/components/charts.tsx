@@ -3,11 +3,23 @@ import React from 'react';
 
 type BarDatum = Record<string, string | number | boolean | undefined>;
 
-export function RevenueLineChart({ data, height = 260 }: { data: { m: string; v: number }[]; height?: number }) {
+export function RevenueLineChart({
+  data,
+  data2,
+  height = 260,
+  color = 'var(--brand)',
+  color2 = '#3B82F6',
+}: {
+  data: { m: string; v: number }[];
+  data2?: { m: string; v: number }[];
+  height?: number;
+  color?: string;
+  color2?: string;
+}) {
   const w = 560, h = height;
   const pad = { l: 44, r: 20, t: 24, b: 32 };
   const innerW = w - pad.l - pad.r, innerH = h - pad.t - pad.b;
-  const vals = data.map(d => d.v);
+  const vals = [...data.map(d => d.v), ...(data2?.map(d => d.v) ?? [])];
   const rawMax = Math.max(...vals);
   const maxVal = Number.isFinite(rawMax) && rawMax > 0 ? rawMax : 50;
   const max = Math.ceil(maxVal / 50) * 50 + 50;
@@ -16,14 +28,16 @@ export function RevenueLineChart({ data, height = 260 }: { data: { m: string; v:
   const points = data.map((d, i) => [x(i), y(d.v)] as [number, number]);
   const line = points.map((p, i) => (i === 0 ? 'M' : 'L') + p[0] + ',' + p[1]).join(' ');
   const area = line + ` L ${x(data.length - 1)},${pad.t + innerH} L ${x(0)},${pad.t + innerH} Z`;
+  const points2 = data2?.map((d, i) => [x(i), y(d.v)] as [number, number]) ?? [];
+  const line2 = points2.map((p, i) => (i === 0 ? 'M' : 'L') + p[0] + ',' + p[1]).join(' ');
   const ticks = [0, Math.round(max / 2), max];
 
   return (
     <svg viewBox={`0 0 ${w} ${h}`} width="100%" height={h} style={{ display: 'block' }}>
       <defs>
         <linearGradient id="revGrad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="var(--brand)" stopOpacity="0.25" />
-          <stop offset="100%" stopColor="var(--brand)" stopOpacity="0" />
+          <stop offset="0%" stopColor={color} stopOpacity="0.25" />
+          <stop offset="100%" stopColor={color} stopOpacity="0" />
         </linearGradient>
       </defs>
       {ticks.map(t => (
@@ -33,10 +47,13 @@ export function RevenueLineChart({ data, height = 260 }: { data: { m: string; v:
         </g>
       ))}
       <path d={area} fill="url(#revGrad)" />
-      <path d={line} fill="none" stroke="var(--brand)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+      {line2 && (
+        <path d={line2} fill="none" stroke={color2} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" strokeDasharray="6 4" />
+      )}
+      <path d={line} fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
       {points.map((p, i) => (
         <g key={i}>
-          <circle cx={p[0]} cy={p[1]} r="4" fill="var(--bg-elev)" stroke="var(--brand)" strokeWidth="2" />
+          <circle cx={p[0]} cy={p[1]} r="4" fill="var(--bg-elev)" stroke={color} strokeWidth="2" />
           <text x={p[0]} y={h - pad.b + 18} fontSize="11" textAnchor="middle" fill="var(--text-muted)">{data[i].m}</text>
           {i === data.length - 1 && (
             <g>
@@ -46,6 +63,15 @@ export function RevenueLineChart({ data, height = 260 }: { data: { m: string; v:
           )}
         </g>
       ))}
+      {data2 && points2.length > 0 && (
+        <g transform={`translate(${w - pad.r - 120}, ${pad.t})`}>
+          <rect x="0" y="0" width="110" height="42" rx="6" fill="var(--bg-muted)" stroke="var(--border)" />
+          <line x1="10" y1="14" x2="28" y2="14" stroke={color} strokeWidth="2.5" />
+          <text x="34" y="17" fontSize="10" fill="var(--text-muted)">Internet</text>
+          <line x1="10" y1="30" x2="28" y2="30" stroke={color2} strokeWidth="2" strokeDasharray="6 4" />
+          <text x="34" y="33" fontSize="10" fill="var(--text-muted)">Cable</text>
+        </g>
+      )}
     </svg>
   );
 }

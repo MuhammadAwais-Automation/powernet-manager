@@ -5,12 +5,22 @@ export type DashboardStats = {
   totalCustomers: number;
   activeCustomers: number;
   unpaidBills: number;
+  unpaidInternetBills: number;
+  unpaidCableBills: number;
   openComplaints: number;
   monthlyRevenue: number;
+  monthlyInternetRevenue: number;
+  monthlyCableRevenue: number;
   expectedRevenue: number;
+  expectedInternetRevenue: number;
+  expectedCableRevenue: number;
   pendingRevenue: number;
+  pendingInternetRevenue: number;
+  pendingCableRevenue: number;
   activeStaff: number;
   revenueByMonth: { m: string; v: number }[];
+  revenueByMonthInternet: { m: string; v: number }[];
+  revenueByMonthCable: { m: string; v: number }[];
   complaintsByStatus: { open: number; in_progress: number; resolved: number };
 };
 

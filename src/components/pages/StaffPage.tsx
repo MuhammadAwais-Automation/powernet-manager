@@ -8,6 +8,7 @@ import { getAreas } from '@/lib/db/areas';
 import { getTeams, createTeam, updateTeam, deleteTeam, updateTeamMembers } from '@/lib/db/teams';
 import { initials, avClass } from '@/lib/utils';
 import { useAuth } from '@/lib/auth/auth-context';
+import { formatPromisedDate, formatVisitNote } from '@/lib/notifications/billing';
 import type { Staff, StaffWithArea, Area, StaffRole, Team, TeamWithMembers } from '@/types/database';
 
 const ROLE_LABELS: Record<string, string> = {
@@ -701,6 +702,25 @@ function StaffActivityDrawer({ staff, onClose }: {
                               Note: {p.note}
                             </div>
                           )}
+                          {p.receipt_url && (
+                            <a
+                              href={p.receipt_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: 6,
+                                marginTop: 4,
+                                fontSize: 11,
+                                fontWeight: 600,
+                                color: 'var(--brand)',
+                              }}
+                            >
+                              <Icon name="eye" size={12} />
+                              View payment proof
+                            </a>
+                          )}
                         </div>
                       </div>
                     ))
@@ -738,7 +758,10 @@ function StaffActivityDrawer({ staff, onClose }: {
                           </div>
                           {v.payment_note && (
                             <div style={{ marginTop: 4, padding: '6px 8px', background: 'var(--bg-muted)', borderRadius: 4, fontSize: 12, color: 'var(--text)' }}>
-                              <strong>Details:</strong> {v.payment_note}
+                              <strong>Visit:</strong> {formatVisitNote(v.payment_note)}
+                              {v.payment_note === 'promise_to_pay' && v.promised_date && (
+                                <span> — <strong>Promised:</strong> {formatPromisedDate(v.promised_date)}</span>
+                              )}
                             </div>
                           )}
                         </div>

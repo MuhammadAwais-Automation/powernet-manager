@@ -14,6 +14,7 @@ export type BillingRealtimeBillRow = {
   payment_method?: string | null;
   payment_source?: string | null;
   collected_by?: string | null;
+  promised_date?: string | null;
 };
 
 export type BillingNotification = {
@@ -50,6 +51,7 @@ export type BillingNotificationSource = {
   paymentMethod?: string | null;
   paymentNote?: string | null;
   paymentSource?: string | null;
+  promisedDate?: string | null;
 };
 
 export function didPaymentChange(
@@ -141,7 +143,25 @@ export function buildBillingNotificationDedupeKey(input: {
   ].join(":");
 }
 
-function formatVisitNote(note?: string | null): string {
+export function formatPromisedDate(value?: string | null): string | null {
+  if (!value) return null;
+  const dateOnly = value.trim().slice(0, 10);
+  const parts = dateOnly.split("-");
+  if (parts.length !== 3) return value;
+  const year = Number(parts[0]);
+  const month = Number(parts[1]);
+  const day = Number(parts[2]);
+  if (!year || !month || !day) return value;
+  const parsed = new Date(year, month - 1, day);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return parsed.toLocaleDateString("en-PK", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+export function formatVisitNote(note?: string | null): string {
   if (!note) return "Visited";
   switch (note.toLowerCase()) {
     case "house_locked":
@@ -192,8 +212,11 @@ export function buildBillingNotification(
   if (isVisit) {
     type = "visit";
     const visitReason = formatVisitNote(source.paymentNote);
+    const promisedDateText = formatPromisedDate(source.promisedDate);
     title = `Customer Visited (${visitReason})`;
-    message = `${source.customerName} was visited${collector} — Status: ${visitReason}`;
+    message = promisedDateText
+      ? `${source.customerName} was visited${collector} — ${visitReason}, promised by ${promisedDateText}`
+      : `${source.customerName} was visited${collector} — Status: ${visitReason}`;
   } else if (isFull) {
     type = "payment_full";
     title = "Full payment received";

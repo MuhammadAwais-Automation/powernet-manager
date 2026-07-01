@@ -27,6 +27,12 @@ import {
   type CustomerBalanceSummary,
 } from "@/lib/billing/core";
 import {
+  formatPromisedDate,
+  formatVisitNote,
+} from "@/lib/notifications/billing";
+import { getBillCallStats } from "@/lib/db/follow-ups";
+import { FollowUpCallModal } from "./FollowUpCallModal";
+import {
   normalizeBillingSearch,
   normalizeBillStatusFilter,
   type BillingTab,
@@ -289,8 +295,13 @@ export default function BillingPage({
   const [page, setPage] = useState(0);
   const [reloadToken, setReloadToken] = useState(0);
   const [generating, setGenerating] = useState(false);
+  const [callStats, setCallStats] = useState<
+    Record<string, { total: number; office: number; agent: number; lastCalledAt: string | null }>
+  >({});
+  const [followUpBill, setFollowUpBill] = useState<BillWithRelations | null>(null);
 
   const PAGE_SIZE = 50;
+  const isCallToActionTab = tab === "CallToAction";
 
   // ── Debounce search ──────────────────────────────────────────────────────────
   useEffect(() => {
@@ -374,6 +385,12 @@ export default function BillingPage({
       setSummary(billingSummary);
       setLedgerSummary(ledger);
       setAreas(areaRows);
+      if (tab0 === "CallToAction" && billPage.rows.length > 0) {
+        const stats = await getBillCallStats(billPage.rows.map((b) => b.id));
+        setCallStats(stats);
+      } else {
+        setCallStats({});
+      }
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Could not load bills");
     } finally {
@@ -872,6 +889,11 @@ export default function BillingPage({
                   label: "Visited",
                   count: summary?.visitedBills ?? 0,
                 },
+                {
+                  value: "CallToAction",
+                  label: "Call to Action",
+                  count: summary?.visitedBills ?? 0,
+                },
               ]}
             />
             <div className="billing-filter-controls">
@@ -982,12 +1004,20 @@ export default function BillingPage({
                     <th>Remaining</th>
                     <th>Status</th>
                     <th>Channel</th>
+                    {isCallToActionTab && (
+                      <>
+                        <th>Visit</th>
+                        <th>Calls</th>
+                      </>
+                    )}
                     <th>Receipt</th>
                     <th style={{ textAlign: "right" }}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {bills.map((b) => (
+                  {bills.map((b) => {
+                    const stats = callStats[b.id];
+                    return (
                     <tr key={b.id} className="clickable">
                       <td className="mono" style={{ fontSize: 12 }}>
                         {b.id.slice(0, 8)}...
@@ -1005,6 +1035,13 @@ export default function BillingPage({
                             <div className="sub mono">
                               {getCustomerSecondaryId(b.customer ?? {}) ?? ""}
                             </div>
+                            {b.payment_method === "visit" &&
+                              b.payment_note === "promise_to_pay" &&
+                              b.promised_date && (
+                              <div className="sub" style={{ color: "var(--cyan)", fontSize: 10, marginTop: 2 }}>
+                                Promised: {formatPromisedDate(b.promised_date)}
+                              </div>
+                            )}
                           </div>
                         </div>
                       </td>
@@ -1063,6 +1100,34 @@ export default function BillingPage({
                           <span className="muted" style={{ fontSize: 11 }}>—</span>
                         )}
                       </td>
+                      {isCallToActionTab && (
+                        <>
+                          <td style={{ fontSize: 11 }}>
+                            {b.payment_method === "visit" ? (
+                              <div>
+                                <div>{formatVisitNote(b.payment_note)}</div>
+                                {b.payment_note === "promise_to_pay" && b.promised_date && (
+                                  <div style={{ color: "var(--cyan)", marginTop: 2 }}>
+                                    {formatPromisedDate(b.promised_date)}
+                                  </div>
+                                )}
+                              </div>
+                            ) : (
+                              <span className="muted">—</span>
+                            )}
+                          </td>
+                          <td style={{ fontSize: 11 }}>
+                            {stats ? (
+                              <div>
+                                <div>{stats.total} total</div>
+                                <div className="muted">Office {stats.office} · Agent {stats.agent}</div>
+                              </div>
+                            ) : (
+                              <Badge color="amber">Pending</Badge>
+                            )}
+                          </td>
+                        </>
+                      )}
                       <td className="mono" style={{ fontSize: 11 }}>
                         {b.receipt_no ?? "-"}
                       </td>
@@ -1071,6 +1136,15 @@ export default function BillingPage({
                           className="row gap-sm"
                           style={{ justifyContent: "flex-end" }}
                         >
+                          {isCallToActionTab && b.payment_method === "visit" && (
+                            <button
+                              className="btn btn-secondary btn-sm"
+                              style={{ fontSize: 11, padding: "4px 8px" }}
+                              onClick={() => setFollowUpBill(b)}
+                            >
+                              Log Call
+                            </button>
+                          )}
                           <button
                             className="icon-btn"
                             style={{ width: 28, height: 28 }}
@@ -1092,7 +1166,8 @@ export default function BillingPage({
                         </div>
                       </td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -1327,10 +1402,17 @@ export default function BillingPage({
                       paidAtTimeStr = d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
                     }
                   }
+                  const visitReason = formatVisitNote(detailBill.payment_note);
+                  const promisedDateStr = formatPromisedDate(detailBill.promised_date);
+                  const isPtp = detailBill.payment_note === "promise_to_pay";
                   return (
                     <div className="bill-detail-card" style={{ gap: 8, borderColor: "var(--amber)" }}>
                       <span className="label" style={{ color: "var(--amber)" }}>Visit Details</span>
                       <div className="bill-detail-pill-container">
+                        <div className="bill-detail-pill-box">
+                          <span className="label">Visit Type</span>
+                          <span className="value">{visitReason}</span>
+                        </div>
                         <div className="bill-detail-pill-box">
                           <span className="label">Visited Date</span>
                           <span className="value">{paidAtDateStr}</span>
@@ -1339,15 +1421,16 @@ export default function BillingPage({
                           <span className="label">Visited Time</span>
                           <span className="value">{paidAtTimeStr}</span>
                         </div>
+                        {isPtp && promisedDateStr && (
+                          <div className="bill-detail-pill-box" style={{ borderColor: "var(--cyan)" }}>
+                            <span className="label">Promised Pay Date</span>
+                            <span className="value" style={{ color: "var(--cyan)" }}>{promisedDateStr}</span>
+                          </div>
+                        )}
                       </div>
                       {detailBill.collector && (
                         <div style={{ marginTop: 6, fontSize: 12, color: "var(--text)" }}>
                           <strong>Visited By: </strong>{detailBill.collector.full_name}
-                        </div>
-                      )}
-                      {detailBill.payment_note && (
-                        <div style={{ marginTop: 4, fontSize: 12, color: "var(--text)" }}>
-                          <strong>Remarks: </strong>{detailBill.payment_note}
                         </div>
                       )}
                     </div>
@@ -1362,6 +1445,7 @@ export default function BillingPage({
                   const targetNote = billPayments[0]?.note ?? detailBill.payment_note;
                   const lastPaidAmt = billPayments[0]?.amount ?? detailBill.paid_amount ?? 0;
                   const latestReceipt = billPayments[0]?.receipt_no ?? detailBill.receipt_no;
+                  const latestProof = billPayments[0]?.receipt_url ?? null;
 
                   let paidAtDateStr = "-";
                   let paidAtTimeStr = "-";
@@ -1426,6 +1510,30 @@ export default function BillingPage({
                           <span className="value" style={{ fontWeight: "normal", fontSize: 13 }}>{targetNote}</span>
                         </div>
                       )}
+
+                      {latestProof && (
+                        <div className="bill-detail-card">
+                          <span className="label">Payment Proof</span>
+                          <a
+                            href={latestProof}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{ display: "block", marginTop: 6 }}
+                          >
+                            <img
+                              src={latestProof}
+                              alt="Payment proof"
+                              style={{
+                                width: "100%",
+                                maxHeight: 200,
+                                objectFit: "cover",
+                                borderRadius: 8,
+                                border: "1px solid var(--border)",
+                              }}
+                            />
+                          </a>
+                        </div>
+                      )}
                     </>
                   );
                 })()}
@@ -1441,6 +1549,7 @@ export default function BillingPage({
                           <th>Amount</th>
                           <th>Method</th>
                           <th>Collected By</th>
+                          <th>Proof</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -1455,6 +1564,21 @@ export default function BillingPage({
                               <td style={{ fontWeight: 600 }}>{fmt(p.amount ?? 0)}</td>
                               <td style={{ textTransform: "capitalize" }}>{p.method ?? "-"}</td>
                               <td>{p.collector?.full_name ?? p.collected_by ?? "-"}</td>
+                              <td>
+                                {p.receipt_url ? (
+                                  <a
+                                    href={p.receipt_url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="btn btn-secondary btn-sm"
+                                    style={{ fontSize: 11, padding: "2px 8px" }}
+                                  >
+                                    View
+                                  </a>
+                                ) : (
+                                  "-"
+                                )}
+                              </td>
                             </tr>
                           );
                         })}
@@ -1515,6 +1639,20 @@ export default function BillingPage({
           fmt={fmt}
           onClose={() => setPaymentBill(null)}
           onSaved={handlePaymentSaved}
+        />
+      )}
+      {followUpBill && (
+        <FollowUpCallModal
+          bill={followUpBill}
+          staffId={staff.id}
+          callerChannel="office"
+          open={!!followUpBill}
+          onClose={() => setFollowUpBill(null)}
+          onSaved={(msg) => {
+            setMessage(msg);
+            setFollowUpBill(null);
+            setReloadToken((t) => t + 1);
+          }}
         />
       )}
     </div>

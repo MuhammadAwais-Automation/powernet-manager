@@ -1,5 +1,9 @@
 import { supabase } from "@/lib/supabase";
 import type { Area } from "@/types/database";
+import {
+  normalizeServiceType,
+  type ServiceType,
+} from "@/lib/reports/core";
 
 let areasCache: { data: Area[]; expiresAt: number } | null = null;
 let areaCountsCache: {
@@ -10,6 +14,7 @@ let areaFinancialCache: {
   data: Record<string, AreaFinancialSummary>;
   expiresAt: number;
   month: string;
+  serviceType: ServiceType;
 } | null = null;
 const CACHE_MS = 60_000;
 
@@ -30,10 +35,13 @@ function clearAreaCaches() {
 
 export async function getAreaFinancialSummaries(
   month: string,
+  serviceType: ServiceType = "both",
 ): Promise<Record<string, AreaFinancialSummary>> {
+  const scopeService = normalizeServiceType(serviceType);
   if (
     areaFinancialCache &&
     areaFinancialCache.month === month &&
+    areaFinancialCache.serviceType === scopeService &&
     areaFinancialCache.expiresAt > Date.now()
   ) {
     return areaFinancialCache.data;
@@ -41,12 +49,14 @@ export async function getAreaFinancialSummaries(
 
   const { data, error } = await supabase.rpc("get_area_financial_summaries", {
     p_month: month,
+    p_service_type: scopeService,
   });
   if (error) {
-    const fallback = await getAreaFinancialSummariesFallback(month);
+    const fallback = await getAreaFinancialSummariesFallback(month, scopeService);
     areaFinancialCache = {
       data: fallback,
       month,
+      serviceType: scopeService,
       expiresAt: Date.now() + CACHE_MS,
     };
     return fallback;
@@ -75,6 +85,7 @@ export async function getAreaFinancialSummaries(
   areaFinancialCache = {
     data: summaries,
     month,
+    serviceType: scopeService,
     expiresAt: Date.now() + CACHE_MS,
   };
   return summaries;
@@ -82,26 +93,59 @@ export async function getAreaFinancialSummaries(
 
 async function getAreaFinancialSummariesFallback(
   month: string,
+  serviceType: ServiceType = "both",
 ): Promise<Record<string, AreaFinancialSummary>> {
-  const [customerRows, billRows, staffRows] = await Promise.all([
-    fetchAllRows<{ area_id: string | null; due_amount: number | null; status: string | null }>(
-      "customers",
-      "area_id, due_amount, status",
-    ),
-    fetchAllRows<{
-      amount: number | null;
-      paid_amount: number | null;
-      status: string | null;
-      customer: { area_id: string | null } | null;
-    }>("bills", "amount, paid_amount, status, customer:customers(area_id)", {
-      month,
-    }),
-    fetchAllRows<{
-      area_id: string | null;
-      area_ids: string[] | null;
-      is_active: boolean | null;
-    }>("staff", "area_id, area_ids, is_active"),
-  ]);
+  const includeInternet = serviceType === "internet" || serviceType === "both";
+  const includeCable = serviceType === "cable" || serviceType === "both";
+
+  const [customerRows, billRows, cableBillRows, cableSettings, staffRows] =
+    await Promise.all([
+      fetchAllRows<{
+        area_id: string | null;
+        due_amount: number | null;
+        status: string | null;
+        has_internet: boolean | null;
+        has_cable: boolean | null;
+        package: { default_price: number | null } | null;
+      }>(
+        "customers",
+        "area_id, due_amount, status, has_internet, has_cable, package:packages(default_price)",
+      ),
+      includeInternet
+        ? fetchAllRows<{
+            amount: number | null;
+            paid_amount: number | null;
+            status: string | null;
+            customer: { area_id: string | null } | null;
+          }>("bills", "amount, paid_amount, status, customer:customers(area_id)", {
+            month,
+          })
+        : Promise.resolve([]),
+      includeCable
+        ? fetchAllRows<{
+            amount: number | null;
+            paid_amount: number | null;
+            status: string | null;
+            customer: { area_id: string | null } | null;
+          }>(
+            "cable_bills",
+            "amount, paid_amount, status, customer:customers(area_id)",
+            { month },
+          )
+        : Promise.resolve([]),
+      includeCable
+        ? supabase.from("cable_settings").select("monthly_price").eq("id", 1).maybeSingle()
+        : Promise.resolve({ data: null, error: null }),
+      fetchAllRows<{
+        area_id: string | null;
+        area_ids: string[] | null;
+        is_active: boolean | null;
+      }>("staff", "area_id, area_ids, is_active"),
+    ]);
+
+  const cablePrice = toNumber(
+    (cableSettings.data as { monthly_price?: number } | null)?.monthly_price,
+  );
 
   const summaries: Record<string, AreaFinancialSummary> = {};
   const ensure = (areaId: string): AreaFinancialSummary => {
@@ -117,15 +161,39 @@ async function getAreaFinancialSummariesFallback(
   };
 
   customerRows.forEach((customer) => {
-    if (!customer.area_id) return;
+    if (!customer.area_id || customer.status !== "active") return;
     const summary = ensure(customer.area_id);
-    summary.customerCount += 1;
-    if (customer.status === "active") {
-      summary.expectedRevenue += toNumber(customer.due_amount);
+    const internetAmount = toNumber(
+      customer.due_amount ?? customer.package?.default_price ?? 0,
+    );
+    const countsTowardInternet =
+      includeInternet && customer.has_internet === true && internetAmount > 0;
+    const countsTowardCable =
+      includeCable && customer.has_cable === true && cablePrice > 0;
+
+    if (countsTowardInternet || countsTowardCable) {
+      summary.customerCount += 1;
+    }
+    if (countsTowardInternet) {
+      summary.expectedRevenue += internetAmount;
+    }
+    if (countsTowardCable) {
+      summary.expectedRevenue += cablePrice;
     }
   });
 
   billRows.forEach((bill) => {
+    const areaId = bill.customer?.area_id;
+    if (!areaId) return;
+    const summary = ensure(areaId);
+    const paid = toNumber(bill.paid_amount);
+    summary.receivedRevenue += paid;
+    if (bill.status !== "paid") {
+      summary.pendingRevenue += Math.max(toNumber(bill.amount) - paid, 0);
+    }
+  });
+
+  cableBillRows.forEach((bill) => {
     const areaId = bill.customer?.area_id;
     if (!areaId) return;
     const summary = ensure(areaId);
@@ -258,7 +326,7 @@ function toNumber(value: unknown): number {
 }
 
 async function fetchAllRows<T extends Record<string, unknown>>(
-  table: "customers" | "bills" | "staff",
+  table: "customers" | "bills" | "cable_bills" | "staff",
   select: string,
   filters?: { month?: string },
 ): Promise<T[]> {
@@ -271,7 +339,9 @@ async function fetchAllRows<T extends Record<string, unknown>>(
       .from(table)
       .select(select)
       .range(from, from + batchSize - 1);
-    if (filters?.month && table === "bills") query = query.eq("month", filters.month);
+    if (filters?.month && (table === "bills" || table === "cable_bills")) {
+      query = query.eq("month", filters.month);
+    }
 
     const { data, error } = await query;
     if (error) throw error;

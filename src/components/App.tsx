@@ -6,6 +6,7 @@ import CustomersPage from './pages/CustomersPage';
 import CustomerRequestsPage from './pages/CustomerRequestsPage';
 import PaymentApprovalsPage from './pages/PaymentApprovalsPage';
 import BillingPage from './pages/BillingPage';
+import CablePage from './pages/CablePage';
 import ComplaintsPage from './pages/ComplaintsPage';
 import StaffPage from './pages/StaffPage';
 import AreasPage from './pages/AreasPage';
@@ -22,6 +23,7 @@ import { getNotificationNavigationTarget } from '@/lib/notifications/navigation'
 import { NAV_BY_ROLE, DEFAULT_PAGE_BY_ROLE, canAccessPage, VALID_PAGE_IDS, type PageId } from '@/lib/auth/permissions';
 import { initials } from '@/lib/utils';
 import type { Staff } from '@/types/database';
+import { globalSearch, type SearchResult } from '@/lib/search';
 
 import { supabase } from '@/lib/supabase';
 
@@ -36,6 +38,7 @@ const ALL_NAV: { id: PageId; label: string; icon: string }[] = [
   { id: 'customer_requests', label: 'Customer Requests', icon: 'fileText' },
   { id: 'payment_approvals', label: 'Payment Approvals', icon: 'check' },
   { id: 'billing',    label: 'Billing & Payments', icon: 'card' },
+  { id: 'cable',      label: 'Cable',              icon: 'signal' },
   { id: 'complaints', label: 'Complaints',         icon: 'alert' },
   { id: 'staff',      label: 'Staff Management',   icon: 'briefcase' },
   { id: 'areas',      label: 'Areas & Sectors',    icon: 'pin' },
@@ -48,6 +51,7 @@ const PAGE_META: Record<PageId, { title: string; sub: string }> = {
   customer_requests: { title: 'Customer Requests', sub: 'New signup approvals and account activation' },
   payment_approvals: { title: 'Payment Approvals', sub: 'Review customer-uploaded receipts and verify payments' },
   billing:    { title: 'Billing & Payments', sub: 'Monthly billing & collections' },
+  cable:      { title: 'Cable',              sub: 'Cable subscribers and monthly collections' },
   complaints: { title: 'Complaints',         sub: 'Open & in-progress tickets' },
   staff:      { title: 'Staff Management',   sub: 'Field agents & dashboard users' },
   areas:      { title: 'Areas & Sectors',    sub: 'Service zones' },
@@ -90,7 +94,7 @@ function Sidebar({ active, setActive, allowedNav, staffName, staffRole, onLogout
           return (
             <button key={n.id} type="button" className={`sidebar-link ${active === n.id ? 'active' : ''}`}
               onClick={() => setActive(n.id)}>
-              <Icon name={n.icon as 'grid' | 'users' | 'fileText' | 'card' | 'alert' | 'briefcase' | 'pin' | 'chart' | 'check'} size={17} />
+              <Icon name={n.icon as 'grid' | 'users' | 'fileText' | 'card' | 'signal' | 'alert' | 'briefcase' | 'pin' | 'chart' | 'check'} size={17} />
               <span>{n.label}</span>
               {badgeVal && badgeVal > 0 ? <span className="count">{badgeVal}</span> : null}
             </button>
@@ -122,10 +126,13 @@ function Sidebar({ active, setActive, allowedNav, staffName, staffRole, onLogout
   );
 }
 
-function Topbar({ meta, isDark, onToggleTheme }: {
+function Topbar({ meta, isDark, onToggleTheme, searchValue, onSearchChange, onSearchFocus }: {
   meta: { title: string; sub: string };
   isDark: boolean;
   onToggleTheme: () => void;
+  searchValue?: string;
+  onSearchChange?: (v: string) => void;
+  onSearchFocus?: () => void;
 }) {
   return (
     <header className="topbar">
@@ -135,7 +142,12 @@ function Topbar({ meta, isDark, onToggleTheme }: {
       </div>
       <div className="topbar-search">
         <Icon name="search" size={14} />
-        <input placeholder="Search…" />
+        <input
+          placeholder="Search customers, bills, complaints…  ⌘K"
+          value={searchValue || ''}
+          onChange={(e) => onSearchChange?.(e.target.value)}
+          onFocus={() => onSearchFocus?.()}
+        />
         <span className="kbd">⌘K</span>
       </div>
       <div className="topbar-actions">
@@ -190,6 +202,11 @@ function ShellContent({ staff, logout }: {
   const [pendingVerifications, setPendingVerifications] = useState(0);
   const [pendingCustomerRequests, setPendingCustomerRequests] = useState(0);
 
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchLoading, setSearchLoading] = useState(false);
+
   // Load theme from localStorage on mount
   useEffect(() => {
     try {
@@ -235,6 +252,46 @@ function ShellContent({ staff, logout }: {
       });
   }, [customerRequestsVersion]);
 
+  // Global search debounce + results
+  useEffect(() => {
+    const q = searchQuery.trim();
+    if (q.length < 2) {
+      setSearchResults([]);
+      setSearchOpen(false);
+      return;
+    }
+    setSearchLoading(true);
+    const t = window.setTimeout(() => {
+      globalSearch(q, 10)
+        .then((res) => {
+          setSearchResults(res);
+          setSearchOpen(true);
+        })
+        .catch(() => {})
+        .finally(() => setSearchLoading(false));
+    }, 160);
+    return () => window.clearTimeout(t);
+  }, [searchQuery]);
+
+  // Keyboard: ⌘K/Ctrl+K focus search, Esc close results
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        const inp = document.querySelector<HTMLInputElement>('.topbar-search input');
+        if (inp) {
+          inp.focus();
+          inp.select();
+        }
+      }
+      if (e.key === 'Escape' && searchOpen) {
+        setSearchOpen(false);
+      }
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [searchOpen]);
+
   // Calculate unread counts
   const unreadBilling = useMemo(() => {
     return items.filter(item => item.kind === 'billing' && !item.read).length;
@@ -268,6 +325,19 @@ function ShellContent({ staff, logout }: {
     setActive(page);
     try { sessionStorage.setItem('powernet_current_page', page); } catch { /* SSR guard */ }
   }, []);
+
+  const handleSearchResult = useCallback((r: SearchResult) => {
+    setSearchOpen(false);
+    setSearchQuery('');
+    handlePageChange(r.page as PageId);
+    if (r.focusId) {
+      if (r.page === 'billing') {
+        setNotificationFocus({ page: 'billing', id: r.focusId, requestId: ((Date.now() % 100000) + 1) });
+      } else if (r.page === 'complaints') {
+        setNotificationFocus({ page: 'complaints', id: r.focusId, requestId: ((Date.now() % 100000) + 1) });
+      }
+    }
+  }, [handlePageChange]);
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
@@ -311,8 +381,66 @@ function ShellContent({ staff, logout }: {
       <Sidebar active={active} setActive={handlePageChange} allowedNav={allowedNav}
         staffName={staff.full_name} staffRole={staff.role} onLogout={logout} badges={badges} />
       <main style={{ minWidth: 0, display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
-        <Topbar meta={meta} isDark={isDark} onToggleTheme={handleToggleTheme}
+        <Topbar
+          meta={meta}
+          isDark={isDark}
+          onToggleTheme={handleToggleTheme}
+          searchValue={searchQuery}
+          onSearchChange={setSearchQuery}
+          onSearchFocus={() => { if (searchResults.length > 0) setSearchOpen(true); }}
         />
+        {/* Global search results dropdown */}
+        {searchOpen && searchResults.length > 0 && (
+          <div
+            className="global-search-dropdown"
+            style={{
+              position: 'absolute',
+              left: 220,
+              top: 58,
+              zIndex: 200,
+              minWidth: 420,
+              maxWidth: 520,
+              background: 'var(--bg-elev)',
+              border: '1px solid var(--border)',
+              borderRadius: 10,
+              boxShadow: 'var(--shadow)',
+              overflow: 'hidden',
+            }}
+          >
+            <div style={{ padding: '6px 10px', fontSize: 11, color: 'var(--text-muted)', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between' }}>
+              <span>Results for “{searchQuery}” {searchLoading ? '…' : ''}</span>
+              <button onClick={() => setSearchOpen(false)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>Esc</button>
+            </div>
+            {searchResults.map((r) => (
+              <button
+                key={`${r.kind}:${r.id}`}
+                type="button"
+                onClick={() => handleSearchResult(r)}
+                style={{
+                  width: '100%',
+                  textAlign: 'left',
+                  padding: '8px 10px',
+                  display: 'flex',
+                  gap: 8,
+                  border: 'none',
+                  background: 'transparent',
+                  cursor: 'pointer',
+                  borderBottom: '1px solid var(--border)',
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--bg-muted)')}
+                onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+              >
+                <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 4, background: 'var(--bg-muted)', color: 'var(--text-muted)', alignSelf: 'flex-start', marginTop: 2, textTransform: 'uppercase' }}>{r.kind}</span>
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <div style={{ fontWeight: 600, color: 'var(--text)', fontSize: 13, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.title}</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.subtitle}</div>
+                </div>
+                {r.meta && <span style={{ fontSize: 11, color: 'var(--text-faint)', marginLeft: 'auto', alignSelf: 'center' }}>{r.meta}</span>}
+              </button>
+            ))}
+            <div style={{ padding: 6, fontSize: 10, color: 'var(--text-faint)', textAlign: 'center' }}>Click to open • ⌘K focus</div>
+          </div>
+        )}
         <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
           {!canAccessPage(staff.role, active) ? <AccessDenied /> : (
             <>
@@ -351,6 +479,11 @@ function ShellContent({ staff, logout }: {
                     focusBillId={notificationFocus?.page === 'billing' ? notificationFocus.id : null}
                     focusToken={notificationFocus?.page === 'billing' ? notificationFocus.requestId : 0}
                   />
+                </div>
+              )}
+              {canAccessPage(staff.role, 'cable') && (
+                <div style={{ display: active === 'cable' ? 'contents' : 'none' }}>
+                  <CablePage staff={staff} />
                 </div>
               )}
               {canAccessPage(staff.role, 'complaints') && (

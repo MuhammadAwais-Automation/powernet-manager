@@ -34,6 +34,8 @@ function AddCustomerDrawer({
     username:          editTarget?.username              ?? '',
     package_id:        editTarget?.package_id            ?? '',
     iptv:              editTarget?.iptv                  ?? false,
+    has_cable:         editTarget?.has_cable             ?? false,
+    has_internet:      editTarget?.has_internet          ?? true,
     address_type:      (editTarget?.address_type         ?? 'id_number') as 'text' | 'id_number',
     address_value:     editTarget?.address_value         ?? '',
     area_id:           editTarget?.area_id               ?? '',
@@ -67,14 +69,16 @@ function AddCustomerDrawer({
         full_name:         form.full_name.trim(),
         cnic:              form.cnic || null,
         phone:             form.phone || null,
-        package_id:        form.package_id || null,
         iptv:              form.iptv,
+        has_cable:         form.has_cable,
+        has_internet:      form.has_internet,
+        package_id:        form.has_internet ? (form.package_id || null) : null,
+        due_amount:        form.has_internet && form.due_amount ? parseInt(form.due_amount, 10) : null,
         address_type:      form.address_type,
         address_value:     form.address_value || null,
         area_id:           form.area_id,
         connection_date:   form.connection_date || null,
-        due_amount:        form.due_amount ? parseInt(form.due_amount) : null,
-        onu_number:        form.onu_number || null,
+        onu_number:        form.has_internet ? (form.onu_number || null) : null,
         status:            form.status,
         disconnected_date: form.disconnected_date || null,
         reconnected_date:  form.reconnected_date || null,
@@ -129,6 +133,10 @@ function AddCustomerDrawer({
           <div className="row gap-sm" style={{ alignItems: 'center' }}>
             <Switch on={form.iptv} onChange={(v: boolean) => set('iptv', v)} />
             <span style={{ fontSize: 13 }}>IPTV</span>
+          </div>
+          <div className="row gap-sm" style={{ alignItems: 'center' }}>
+            <Switch on={form.has_cable} onChange={(v: boolean) => set('has_cable', v)} />
+            <span style={{ fontSize: 13 }}>Cable</span>
           </div>
         </div>
 
@@ -319,6 +327,7 @@ function CustomerDetail({
                       border: '1px solid var(--border)' }}>
           <Badge color={statusColor(customerDisplayStatus(customer))} dot>{customerDisplayStatus(customer).toUpperCase()}</Badge>
           {customer.iptv && <Badge color="purple" dot>IPTV</Badge>}
+          {customer.has_cable && <Badge color="purple" dot>Cable</Badge>}
           {customer.due_amount
             ? <span style={{ marginLeft: 'auto', fontSize: 13, fontWeight: 600, fontFamily: 'JetBrains Mono, monospace' }}>
                 Rs. {customer.due_amount.toLocaleString()}/mo
@@ -346,6 +355,11 @@ function CustomerDetail({
             {customer.onu_number && <InfoRow label="ONU Number" value={customer.onu_number} mono />}
             <InfoRow label="IPTV"
               value={customer.iptv
+                ? <Badge color="purple" dot>Active</Badge>
+                : <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>Not subscribed</span>}
+            />
+            <InfoRow label="Cable"
+              value={customer.has_cable
                 ? <Badge color="purple" dot>Active</Badge>
                 : <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>Not subscribed</span>}
             />
@@ -502,6 +516,7 @@ export default function CustomersPage() {
   const [statusFilter, setStatusFilter] = useState('');
   const [pkgFilter, setPkgFilter] = useState('');
   const [iptvFilter, setIptvFilter] = useState(false);
+  const [cableFilter, setCableFilter] = useState(false);
   const [connectedBefore, setConnectedBefore] = useState('');
   const [showMoreFilters, setShowMoreFilters] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -510,7 +525,7 @@ export default function CustomersPage() {
   const PAGE_SIZE = 50;
   const [page, setPage] = useState(0);
 
-  useEffect(() => { setPage(0); }, [search, areaFilter, statusFilter, pkgFilter, iptvFilter, reloadToken]);
+  useEffect(() => { setPage(0); }, [search, areaFilter, statusFilter, pkgFilter, iptvFilter, cableFilter, reloadToken]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => setSearch(rawSearch), 250);
@@ -553,6 +568,7 @@ export default function CustomersPage() {
       packageId: pkgFilter || undefined,
       status: statusFilter ? (statusFilter as CustomerStatus) : undefined,
       iptv: iptvFilter || undefined,
+      hasCable: cableFilter || undefined,
       connectedBefore: connectedBefore || undefined,
       // eslint-disable-next-line react-hooks/exhaustive-deps
     })
@@ -569,7 +585,7 @@ export default function CustomersPage() {
       });
 
     return () => { cancelled = true; };
-  }, [page, search, areaFilter, statusFilter, pkgFilter, iptvFilter, connectedBefore, reloadToken]);
+  }, [page, search, areaFilter, statusFilter, pkgFilter, iptvFilter, cableFilter, connectedBefore, reloadToken]);
 
   const [editCustomer, setEditCustomer] = useState<CustomerWithRelations | null>(null);
 
@@ -697,12 +713,12 @@ export default function CustomersPage() {
         <div className="spacer" />
         <div ref={moreFiltersRef} style={{ position: 'relative' }}>
           <button
-            className={`btn btn-ghost btn-sm${showMoreFilters || iptvFilter ? ' active' : ''}`}
+            className={`btn btn-ghost btn-sm${showMoreFilters || iptvFilter || cableFilter ? ' active' : ''}`}
             onClick={() => setShowMoreFilters(v => !v)}
           >
             <Icon name="filter" size={14} />
             More filters
-            {iptvFilter && <span style={{ marginLeft: 4, background: 'var(--color-primary)', color: '#fff', borderRadius: 10, fontSize: 10, padding: '1px 6px' }}>1</span>}
+            {(iptvFilter || cableFilter) && <span style={{ marginLeft: 4, background: 'var(--color-primary)', color: '#fff', borderRadius: 10, fontSize: 10, padding: '1px 6px' }}>{(iptvFilter ? 1 : 0) + (cableFilter ? 1 : 0)}</span>}
           </button>
           {showMoreFilters && (
             <div style={{
@@ -722,6 +738,15 @@ export default function CustomersPage() {
                   style={{ width: 15, height: 15, accentColor: 'var(--color-primary)' }}
                 />
                 <span>IPTV subscribers only</span>
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13, cursor: 'pointer', padding: '6px 0' }}>
+                <input
+                  type="checkbox"
+                  checked={cableFilter}
+                  onChange={e => { setCableFilter(e.target.checked); setPage(0); }}
+                  style={{ width: 15, height: 15, accentColor: 'var(--color-primary)' }}
+                />
+                <span>Cable subscribers only</span>
               </label>
               <div style={{ paddingTop: 6 }}>
                 <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)', marginBottom: 6 }}>Connected before</div>

@@ -253,6 +253,7 @@ export function NotificationsProvider({
             paidAt: visit.paid_at ?? new Date().toISOString(),
             paymentMethod: visit.payment_method,
             paymentNote: visit.payment_note,
+            promisedDate: visit.promised_date,
           });
 
           addNotification(notification);
@@ -365,6 +366,7 @@ export function NotificationsProvider({
                 paymentMethod: bill.payment_method,
                 paymentNote: bill.payment_note,
                 paymentSource: bill.payment_source,
+                promisedDate: bill.promised_date,
               });
 
               addNotification(notification);

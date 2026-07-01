@@ -12,6 +12,7 @@ import {
 } from "@/lib/db/areas";
 import { getStaff } from "@/lib/db/staff";
 import { getCurrentBillingMonth } from "@/lib/billing/core";
+import type { ServiceType } from "@/lib/reports/core";
 import type { Area, StaffWithArea } from "@/types/database";
 
 const pins = [
@@ -349,29 +350,42 @@ export default function AreasPage() {
   const [financials, setFinancials] = useState<
     Record<string, AreaFinancialSummary>
   >({});
+  const [serviceFilter, setServiceFilter] = useState<ServiceType>("both");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [addOpen, setAddOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<Area | null>(null);
 
   useEffect(() => {
+    let active = true;
+    setLoading(true);
+    setError(null);
+
     Promise.all([
       getAreas(),
       getStaff(),
       getAreaCustomerCounts(),
-      getAreaFinancialSummaries(getCurrentBillingMonth()),
+      getAreaFinancialSummaries(getCurrentBillingMonth(), serviceFilter),
     ])
       .then(([a, s, c, f]) => {
+        if (!active) return;
         setAreas(a);
         setStaff(s);
         setCounts(c);
         setFinancials(f);
       })
-      .catch((e: unknown) =>
-        setError(e instanceof Error ? e.message : "Could not load areas"),
-      )
-      .finally(() => setLoading(false));
-  }, []);
+      .catch((e: unknown) => {
+        if (!active) return;
+        setError(e instanceof Error ? e.message : "Could not load areas");
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [serviceFilter]);
 
   if (loading)
     return (
@@ -456,7 +470,7 @@ export default function AreasPage() {
             <AreaCard
               key={a.id}
               area={a}
-              customerCount={counts[a.id] ?? 0}
+              customerCount={financials[a.id]?.customerCount ?? counts[a.id] ?? 0}
               assignedStaff={staffForArea(a.id)}
               financial={financials[a.id]}
               onEdit={() => setEditTarget(a)}
@@ -477,6 +491,16 @@ export default function AreasPage() {
           </p>
         </div>
         <div className="row gap-sm">
+          <select
+            className="select"
+            value={serviceFilter}
+            onChange={(e) => setServiceFilter(e.target.value as ServiceType)}
+            style={{ width: 150 }}
+          >
+            <option value="both">All Services</option>
+            <option value="internet">Internet</option>
+            <option value="cable">Cable</option>
+          </select>
           <button className="btn btn-secondary">
             <Icon name="download" size={14} />
             Export
