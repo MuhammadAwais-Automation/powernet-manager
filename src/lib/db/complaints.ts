@@ -27,6 +27,34 @@ export function clearComplaintsCache() {
   complaintsCache = null
 }
 
+export function mergeComplaintIntoList(
+  list: ComplaintWithRelations[],
+  updated: ComplaintWithRelations,
+): ComplaintWithRelations[] {
+  const idx = list.findIndex((item) => item.id === updated.id)
+  if (idx < 0) return [updated, ...list]
+  const next = [...list]
+  next[idx] = updated
+  return next
+}
+
+export function removeComplaintFromList(
+  list: ComplaintWithRelations[],
+  complaintId: string,
+): ComplaintWithRelations[] {
+  return list.filter((item) => item.id !== complaintId)
+}
+
+export function patchComplaintsCache(
+  updater: (list: ComplaintWithRelations[]) => ComplaintWithRelations[],
+) {
+  if (!complaintsCache) return
+  complaintsCache = {
+    data: updater(complaintsCache.data),
+    expiresAt: complaintsCache.expiresAt,
+  }
+}
+
 export async function getComplaints(): Promise<ComplaintWithRelations[]> {
   if (complaintsCache && complaintsCache.expiresAt > Date.now()) return complaintsCache.data
 

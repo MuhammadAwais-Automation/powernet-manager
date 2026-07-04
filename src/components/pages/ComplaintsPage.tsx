@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import Icon from "../Icon";
 import { Badge, Avatar, Modal, Tabs } from "../ui";
 import {
@@ -7,9 +7,14 @@ import {
   getComplaints,
   createComplaint,
   updateComplaint,
+  mergeComplaintIntoList,
+  removeComplaintFromList,
+  patchComplaintsCache,
 } from "@/lib/db/complaints";
+import { supabase } from "@/lib/supabase";
+import { useNotifications } from "@/lib/notifications/notifications-context";
 import { getAreas } from "@/lib/db/areas";
-import { getStaff } from "@/lib/db/staff";
+import { getStaff, invalidateStaffCache } from "@/lib/db/staff";
 import { getTeams } from "@/lib/db/teams";
 import { searchCustomers, type CustomerSearchResult } from "@/lib/db/customers";
 import type {
@@ -22,6 +27,7 @@ import type {
   TeamWithMembers,
 } from "@/types/database";
 import { COMPLAINT_TYPES, CABLE_COMPLAINT_TYPES, ALL_COMPLAINT_TYPES, formatComplaintType, getComplaintServiceLine, assignableTechnicianRoles, formatServiceLine } from "@/lib/complaints/types";
+import { notifyComplaintAssignment } from "@/lib/notifications/mobile-push";
 
 const ROLE_SHORT: Record<string, string> = {
   technician: "Internet Tech",
@@ -106,6 +112,16 @@ function LogComplaintModal({
         in_progress_at: null,
         team_id: teamId,
       });
+      if (assignedToId || teamId) {
+        const team = teamId ? teams.find((t) => t.id === teamId) : null;
+        void notifyComplaintAssignment({
+          complaintId: created.id,
+          complaintCode: created.complaint_code,
+          issue: created.issue,
+          assignedStaffId: assignedToId,
+          teamMemberStaffIds: team?.members?.map((m) => m.staff_id) ?? [],
+        });
+      }
       const withRelations: ComplaintWithRelations = {
         ...created,
         customer: {
@@ -523,6 +539,24 @@ function ComplaintModal({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  useEffect(() => {
+    setStatus(complaint.status);
+    setPriority(complaint.priority);
+    setAssignedEntity(
+      complaint.team_id
+        ? `team:${complaint.team_id}`
+        : complaint.assigned_to
+          ? `staff:${complaint.assigned_to}`
+          : "",
+    );
+  }, [
+    complaint.id,
+    complaint.status,
+    complaint.priority,
+    complaint.assigned_to,
+    complaint.team_id,
+  ]);
+
   const isAlreadyAssigned = !!(complaint.assigned_to || complaint.team_id);
   const assignRoles = assignableTechnicianRoles();
   const priLabel: Record<string, string> = {
@@ -579,6 +613,19 @@ function ComplaintModal({
         priority,
         resolved_at: resolvedAt,
       });
+      const assignmentChanged =
+        (assignedToId ?? null) !== (complaint.assigned_to ?? null) ||
+        (teamId ?? null) !== (complaint.team_id ?? null);
+      if (hasAssignment && (newlyAssigned || assignmentChanged)) {
+        const team = teamId ? teams.find((t) => t.id === teamId) : null;
+        void notifyComplaintAssignment({
+          complaintId: complaint.id,
+          complaintCode: complaint.complaint_code,
+          issue: complaint.issue,
+          assignedStaffId: assignedToId,
+          teamMemberStaffIds: team?.members?.map((m) => m.staff_id) ?? [],
+        });
+      }
       onSaved();
       onClose();
     } catch (err) {
@@ -940,10 +987,14 @@ function ComplaintModal({
 
 export default function ComplaintsPage({
   refreshToken = 0,
+  staffRefreshToken = 0,
+  isActive = true,
   focusComplaintId = null,
   focusToken = 0,
 }: {
   refreshToken?: number;
+  staffRefreshToken?: number;
+  isActive?: boolean;
   focusComplaintId?: string | null;
   focusToken?: number;
 }) {
@@ -966,13 +1017,77 @@ export default function ComplaintsPage({
   const [filterType, setFilterType] = useState<string>("all");
   const [filterPriority, setFilterPriority] = useState<string>("all");
   const [searchTerm, setSearchTerm] = useState("");
+  const [syncWarning, setSyncWarning] = useState<string | null>(null);
 
-  const prevRefreshRef = React.useRef(refreshToken);
+  const { complaintSync } = useNotifications();
+  const prevComplaintSyncTokenRef = useRef(0);
+  const prevReloadTokenRef = useRef(refreshToken);
+  const listFetchSeqRef = useRef(0);
+  const prevStaffRefreshRef = useRef(staffRefreshToken);
+  const prevActiveRef = useRef(isActive);
+
+  const reloadAssignees = useCallback(async () => {
+    invalidateStaffCache();
+    const [a, s, t] = await Promise.all([getAreas(), getStaff(), getTeams()]);
+    setAreas(a);
+    setStaff(s);
+    setTeams(t);
+  }, []);
+
+  const loadComplaintsList = useCallback(async (options?: { force?: boolean }) => {
+    const seq = ++listFetchSeqRef.current;
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      console.warn("Complaints list refresh skipped: no active session");
+      setSyncWarning("Session expired — reload the page to refresh complaints.");
+      return null;
+    }
+
+    try {
+      const rows = await getComplaints();
+      if (seq !== listFetchSeqRef.current) return null;
+      if (!rows.length && complaints.length > 0 && !options?.force) {
+        console.warn("Complaints list refresh returned empty — keeping last good data");
+        setSyncWarning("Live sync returned no rows — showing last loaded data.");
+        return null;
+      }
+      setComplaints(rows);
+      setSyncWarning(null);
+      setError(null);
+      return rows;
+    } catch (e: unknown) {
+      if (seq !== listFetchSeqRef.current) return null;
+      const message = e instanceof Error ? e.message : "Could not refresh complaints";
+      console.warn("Complaints list refresh failed:", message);
+      setSyncWarning(`Live sync failed — showing last loaded data. (${message})`);
+      return null;
+    }
+  }, [complaints.length]);
+
+  const applyComplaintPatch = useCallback(async (complaintId: string) => {
+    if (!complaintId) return;
+    try {
+      const updated = await getComplaintById(complaintId);
+      if (!updated) return;
+      setComplaints((prev) => mergeComplaintIntoList(prev, updated));
+      patchComplaintsCache((list) => mergeComplaintIntoList(list, updated));
+      setOpen((prev) => (prev?.id === updated.id ? updated : prev));
+      setSyncWarning(null);
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : "Could not patch complaint";
+      console.warn("Complaint live patch failed:", message);
+      setSyncWarning(`Could not update complaint ${complaintId} live. (${message})`);
+    }
+  }, []);
 
   useEffect(() => {
-    Promise.all([getComplaints(), getAreas(), getStaff(), getTeams()])
-      .then(([c, a, s, t]) => {
-        setComplaints(c);
+    Promise.all([
+      loadComplaintsList({ force: true }),
+      getAreas(),
+      getStaff(),
+      getTeams(),
+    ])
+      .then(([, a, s, t]) => {
         setAreas(a);
         setStaff(s);
         setTeams(t);
@@ -981,15 +1096,52 @@ export default function ComplaintsPage({
         setError(e instanceof Error ? e.message : "Could not load complaints"),
       )
       .finally(() => setLoading(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
-    if (prevRefreshRef.current === refreshToken) return;
-    prevRefreshRef.current = refreshToken;
-    getComplaints()
-      .then((c) => setComplaints(c))
-      .catch(() => {});
-  }, [refreshToken]);
+    if (prevReloadTokenRef.current === refreshToken) return;
+    prevReloadTokenRef.current = refreshToken;
+    if (refreshToken === 0) return;
+    void loadComplaintsList();
+  }, [refreshToken, loadComplaintsList]);
+
+  useEffect(() => {
+    if (!complaintSync) return;
+    if (prevComplaintSyncTokenRef.current === complaintSync.token) return;
+    prevComplaintSyncTokenRef.current = complaintSync.token;
+
+    if (complaintSync.action === "reload") {
+      void loadComplaintsList();
+      return;
+    }
+    if (complaintSync.action === "delete") {
+      setComplaints((prev) => removeComplaintFromList(prev, complaintSync.complaintId));
+      patchComplaintsCache((list) => removeComplaintFromList(list, complaintSync.complaintId));
+      setOpen((prev) => (prev?.id === complaintSync.complaintId ? null : prev));
+      return;
+    }
+    void applyComplaintPatch(complaintSync.complaintId);
+  }, [complaintSync, applyComplaintPatch, loadComplaintsList]);
+
+  useEffect(() => {
+    if (prevStaffRefreshRef.current === staffRefreshToken) return;
+    prevStaffRefreshRef.current = staffRefreshToken;
+    if (staffRefreshToken === 0) return;
+    reloadAssignees().catch(() => {});
+  }, [staffRefreshToken, reloadAssignees]);
+
+  useEffect(() => {
+    const becameActive = isActive && !prevActiveRef.current;
+    prevActiveRef.current = isActive;
+    if (!becameActive) return;
+    reloadAssignees().catch(() => {});
+  }, [isActive, reloadAssignees]);
+
+  useEffect(() => {
+    if (!logOpen && !open) return;
+    reloadAssignees().catch(() => {});
+  }, [logOpen, open, reloadAssignees]);
 
   useEffect(() => {
     if (!focusComplaintId || focusToken === 0) return;
@@ -1021,9 +1173,14 @@ export default function ComplaintsPage({
   }, [focusComplaintId, focusToken]);
 
   const handleComplaintSaved = (c: ComplaintWithRelations) => {
-    setComplaints((prev) => [c, ...prev]);
+    setComplaints((prev) => mergeComplaintIntoList(prev, c));
+    patchComplaintsCache((list) => mergeComplaintIntoList(list, c));
     setSavedComplaintCode(c.complaint_code);
   };
+
+  const liveOpenComplaint = open
+    ? complaints.find((item) => item.id === open.id) ?? open
+    : null;
 
   if (loading)
     return (
@@ -1268,15 +1425,38 @@ export default function ComplaintsPage({
             setFilterServiceLine("all");
             setFilterType("all");
             setFilterPriority("all");
-            getComplaints()
-              .then(setComplaints)
-              .catch(() => {});
+            void loadComplaintsList({ force: true });
           }}
         >
           <Icon name="refresh" size={14} />
           Reset Filters
         </button>
       </div>
+
+      {syncWarning && (
+        <div
+          style={{
+            padding: "10px 14px",
+            borderRadius: 8,
+            background: "var(--amber-50, #fffbeb)",
+            color: "var(--amber, #d97706)",
+            marginBottom: 14,
+            fontSize: 13,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 10,
+          }}
+        >
+          <span>{syncWarning}</span>
+          <button
+            className="btn btn-ghost btn-sm"
+            onClick={() => setSyncWarning(null)}
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
 
       {complaints.length === 0 ? (
         <div
@@ -1580,16 +1760,14 @@ export default function ComplaintsPage({
         </div>
       )}
 
-      {open && (
+      {liveOpenComplaint && (
         <ComplaintModal
-          complaint={open}
+          complaint={liveOpenComplaint}
           onClose={() => setOpen(null)}
           staff={staff}
           teams={teams}
           onSaved={() => {
-            getComplaints()
-              .then((c) => setComplaints(c))
-              .catch(() => {});
+            void applyComplaintPatch(liveOpenComplaint.id);
           }}
         />
       )}

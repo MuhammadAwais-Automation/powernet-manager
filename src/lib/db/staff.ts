@@ -9,6 +9,11 @@ function clearStaffCache() {
   staffCache = null
 }
 
+/** Drop in-memory staff list so the next getStaff() hits Supabase. */
+export function invalidateStaffCache() {
+  clearStaffCache()
+}
+
 export async function getStaff(): Promise<StaffWithArea[]> {
   if (staffCache && staffCache.expiresAt > Date.now()) return staffCache.data
 

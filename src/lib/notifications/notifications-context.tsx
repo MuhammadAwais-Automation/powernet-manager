@@ -21,6 +21,8 @@ import {
   clearComplaintsCache,
   getComplaintById,
   getRecentComplaintStatusEvents,
+  patchComplaintsCache,
+  removeComplaintFromList,
 } from "@/lib/db/complaints";
 import {
   buildBillingNotification,
@@ -74,12 +76,19 @@ export type AppNotification =
   | CustomerSignupNotification
   | PaymentVerificationNotification;
 
+export type ComplaintSyncEvent = {
+  token: number;
+  complaintId: string;
+  action: "upsert" | "delete" | "reload";
+};
+
 type NotificationsContextValue = {
   items: AppNotification[];
   toasts: AppNotification[];
   unreadCount: number;
   billingVersion: number;
   complaintsVersion: number;
+  complaintSync: ComplaintSyncEvent | null;
   customerRequestsVersion: number;
   paymentVerificationsVersion: number;
   isInboxOpen: boolean;
@@ -105,6 +114,9 @@ export function NotificationsProvider({
   const [toasts, setToasts] = useState<AppNotification[]>([]);
   const [billingVersion, setBillingVersion] = useState(0);
   const [complaintsVersion, setComplaintsVersion] = useState(0);
+  const [complaintSync, setComplaintSync] = useState<ComplaintSyncEvent | null>(null);
+  const complaintSyncTokenRef = useRef(0);
+  const dashboardComplaintRefreshTimerRef = useRef<number | null>(null);
   const [customerRequestsVersion, setCustomerRequestsVersion] = useState(0);
   const [paymentVerificationsVersion, setPaymentVerificationsVersion] = useState(0);
   const [isInboxOpen, setInboxOpen] = useState(false);
@@ -140,6 +152,41 @@ export function NotificationsProvider({
     clearDashboardCache();
     setComplaintsVersion((version) => version + 1);
   }, []);
+
+  const emitComplaintSync = useCallback(
+    (complaintId: string, action: ComplaintSyncEvent["action"]) => {
+      complaintSyncTokenRef.current += 1;
+      setComplaintSync({
+        token: complaintSyncTokenRef.current,
+        complaintId,
+        action,
+      });
+      if (action === "reload") {
+        refreshComplaintViews();
+        return;
+      }
+      if (action === "delete") {
+        clearDashboardCache();
+        patchComplaintsCache((list) => removeComplaintFromList(list, complaintId));
+        if (dashboardComplaintRefreshTimerRef.current) {
+          window.clearTimeout(dashboardComplaintRefreshTimerRef.current);
+        }
+        dashboardComplaintRefreshTimerRef.current = window.setTimeout(() => {
+          clearDashboardCache();
+          setComplaintsVersion((version) => version + 1);
+        }, 1500);
+        return;
+      }
+      if (dashboardComplaintRefreshTimerRef.current) {
+        window.clearTimeout(dashboardComplaintRefreshTimerRef.current);
+      }
+      dashboardComplaintRefreshTimerRef.current = window.setTimeout(() => {
+        clearDashboardCache();
+        setComplaintsVersion((version) => version + 1);
+      }, 2000);
+    },
+    [refreshComplaintViews],
+  );
 
   const refreshCustomerRequestViews = useCallback(() => {
     clearDashboardCache();
@@ -199,7 +246,6 @@ export function NotificationsProvider({
         ]);
 
         let billingChanged = false;
-        let complaintsChanged = false;
 
         for (const payment of [...payments].reverse()) {
           if (seenPaymentIdsRef.current.has(payment.id)) continue;
@@ -266,6 +312,8 @@ export function NotificationsProvider({
           seenComplaintStatusKeysRef.current.add(statusKey);
           if (!notify) continue;
 
+          emitComplaintSync(complaint.id, "upsert");
+
           const notification = buildComplaintNotification({
             complaintId: complaint.id,
             complaintCode: complaint.complaint_code,
@@ -280,18 +328,16 @@ export function NotificationsProvider({
           });
 
           addNotification(notification);
-          complaintsChanged = true;
         }
 
         if (billingChanged) refreshBillingViews();
-        if (complaintsChanged) refreshComplaintViews();
       } catch (error) {
         console.warn("Polling fallback could not refresh notifications", error);
       } finally {
         pollingInFlightRef.current = false;
       }
     },
-    [addNotification, refreshBillingViews, refreshComplaintViews],
+    [addNotification, emitComplaintSync, refreshBillingViews],
   );
 
   useEffect(() => {
@@ -315,6 +361,9 @@ export function NotificationsProvider({
     return () => {
       window.clearInterval(timer);
       window.clearTimeout(activationTimer);
+      if (dashboardComplaintRefreshTimerRef.current) {
+        window.clearTimeout(dashboardComplaintRefreshTimerRef.current);
+      }
     };
   }, [pollFallbackChanges, setPollingFallback]);
 
@@ -429,9 +478,15 @@ export function NotificationsProvider({
           async (payload) => {
             const oldRow = payload.old as ComplaintRealtimeRow | null;
             const newRow = payload.new as ComplaintRealtimeRow | null;
+            const eventType = payload.eventType;
 
-            // Always clear cache so the complaints page refreshes
-            refreshComplaintViews();
+            if (eventType === "DELETE" && oldRow?.id) {
+              emitComplaintSync(oldRow.id, "delete");
+            } else if (newRow?.id) {
+              emitComplaintSync(newRow.id, "upsert");
+            } else {
+              emitComplaintSync("", "reload");
+            }
 
             // Show intake notifications for new open complaints and technician status updates.
             if (!didComplaintStatusChange(oldRow, newRow) || !newRow?.id)
@@ -504,7 +559,7 @@ export function NotificationsProvider({
       if (retryTimer) window.clearTimeout(retryTimer);
       if (channel) void supabase.removeChannel(channel);
     };
-  }, [addNotification, refreshComplaintViews, updateRealtimeHealth]);
+  }, [addNotification, emitComplaintSync, updateRealtimeHealth]);
 
   // Customer signup realtime subscription
   useEffect(() => {
@@ -739,6 +794,7 @@ export function NotificationsProvider({
       unreadCount: items.filter((item) => !item.read).length,
       billingVersion,
       complaintsVersion,
+      complaintSync,
       customerRequestsVersion,
       paymentVerificationsVersion,
       isInboxOpen,
@@ -766,6 +822,7 @@ export function NotificationsProvider({
     }),
     [
       billingVersion,
+      complaintSync,
       complaintsVersion,
       customerRequestsVersion,
       paymentVerificationsVersion,

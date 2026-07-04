@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import Icon from '../Icon';
 import { Badge, Switch, Modal, Drawer, Tabs } from '../ui';
 import { supabase } from '@/lib/supabase';
-import { getStaff, updateStaff, updateStaffPassword, deleteStaff, getStaffActivity, type StaffActivity } from '@/lib/db/staff';
+import { getStaff, updateStaff, updateStaffPassword, deleteStaff, getStaffActivity, invalidateStaffCache, type StaffActivity } from '@/lib/db/staff';
 import { getAreas } from '@/lib/db/areas';
 import { getTeams, createTeam, updateTeam, deleteTeam, updateTeamMembers } from '@/lib/db/teams';
 import { initials, avClass } from '@/lib/utils';
@@ -1073,7 +1073,7 @@ function StaffCard({ s, onEdit, onViewCreds, onToggleActive, onDelete, onViewAct
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
-export default function StaffPage() {
+export default function StaffPage({ onCatalogChange }: { onCatalogChange?: () => void }) {
   const { staff: currentStaff } = useAuth();
   const [staff, setStaff]             = useState<StaffWithArea[]>([]);
   const [areas, setAreas]             = useState<Area[]>([]);
@@ -1101,6 +1101,7 @@ export default function StaffPage() {
   const visibleStaff = staff.filter(s => s.id !== currentStaff?.id);
 
   const handleSaved = (saved: Staff) => {
+    invalidateStaffCache();
     const sAreaIds = saved.area_ids || [];
     const sAreas = areas.filter(a => sAreaIds.includes(a.id));
     const area = areas.find(a => a.id === saved.area_id) ?? sAreas[0] ?? null;
@@ -1110,6 +1111,7 @@ export default function StaffPage() {
       if (idx >= 0) { const next = [...prev]; next[idx] = withArea; return next; }
       return [...prev, withArea];
     });
+    onCatalogChange?.();
   };
 
   const handleToggleActive = async (s: StaffWithArea, val: boolean) => {
@@ -1117,6 +1119,8 @@ export default function StaffPage() {
     try {
       const { updateStaff } = await import('@/lib/db/staff');
       await updateStaff(s.id, { is_active: val });
+      invalidateStaffCache();
+      onCatalogChange?.();
     } catch {
       setStaff(prev => prev.map(m => m.id === s.id ? { ...m, is_active: !val } : m));
     }
@@ -1124,8 +1128,10 @@ export default function StaffPage() {
 
   const handleDelete = async (s: StaffWithArea) => {
     await deleteStaff(s.id);
+    invalidateStaffCache();
     setStaff(prev => prev.filter(m => m.id !== s.id));
     setDeleteTarget(null);
+    onCatalogChange?.();
   };
 
   const handlePasswordReset = async (s: StaffWithArea, newPw: string) => {
@@ -1385,6 +1391,7 @@ export default function StaffPage() {
           onSaved={(newTeam) => {
             setTeams(prev => [...prev, newTeam]);
             setTeamAddOpen(false);
+            onCatalogChange?.();
           }}
         />
       )}
@@ -1398,6 +1405,7 @@ export default function StaffPage() {
           onSaved={(updatedTeam) => {
             setTeams(prev => prev.map(t => t.id === updatedTeam.id ? updatedTeam : t));
             setTeamEditTarget(null);
+            onCatalogChange?.();
           }}
         />
       )}
@@ -1411,6 +1419,7 @@ export default function StaffPage() {
             await deleteTeam(teamDeleteTarget.id);
             setTeams(prev => prev.filter(t => t.id !== teamDeleteTarget.id));
             setTeamDeleteTarget(null);
+            onCatalogChange?.();
           }}
         />
       )}

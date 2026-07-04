@@ -9,7 +9,34 @@ type PushBody = {
   data?: Record<string, string>;
 };
 
+const PUSH_ROLES = new Set(["admin", "complaint_manager"]);
+
+async function getCallerStaff(
+  authHeader: string | null,
+): Promise<{ id: string; role: string } | null> {
+  if (!authHeader) return null;
+  const token = authHeader.replace(/^Bearer\s+/i, "");
+  const { data: userData, error: userErr } =
+    await supabaseAdmin.auth.getUser(token);
+  if (userErr || !userData.user) return null;
+  const { data: staff, error: staffErr } = await supabaseAdmin
+    .from("staff")
+    .select("id, role")
+    .eq("auth_user_id", userData.user.id)
+    .maybeSingle();
+  if (staffErr || !staff) return null;
+  return staff as { id: string; role: string };
+}
+
 export async function POST(request: Request) {
+  const caller = await getCallerStaff(request.headers.get("authorization"));
+  if (!caller) {
+    return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+  }
+  if (!PUSH_ROLES.has(caller.role)) {
+    return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
+  }
+
   if (!process.env.FCM_SERVICE_ACCOUNT_JSON?.trim()) {
     return NextResponse.json(
       { ok: false, error: "FCM_SERVICE_ACCOUNT_JSON not configured" },

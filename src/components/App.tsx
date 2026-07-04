@@ -256,6 +256,10 @@ function ShellContent({ staff, logout }: {
 
   const [pendingVerifications, setPendingVerifications] = useState(0);
   const [pendingCustomerRequests, setPendingCustomerRequests] = useState(0);
+  const [staffCatalogVersion, setStaffCatalogVersion] = useState(0);
+  const bumpStaffCatalog = useCallback(() => {
+    setStaffCatalogVersion((v) => v + 1);
+  }, []);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
@@ -539,6 +543,8 @@ function ShellContent({ staff, logout }: {
                 <div style={{ display: active === 'complaints' ? 'contents' : 'none' }}>
                   <ComplaintsPage
                     refreshToken={complaintsVersion}
+                    staffRefreshToken={staffCatalogVersion}
+                    isActive={active === 'complaints'}
                     focusComplaintId={notificationFocus?.page === 'complaints' ? notificationFocus.id : null}
                     focusToken={notificationFocus?.page === 'complaints' ? notificationFocus.requestId : 0}
                   />
@@ -546,7 +552,7 @@ function ShellContent({ staff, logout }: {
               )}
               {canAccessPage(staff.role, 'staff') && (
                 <div style={{ display: active === 'staff' ? 'contents' : 'none' }}>
-                  <StaffPage />
+                  <StaffPage onCatalogChange={bumpStaffCatalog} />
                 </div>
               )}
               {canAccessPage(staff.role, 'areas') && (
