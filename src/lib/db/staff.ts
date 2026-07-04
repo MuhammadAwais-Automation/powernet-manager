@@ -134,6 +134,7 @@ export interface StaffActivity {
     receipt_no: string
     receipt_url: string | null
     paid_at: string
+    service: 'internet' | 'cable'
     bill: {
       amount: number
       paid_amount: number
@@ -155,6 +156,7 @@ export interface StaffActivity {
     paid_at: string | null
     payment_note: string | null
     promised_date: string | null
+    service: 'internet' | 'cable'
     customer: {
       id: string
       customer_code: string
@@ -200,7 +202,11 @@ export interface StaffActivity {
   }[]
 }
 
-export async function getStaffActivity(staffId: string, dateStr: string): Promise<StaffActivity> {
+export async function getStaffActivity(
+  staffId: string,
+  dateStr: string,
+  serviceLine?: 'internet' | 'cable' | null,
+): Promise<StaffActivity> {
   const [yr, mo, dy] = dateStr.split('-').map(Number)
   const start = new Date(yr, mo - 1, dy, 0, 0, 0, 0)
   const end = new Date(yr, mo - 1, dy, 23, 59, 59, 999)
@@ -208,7 +214,7 @@ export async function getStaffActivity(staffId: string, dateStr: string): Promis
   const startISO = start.toISOString()
   const endISO = end.toISOString()
 
-  // 1. Fetch payments
+  // 1. Fetch internet payments
   const paymentsPromise = supabase
     .from('payments')
     .select(`
@@ -234,7 +240,31 @@ export async function getStaffActivity(staffId: string, dateStr: string): Promis
     .lte('paid_at', endISO)
     .order('paid_at', { ascending: false })
 
-  // 2. Fetch visits
+  const cablePaymentsPromise = supabase
+    .from('cable_payments')
+    .select(`
+      id,
+      amount,
+      method,
+      note,
+      receipt_no,
+      paid_at,
+      cable_bill:cable_bills(amount, paid_amount, status),
+      customer:customers(
+        id,
+        customer_code,
+        full_name,
+        address_type,
+        address_value,
+        area:areas(name)
+      )
+    `)
+    .eq('collected_by', staffId)
+    .gte('paid_at', startISO)
+    .lte('paid_at', endISO)
+    .order('paid_at', { ascending: false })
+
+  // 2. Fetch internet visits
   const visitsPromise = supabase
     .from('bills')
     .select(`
@@ -259,8 +289,31 @@ export async function getStaffActivity(staffId: string, dateStr: string): Promis
     .lte('paid_at', endISO)
     .order('paid_at', { ascending: false })
 
+  const cableVisitsPromise = supabase
+    .from('cable_bills')
+    .select(`
+      id,
+      amount,
+      paid_amount,
+      paid_at,
+      payment_note,
+      customer:customers(
+        id,
+        customer_code,
+        full_name,
+        address_type,
+        address_value,
+        area:areas(name)
+      )
+    `)
+    .eq('collected_by', staffId)
+    .eq('payment_method', 'visit')
+    .gte('paid_at', startISO)
+    .lte('paid_at', endISO)
+    .order('paid_at', { ascending: false })
+
   // 3. Fetch resolved complaints
-  const resolvedComplaintsPromise = supabase
+  let resolvedComplaintsQuery = supabase
     .from('complaints')
     .select(`
       id,
@@ -285,8 +338,12 @@ export async function getStaffActivity(staffId: string, dateStr: string): Promis
     .lte('resolved_at', endISO)
     .order('resolved_at', { ascending: false })
 
+  if (serviceLine) resolvedComplaintsQuery = resolvedComplaintsQuery.eq('service_line', serviceLine)
+
+  const resolvedComplaintsPromise = resolvedComplaintsQuery
+
   // 4. Fetch active complaints
-  const activeComplaintsPromise = supabase
+  let activeComplaintsQuery = supabase
     .from('complaints')
     .select(`
       id,
@@ -309,21 +366,81 @@ export async function getStaffActivity(staffId: string, dateStr: string): Promis
     .neq('status', 'resolved')
     .order('opened_at', { ascending: false })
 
-  const [paymentsRes, visitsRes, resolvedRes, activeRes] = await Promise.all([
+  if (serviceLine) activeComplaintsQuery = activeComplaintsQuery.eq('service_line', serviceLine)
+
+  const activeComplaintsPromise = activeComplaintsQuery
+
+  const [paymentsRes, cablePaymentsRes, visitsRes, cableVisitsRes, resolvedRes, activeRes] = await Promise.all([
     paymentsPromise,
+    cablePaymentsPromise,
     visitsPromise,
+    cableVisitsPromise,
     resolvedComplaintsPromise,
     activeComplaintsPromise
   ])
 
   if (paymentsRes.error) throw paymentsRes.error
+  if (cablePaymentsRes.error) throw cablePaymentsRes.error
   if (visitsRes.error) throw visitsRes.error
+  if (cableVisitsRes.error) throw cableVisitsRes.error
   if (resolvedRes.error) throw resolvedRes.error
   if (activeRes.error) throw activeRes.error
 
+  type RawPayment = Omit<StaffActivity['payments'][number], 'service'> & { bill?: StaffActivity['payments'][number]['bill'] }
+  type RawCablePayment = {
+    id: string
+    amount: number
+    method: string
+    note: string | null
+    receipt_no: string
+    paid_at: string
+    cable_bill: StaffActivity['payments'][number]['bill'] | StaffActivity['payments'][number]['bill'][] | null
+    customer: StaffActivity['payments'][number]['customer']
+  }
+
+  const internetPayments: StaffActivity['payments'] = ((paymentsRes.data ?? []) as unknown as RawPayment[]).map((p) => ({
+    ...p,
+    service: 'internet' as const,
+  }))
+
+  const cablePayments: StaffActivity['payments'] = ((cablePaymentsRes.data ?? []) as unknown as RawCablePayment[]).map((p) => {
+    const bill = Array.isArray(p.cable_bill) ? p.cable_bill[0] ?? null : p.cable_bill
+    return {
+      id: p.id,
+      amount: p.amount,
+      method: p.method,
+      note: p.note,
+      receipt_no: p.receipt_no,
+      receipt_url: null,
+      paid_at: p.paid_at,
+      service: 'cable' as const,
+      bill,
+      customer: p.customer,
+    }
+  })
+
+  const combinedPayments = [...internetPayments, ...cablePayments].sort(
+    (a, b) => Date.parse(b.paid_at) - Date.parse(a.paid_at),
+  )
+
+  type RawVisit = Omit<StaffActivity['visits'][number], 'service' | 'promised_date'> & { promised_date?: string | null }
+  const internetVisits: StaffActivity['visits'] = ((visitsRes.data ?? []) as unknown as RawVisit[]).map((v) => ({
+    ...v,
+    promised_date: v.promised_date ?? null,
+    service: 'internet' as const,
+  }))
+  const cableVisits: StaffActivity['visits'] = ((cableVisitsRes.data ?? []) as unknown as RawVisit[]).map((v) => ({
+    ...v,
+    promised_date: null,
+    payment_note: v.payment_note ?? null,
+    service: 'cable' as const,
+  }))
+
   return {
-    payments: (paymentsRes.data ?? []) as unknown as StaffActivity['payments'],
-    visits: (visitsRes.data ?? []) as unknown as StaffActivity['visits'],
+    payments: combinedPayments,
+    visits: [...internetVisits, ...cableVisits].sort(
+      (a, b) => Date.parse(b.paid_at ?? '') - Date.parse(a.paid_at ?? ''),
+    ),
     resolvedComplaints: (resolvedRes.data ?? []) as unknown as StaffActivity['resolvedComplaints'],
     activeComplaints: (activeRes.data ?? []) as unknown as StaffActivity['activeComplaints'],
   }

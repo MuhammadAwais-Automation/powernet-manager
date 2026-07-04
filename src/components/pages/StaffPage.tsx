@@ -12,7 +12,8 @@ import { formatPromisedDate, formatVisitNote } from '@/lib/notifications/billing
 import type { Staff, StaffWithArea, Area, StaffRole, Team, TeamWithMembers } from '@/types/database';
 
 const ROLE_LABELS: Record<string, string> = {
-  technician:        'Technician',
+  technician:        'Internet Technician',
+  cable_technician:  'Cable Technician',
   recovery_agent:    'Recovery Agent',
   helper:            'Helper',
   admin:             'Admin',
@@ -21,6 +22,7 @@ const ROLE_LABELS: Record<string, string> = {
 
 const ROLE_COLORS: Record<string, 'blue' | 'amber' | 'green' | 'purple' | 'gray'> = {
   technician:        'blue',
+  cable_technician:  'purple',
   recovery_agent:    'amber',
   helper:            'green',
   admin:             'gray',
@@ -29,12 +31,16 @@ const ROLE_COLORS: Record<string, 'blue' | 'amber' | 'green' | 'purple' | 'gray'
 
 const DASHBOARD_ROLES = new Set(['admin', 'complaint_manager']);
 
-const STAFF_ROLE_OPTIONS = [
-  { value: 'technician', label: 'Technician' },
+const MOBILE_STAFF_ROLE_OPTIONS = [
+  { value: 'technician', label: 'Internet Technician' },
+  { value: 'cable_technician', label: 'Cable Technician' },
   { value: 'recovery_agent', label: 'Recovery Agent' },
   { value: 'helper', label: 'Helper' },
+] as const;
+
+const DASHBOARD_STAFF_ROLE_OPTIONS = [
   { value: 'complaint_manager', label: 'Complaint Manager' },
-];
+] as const;
 
 async function getAuthHeaders(): Promise<Record<string, string>> {
   const { data: { session } } = await supabase.auth.getSession();
@@ -170,10 +176,20 @@ function StaffFormModal({ open, onClose, areas, onSaved, editTarget }: {
             <label>Role *</label>
             <select className="select" value={form.role} onChange={e => set('role', e.target.value)}>
               {editTarget?.role === 'admin' && <option value="admin">Admin (fixed)</option>}
-              {STAFF_ROLE_OPTIONS.map(role => (
-                <option key={role.value} value={role.value}>{role.label}</option>
-              ))}
+              <optgroup label="Mobile App Roles">
+                {MOBILE_STAFF_ROLE_OPTIONS.map(role => (
+                  <option key={role.value} value={role.value}>{role.label}</option>
+                ))}
+              </optgroup>
+              <optgroup label="Dashboard Roles">
+                {DASHBOARD_STAFF_ROLE_OPTIONS.map(role => (
+                  <option key={role.value} value={role.value}>{role.label}</option>
+                ))}
+              </optgroup>
             </select>
+            <div className="muted" style={{ fontSize: 11, marginTop: 6 }}>
+              Internet and Cable technicians handle field complaints in the mobile app.
+            </div>
           </div>
         </div>
 
@@ -508,7 +524,11 @@ function StaffActivityDrawer({ staff, onClose }: {
     let active = true;
     setLoading(true);
     setError(null);
-    getStaffActivity(staff.id, dateStr)
+    getStaffActivity(
+      staff.id,
+      dateStr,
+      staff.role === 'cable_technician' ? 'cable' : staff.role === 'technician' ? 'internet' : null,
+    )
       .then(data => {
         if (!active) return;
         setActivity(data);
@@ -516,7 +536,7 @@ function StaffActivityDrawer({ staff, onClose }: {
         // Auto-select tab based on role and data
         if (staff.role === 'recovery_agent') {
           setActiveTab('payments');
-        } else if (staff.role === 'technician') {
+        } else if (staff.role === 'technician' || staff.role === 'cable_technician') {
           setActiveTab('active');
         } else {
           if (data.payments.length > 0) setActiveTab('payments');
@@ -556,6 +576,8 @@ function StaffActivityDrawer({ staff, onClose }: {
   };
 
   const totalRecovered = activity?.payments.reduce((sum, p) => sum + p.amount, 0) ?? 0;
+  const internetRecovered = activity?.payments.filter(p => p.service === 'internet').reduce((sum, p) => sum + p.amount, 0) ?? 0;
+  const cableRecovered = activity?.payments.filter(p => p.service === 'cable').reduce((sum, p) => sum + p.amount, 0) ?? 0;
   const partialCount = activity?.payments.filter(p => p.amount < (p.bill?.amount ?? p.amount)).length ?? 0;
   const fullCount = (activity?.payments.length ?? 0) - partialCount;
   const visitsCount = activity?.visits.length ?? 0;
@@ -567,7 +589,7 @@ function StaffActivityDrawer({ staff, onClose }: {
     tabsList.push({ value: 'payments', label: 'Payments', count: activity?.payments.length ?? 0 });
     tabsList.push({ value: 'visits', label: 'Visits Logged', count: visitsCount });
   }
-  if (staff.role === 'technician' || staff.role === 'complaint_manager' || (activity && (activity.resolvedComplaints.length > 0 || activity.activeComplaints.length > 0))) {
+  if (staff.role === 'technician' || staff.role === 'cable_technician' || staff.role === 'complaint_manager' || (activity && (activity.resolvedComplaints.length > 0 || activity.activeComplaints.length > 0))) {
     tabsList.push({ value: 'active', label: 'Active Complaints', count: activeCount });
     tabsList.push({ value: 'resolved', label: 'Resolved Today', count: resolvedCount });
   }
@@ -625,9 +647,17 @@ function StaffActivityDrawer({ staff, onClose }: {
           <>
             {staff.role === 'recovery_agent' ? (
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                <div className="card" style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <div className="card" style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 4, gridColumn: 'span 2' }}>
                   <span className="muted" style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase' }}>Total Recovered</span>
                   <span style={{ fontSize: 18, fontWeight: 700, color: 'var(--brand)' }}>Rs. {totalRecovered.toLocaleString()}</span>
+                </div>
+                <div className="card" style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  <span className="muted" style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase' }}>Internet</span>
+                  <span style={{ fontSize: 16, fontWeight: 700, color: 'var(--blue)' }}>Rs. {internetRecovered.toLocaleString()}</span>
+                </div>
+                <div className="card" style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  <span className="muted" style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase' }}>Cable</span>
+                  <span style={{ fontSize: 16, fontWeight: 700, color: 'var(--purple)' }}>Rs. {cableRecovered.toLocaleString()}</span>
                 </div>
                 <div className="card" style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 4 }}>
                   <span className="muted" style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase' }}>Payments (F/P)</span>
@@ -635,12 +665,12 @@ function StaffActivityDrawer({ staff, onClose }: {
                     {fullCount} <span style={{ fontSize: 12, fontWeight: 400, color: 'var(--text-muted)' }}>full</span> / {partialCount} <span style={{ fontSize: 12, fontWeight: 400, color: 'var(--text-muted)' }}>part</span>
                   </span>
                 </div>
-                <div className="card" style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 4, gridColumn: 'span 2' }}>
+                <div className="card" style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 4 }}>
                   <span className="muted" style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase' }}>Visits Logged Today</span>
                   <span style={{ fontSize: 18, fontWeight: 700, color: 'var(--amber)' }}>{visitsCount} customer visits</span>
                 </div>
               </div>
-            ) : staff.role === 'technician' ? (
+            ) : staff.role === 'technician' || staff.role === 'cable_technician' ? (
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                 <div className="card" style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 4 }}>
                   <span className="muted" style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase' }}>Resolved Today</span>
@@ -676,9 +706,14 @@ function StaffActivityDrawer({ staff, onClose }: {
                             <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--green)' }}>
                               Rs. {p.amount.toLocaleString()}
                             </span>
-                            <Badge color={p.bill?.status === 'paid' ? 'green' : 'amber'}>
-                              {p.bill?.status === 'paid' ? 'Paid' : 'Partial'}
-                            </Badge>
+                            <div style={{ display: 'flex', gap: 4 }}>
+                              <Badge color={p.service === 'cable' ? 'purple' : 'blue'}>
+                                {p.service === 'cable' ? 'Cable' : 'Internet'}
+                              </Badge>
+                              <Badge color={p.bill?.status === 'paid' ? 'green' : 'amber'}>
+                                {p.bill?.status === 'paid' ? 'Paid' : 'Partial'}
+                              </Badge>
+                            </div>
                           </div>
                         </div>
 
@@ -1130,13 +1165,15 @@ export default function StaffPage() {
   const byRole = (role: StaffRole) => visibleStaff.filter(s => s.role === role);
   const dashUsers   = visibleStaff.filter(s => DASHBOARD_ROLES.has(s.role));
   const technicians = byRole('technician');
+  const cableTechnicians = byRole('cable_technician');
   const agents      = byRole('recovery_agent');
   const helpers     = byRole('helper');
 
   const roleFilters = [
     { value: 'all', label: 'All', count: visibleStaff.length },
     { value: 'dashboard', label: 'Dashboard Users', count: dashUsers.length, color: 'var(--purple)' },
-    { value: 'technician', label: 'Technicians', count: technicians.length, color: 'var(--blue)' },
+    { value: 'technician', label: 'Internet Technicians', count: technicians.length, color: 'var(--blue)' },
+    { value: 'cable_technician', label: 'Cable Technicians', count: cableTechnicians.length, color: 'var(--purple)' },
     { value: 'recovery_agent', label: 'Recovery Agents', count: agents.length, color: 'var(--amber)' },
     { value: 'helper', label: 'Helpers', count: helpers.length, color: 'var(--green)' }
   ];
@@ -1155,7 +1192,7 @@ export default function StaffPage() {
           <p>
             {activePageTab === 'members' ? (
               <>
-                {visibleStaff.length} total · {dashUsers.length} dashboard · {technicians.length} technicians · {agents.length} recovery agents
+                {visibleStaff.length} total · {dashUsers.length} dashboard · {technicians.length} technicians · {cableTechnicians.length} cable techs · {agents.length} recovery agents
                 {helpers.length > 0 ? ` · ${helpers.length} helpers` : ''}
               </>
             ) : (
@@ -1445,6 +1482,7 @@ function TeamFormModal({ open, onClose, staff, onSaved, editTarget }: {
   };
 
   const technicians = filterBySearch(staff.filter(s => s.role === 'technician'));
+  const cableTechnicians = filterBySearch(staff.filter(s => s.role === 'cable_technician'));
   const helpers = filterBySearch(staff.filter(s => s.role === 'helper'));
   const recoveryAgents = filterBySearch(staff.filter(s => s.role === 'recovery_agent'));
   const complaintManagers = filterBySearch(staff.filter(s => s.role === 'complaint_manager'));
@@ -1538,7 +1576,8 @@ function TeamFormModal({ open, onClose, staff, onSaved, editTarget }: {
         <div style={{ borderTop: '1px solid var(--border)', paddingTop: 14 }}>
           <label style={{ fontSize: 13, fontWeight: 600, display: 'block', marginBottom: 10 }}>Select Team Members</label>
           <div style={{ maxHeight: 300, overflowY: 'auto', paddingRight: 4 }}>
-            {renderStaffSection('Technicians', technicians, 'var(--blue)')}
+            {renderStaffSection('Internet Technicians', technicians, 'var(--blue)')}
+            {renderStaffSection('Cable Technicians', cableTechnicians, 'var(--purple)')}
             {renderStaffSection('Helpers', helpers, 'var(--green)')}
             {renderStaffSection('Recovery Agents', recoveryAgents, 'var(--amber)')}
             {renderStaffSection('Complaint Managers', complaintManagers, 'var(--purple)')}

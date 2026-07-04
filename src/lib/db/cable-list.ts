@@ -1,12 +1,12 @@
 import { supabase } from '@/lib/supabase'
-import type { CableListRow, CustomerStatus } from '@/types/database'
+import type { CableListRow, CableType } from '@/types/database'
 
 export type CableListParams = {
   page: number
   pageSize: number
   search?: string
   areaId?: string
-  status?: CustomerStatus
+  cableType?: CableType
   hasInternet?: boolean
   connectedBefore?: string
 }
@@ -22,6 +22,11 @@ const CABLE_LIST_SELECT = `
   is_tdc,
   connection_date,
   has_internet,
+  has_cable,
+  iptv,
+  cable_type,
+  address_type,
+  address_value,
   area:areas(id, name)
 `
 
@@ -48,8 +53,7 @@ export async function getCableSubscriberList(params: CableListParams): Promise<{
   }
 
   if (params.areaId) query = query.eq('area_id', params.areaId)
-  if (params.status === 'tdc') query = query.eq('is_tdc', true)
-  else if (params.status) query = query.eq('status', params.status)
+  if (params.cableType) query = query.eq('cable_type', params.cableType)
   if (params.hasInternet === true) query = query.eq('has_internet', true)
   if (params.hasInternet === false) query = query.eq('has_internet', false)
   if (params.connectedBefore) query = query.lte('connection_date', params.connectedBefore)

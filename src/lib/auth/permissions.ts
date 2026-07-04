@@ -17,6 +17,7 @@ export const NAV_BY_ROLE: Record<StaffRole, PageId[]> = {
   admin:             ['dashboard', 'customers', 'customer_requests', 'payment_approvals', 'billing', 'cable', 'complaints', 'staff', 'areas', 'reports', 'settings'],
   complaint_manager: ['complaints', 'customers'],
   technician:        [],
+  cable_technician:  [],
   recovery_agent:    [],
   helper:            [],
 }
@@ -25,6 +26,7 @@ export const DEFAULT_PAGE_BY_ROLE: Record<StaffRole, PageId> = {
   admin:             'dashboard',
   complaint_manager: 'complaints',
   technician:        'dashboard',
+  cable_technician:  'dashboard',
   recovery_agent:    'dashboard',
   helper:            'dashboard',
 }

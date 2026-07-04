@@ -21,7 +21,16 @@ import type {
   ComplaintStatus,
   TeamWithMembers,
 } from "@/types/database";
-import { COMPLAINT_TYPES, formatComplaintType } from "@/lib/complaints/types";
+import { COMPLAINT_TYPES, CABLE_COMPLAINT_TYPES, ALL_COMPLAINT_TYPES, formatComplaintType, getComplaintServiceLine, assignableTechnicianRoles, formatServiceLine } from "@/lib/complaints/types";
+
+const ROLE_SHORT: Record<string, string> = {
+  technician: "Internet Tech",
+  cable_technician: "Cable Tech",
+};
+
+function complaintLine(c: Pick<ComplaintWithRelations, "type" | "service_line">): "internet" | "cable" {
+  return c.service_line ?? getComplaintServiceLine(c.type);
+}
 
 function LogComplaintModal({
   onClose,
@@ -61,6 +70,8 @@ function LogComplaintModal({
     return () => clearTimeout(t);
   }, [customerSearch]);
 
+  const assignRoles = assignableTechnicianRoles();
+
   const handleSubmit = async () => {
     if (!selectedCustomer) {
       setError("Select a customer");
@@ -81,10 +92,13 @@ function LogComplaintModal({
         teamId = form.assigned_to.substring(5);
       }
 
+      const serviceLine = getComplaintServiceLine(form.type);
+
       const created = await createComplaint({
         customer_id: selectedCustomer.id,
         issue: form.issue.trim(),
         type: form.type,
+        service_line: serviceLine,
         priority: form.priority,
         status: form.status,
         assigned_to: assignedToId,
@@ -360,12 +374,20 @@ function LogComplaintModal({
                 setForm((f) => ({
                   ...f,
                   type: e.target.value as ComplaintType,
+                  assigned_to: "",
                 }))
               }
             >
-              {COMPLAINT_TYPES.map((t) => (
-                <option key={t.value} value={t.value}>{t.label}</option>
-              ))}
+              <optgroup label="Internet">
+                {COMPLAINT_TYPES.map((t) => (
+                  <option key={t.value} value={t.value}>{t.label}</option>
+                ))}
+              </optgroup>
+              <optgroup label="Cable">
+                {CABLE_COMPLAINT_TYPES.map((t) => (
+                  <option key={t.value} value={t.value}>{t.label}</option>
+                ))}
+              </optgroup>
             </select>
           </div>
           <div className="field">
@@ -408,10 +430,10 @@ function LogComplaintModal({
             )}
             <optgroup label="Individuals">
               {staff
-                .filter((s) => s.role === "technician" || s.role === "helper")
+                .filter((s) => assignRoles.includes(s.role))
                 .map((s) => (
                   <option key={s.id} value={`staff:${s.id}`}>
-                    {s.full_name} ({s.role === "technician" ? "Tech" : "Helper"})
+                    {s.full_name} ({ROLE_SHORT[s.role] ?? s.role})
                   </option>
                 ))}
             </optgroup>
@@ -502,6 +524,7 @@ function ComplaintModal({
   const [error, setError] = useState<string | null>(null);
 
   const isAlreadyAssigned = !!(complaint.assigned_to || complaint.team_id);
+  const assignRoles = assignableTechnicianRoles();
   const priLabel: Record<string, string> = {
     high: "High",
     medium: "Medium",
@@ -812,10 +835,10 @@ function ComplaintModal({
               )}
               <optgroup label="Individuals">
                 {staff
-                  .filter((s) => s.role === "technician" || s.role === "helper")
+                  .filter((s) => assignRoles.includes(s.role))
                   .map((s) => (
                     <option key={s.id} value={`staff:${s.id}`}>
-                      {s.full_name} ({s.role === "technician" ? "Tech" : "Helper"})
+                      {s.full_name} ({ROLE_SHORT[s.role] ?? s.role})
                     </option>
                   ))}
               </optgroup>
@@ -939,6 +962,7 @@ export default function ComplaintsPage({
 
   // Dynamic filter states
   const [filterArea, setFilterArea] = useState<string>("all");
+  const [filterServiceLine, setFilterServiceLine] = useState<string>("all");
   const [filterType, setFilterType] = useState<string>("all");
   const [filterPriority, setFilterPriority] = useState<string>("all");
   const [searchTerm, setSearchTerm] = useState("");
@@ -1041,6 +1065,7 @@ export default function ComplaintsPage({
   const filteredComplaints = complaints.filter((c) => {
     if (filterArea !== "all" && c.customer?.area_id !== filterArea)
       return false;
+    if (filterServiceLine !== "all" && complaintLine(c) !== filterServiceLine) return false;
     if (filterType !== "all" && c.type !== filterType) return false;
     if (filterPriority !== "all" && c.priority !== filterPriority) return false;
     if (searchTerm.trim()) {
@@ -1206,11 +1231,21 @@ export default function ComplaintsPage({
         <select
           className="select"
           style={{ width: "auto" }}
+          value={filterServiceLine}
+          onChange={(e) => setFilterServiceLine(e.target.value)}
+        >
+          <option value="all">All services</option>
+          <option value="internet">Internet</option>
+          <option value="cable">Cable</option>
+        </select>
+        <select
+          className="select"
+          style={{ width: "auto" }}
           value={filterType}
           onChange={(e) => setFilterType(e.target.value)}
         >
           <option value="all">All types</option>
-          {COMPLAINT_TYPES.map((t) => (
+          {ALL_COMPLAINT_TYPES.map((t) => (
             <option key={t.value} value={t.value}>{t.label}</option>
           ))}
         </select>
@@ -1230,6 +1265,7 @@ export default function ComplaintsPage({
           className="btn btn-ghost btn-sm"
           onClick={() => {
             setFilterArea("all");
+            setFilterServiceLine("all");
             setFilterType("all");
             setFilterPriority("all");
             getComplaints()
@@ -1491,6 +1527,8 @@ export default function ComplaintsPage({
             <thead>
               <tr>
                 <th>ID</th>
+                <th>Service</th>
+                <th>Type</th>
                 <th>Issue</th>
                 <th>Customer</th>
                 <th>Priority</th>
@@ -1505,6 +1543,12 @@ export default function ComplaintsPage({
                   <td className="mono" style={{ fontSize: 12 }}>
                     {c.complaint_code}
                   </td>
+                  <td>
+                    <Badge color={complaintLine(c) === "cable" ? "purple" : "blue"}>
+                      {formatServiceLine(complaintLine(c))}
+                    </Badge>
+                  </td>
+                  <td style={{ fontSize: 12 }}>{formatComplaintType(c.type)}</td>
                   <td style={{ fontWeight: 500 }}>{c.issue}</td>
                   <td>{c.customer?.full_name ?? "—"}</td>
                   <td>

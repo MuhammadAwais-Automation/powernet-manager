@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import Icon from '../Icon';
-import { Badge, Avatar, Switch, Drawer } from '../ui';
+import { Badge, Avatar, Drawer } from '../ui';
 import { createCustomer, getCustomerById, updateCustomer } from '@/lib/db/customers';
 import { getCableSubscriberList } from '@/lib/db/cable-list';
 import { getCableBillsByCustomer } from '@/lib/db/cable-bills';
@@ -14,6 +14,7 @@ import type {
   Area,
   CableBillWithRelations,
   CableListRow,
+  CableType,
   CustomerStatus,
   CustomerWithRelations,
   Package,
@@ -23,11 +24,68 @@ function displayStatus(c: { status: CustomerStatus; is_tdc?: boolean }): Custome
   return c.is_tdc ? 'tdc' : c.status;
 }
 
-function statusColor(status: CustomerStatus): 'green' | 'red' | 'amber' | 'blue' {
-  if (status === 'active') return 'green';
-  if (status === 'free') return 'blue';
-  if (status === 'suspended' || status === 'tdc') return 'amber';
+function cableTypeLabel(type: CableType | null | undefined): string {
+  if (type === 'digital') return 'Digital';
+  if (type === 'analog') return 'Analog';
+  return '—';
+}
+
+function cableTypeColor(type: CableType | null | undefined): 'blue' | 'amber' | 'red' {
+  if (type === 'digital') return 'blue';
+  if (type === 'analog') return 'amber';
   return 'red';
+}
+
+function addressDisplay(customer: {
+  address_type?: CustomerWithRelations['address_type'];
+  address_value?: string | null;
+  house_id?: string | null;
+  remarks?: string | null;
+}): string {
+  const parts: string[] = [];
+  if (customer.address_value) {
+    if (customer.address_type === 'id_number') {
+      const v = customer.address_value.trim().toUpperCase();
+      parts.push(v.startsWith('ID NO') || v.startsWith('ID NUMBER') ? customer.address_value : `ID NO ${customer.address_value}`);
+    } else {
+      parts.push(customer.address_value);
+    }
+  }
+  if (customer.house_id && customer.house_id !== customer.address_value) {
+    parts.push(customer.house_id);
+  }
+  if (!parts.length && customer.remarks) {
+    const card = customer.remarks.match(/Card:\s*(\S+)/);
+    if (card) parts.push(`Card ${card[1]}`);
+  }
+  return parts.join(' · ') || '—';
+}
+
+function cardFromRemarks(remarks: string | null | undefined): string | null {
+  if (!remarks) return null;
+  const m = remarks.match(/Card:\s*(\S+)/);
+  return m ? m[1] : null;
+}
+
+function ServiceBadges({ customer }: { customer: Pick<CustomerWithRelations, 'has_cable' | 'has_internet' | 'iptv' | 'cable_type'> }) {
+  const items: React.ReactNode[] = [];
+  if (customer.has_cable) {
+    items.push(
+      <Badge key="cable" color="purple" dot>
+        Cable{customer.cable_type ? ` (${cableTypeLabel(customer.cable_type)})` : ''}
+      </Badge>,
+    );
+  }
+  if (customer.has_internet) {
+    items.push(<Badge key="internet" color="green" dot>Internet</Badge>);
+  }
+  if (customer.iptv) {
+    items.push(<Badge key="iptv" color="blue" dot>IPTV</Badge>);
+  }
+  if (!items.length) {
+    return <span className="muted" style={{ fontSize: 12 }}>—</span>;
+  }
+  return <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>{items}</div>;
 }
 
 function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
@@ -58,11 +116,8 @@ function CableSubscriberForm({
     full_name: editTarget?.full_name ?? '',
     cnic: editTarget?.cnic ?? '',
     phone: editTarget?.phone ?? '',
-    username: editTarget?.username ?? '',
-    has_internet: editTarget?.has_internet ?? false,
-    package_id: editTarget?.package_id ?? '',
-    due_amount: editTarget?.due_amount?.toString() ?? '',
-    address_type: (editTarget?.address_type ?? 'id_number') as 'text' | 'id_number',
+    cable_type: (editTarget?.cable_type ?? '') as '' | CableType,
+    address_type: (editTarget?.address_type ?? 'text') as 'text' | 'id_number',
     address_value: editTarget?.address_value ?? '',
     area_id: editTarget?.area_id ?? '',
     connection_date: editTarget?.connection_date ?? '',
@@ -77,7 +132,7 @@ function CableSubscriberForm({
     if (!form.full_name.trim()) { setError('Name required'); return; }
     if (!form.area_id) { setError('Area required'); return; }
     if (!form.phone.trim()) { setError('Phone required'); return; }
-    if (form.has_internet && !form.package_id) { setError('Package required when internet is enabled'); return; }
+    if (!form.cable_type) { setError('Cable type required (Digital or Analog)'); return; }
 
     setSaving(true);
     setError(null);
@@ -86,19 +141,20 @@ function CableSubscriberForm({
         full_name: form.full_name.trim(),
         cnic: form.cnic || null,
         phone: form.phone || null,
-        username: form.username || null,
+        username: editTarget?.username ?? null,
         has_cable: true,
-        has_internet: form.has_internet,
+        has_internet: editTarget?.has_internet ?? false,
         iptv: editTarget?.iptv ?? false,
-        package_id: form.has_internet ? (form.package_id || null) : null,
-        due_amount: form.has_internet && form.due_amount ? parseInt(form.due_amount, 10) : null,
+        package_id: editTarget?.package_id ?? null,
+        due_amount: editTarget?.due_amount ?? null,
+        cable_type: form.cable_type,
         address_type: form.address_type,
         address_value: form.address_value || null,
         area_id: form.area_id,
         connection_date: form.connection_date || null,
         status: form.status,
         remarks: form.remarks || null,
-        onu_number: form.has_internet ? (editTarget?.onu_number ?? null) : null,
+        onu_number: editTarget?.onu_number ?? null,
         disconnected_date: editTarget?.disconnected_date ?? null,
         reconnected_date: editTarget?.reconnected_date ?? null,
       };
@@ -141,24 +197,10 @@ function CableSubscriberForm({
         </div>
 
         <div className="card card-pad" style={{ marginBottom: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <div className="muted" style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Services</div>
-          <div className="row gap-sm" style={{ alignItems: 'center' }}>
-            <Switch on={form.has_internet} onChange={(v: boolean) => set('has_internet', v)} />
-            <span style={{ fontSize: 13 }}>Internet</span>
-          </div>
-          {form.has_internet && (
-            <>
-              <select className="select" value={form.package_id} onChange={(e) => set('package_id', e.target.value)}>
-                <option value="">Select internet package *</option>
-                {packages.map((p) => (
-                  <option key={p.id} value={p.id}>{p.name}{p.default_price ? ` — Rs. ${p.default_price}` : ''}</option>
-                ))}
-              </select>
-              <input className="select" type="number" placeholder="Internet monthly due (PKR)" value={form.due_amount} onChange={(e) => set('due_amount', e.target.value)} />
-            </>
-          )}
-          <div style={{ padding: '10px 12px', background: 'var(--bg-muted)', borderRadius: 8, fontSize: 12, color: 'var(--text-muted)' }}>
-            Cable subscription is always enabled for subscribers added here.
+          <div className="muted" style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Cable Type</div>
+          <div className="row gap-sm">
+            <button type="button" className={`btn btn-sm ${form.cable_type === 'digital' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => set('cable_type', 'digital')}>Digital (DECO)</button>
+            <button type="button" className={`btn btn-sm ${form.cable_type === 'analog' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => set('cable_type', 'analog')}>Analog (ANAL)</button>
           </div>
         </div>
 
@@ -197,39 +239,20 @@ function CableSubscriberDetail({
   cablePrice,
   onClose,
   onEdit,
-  onUpdated,
 }: {
   customer: CustomerWithRelations;
   cablePrice: number;
   onClose: () => void;
   onEdit: () => void;
-  onUpdated: () => void;
 }) {
   const [bills, setBills] = useState<CableBillWithRelations[]>([]);
-  const [togglingInternet, setTogglingInternet] = useState(false);
 
   useEffect(() => {
     getCableBillsByCustomer(customer.id).then(setBills).catch(() => setBills([]));
   }, [customer.id]);
 
-  const toggleInternet = async () => {
-    setTogglingInternet(true);
-    try {
-      const next = !customer.has_internet;
-      await updateCustomer(customer.id, {
-        has_internet: next,
-        package_id: next ? customer.package_id : null,
-        due_amount: next ? customer.due_amount : null,
-      });
-      onUpdated();
-    } catch {
-      /* ignore */
-    } finally {
-      setTogglingInternet(false);
-    }
-  };
-
   const outstanding = bills.reduce((sum, b) => sum + Math.max(b.amount - (b.paid_amount ?? 0), 0), 0);
+  const cardNo = cardFromRemarks(customer.remarks);
 
   return (
     <>
@@ -244,39 +267,51 @@ function CableSubscriberDetail({
         <button className="icon-btn" onClick={onClose}><Icon name="close" size={16} /></button>
       </div>
       <div className="drawer-body">
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', background: 'var(--bg-muted)', borderRadius: 10, marginBottom: 16, border: '1px solid var(--border)' }}>
-          <Badge color="purple" dot>Cable</Badge>
-          <Badge color={customer.has_internet ? 'green' : 'red'} dot>{customer.has_internet ? 'Internet' : 'No Internet'}</Badge>
-          <span style={{ marginLeft: 'auto', fontSize: 13, fontWeight: 600, fontFamily: 'JetBrains Mono, monospace' }}>
-            Rs. {cablePrice.toLocaleString()}/mo
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', background: 'var(--bg-muted)', borderRadius: 10, marginBottom: 16, border: '1px solid var(--border)', flexWrap: 'wrap' }}>
+          {customer.cable_type && (
+            <Badge color={cableTypeColor(customer.cable_type)} dot>{cableTypeLabel(customer.cable_type)} Cable</Badge>
+          )}
+          <Badge color="purple" dot>Cable Rs. {cablePrice.toLocaleString()}/mo</Badge>
+          <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--text-muted)' }}>
+            {displayStatus(customer).toUpperCase()}
           </span>
+        </div>
+
+        <div className="card" style={{ marginBottom: 14 }}>
+          <div className="card-head"><h3>Personal Info</h3></div>
+          <div className="card-pad" style={{ paddingTop: 8, paddingBottom: 8 }}>
+            <InfoRow label="CNIC" value={customer.cnic} />
+            <InfoRow label="Phone" value={customer.phone} />
+            <InfoRow label="Card No" value={cardNo} />
+          </div>
+        </div>
+
+        <div className="card" style={{ marginBottom: 14 }}>
+          <div className="card-head"><h3>Location</h3></div>
+          <div className="card-pad" style={{ paddingTop: 8, paddingBottom: 8 }}>
+            <InfoRow label="Address" value={addressDisplay(customer)} />
+            <InfoRow label="Area" value={customer.area ? `${customer.area.name} (${customer.area.code})` : '—'} />
+            {customer.connection_date && <InfoRow label="Connected Since" value={customer.connection_date} />}
+          </div>
         </div>
 
         <div className="card" style={{ marginBottom: 14 }}>
           <div className="card-head"><h3>Services</h3></div>
           <div className="card-pad" style={{ paddingTop: 8, paddingBottom: 8 }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 0' }}>
-              <div>
-                <div style={{ fontSize: 13, fontWeight: 600 }}>Internet</div>
-                <div className="muted" style={{ fontSize: 11 }}>Toggle if subscriber also has internet</div>
-              </div>
-              <Switch on={customer.has_internet} onChange={() => { if (!togglingInternet) void toggleInternet(); }} />
-            </div>
-            {customer.has_internet && customer.package && (
-              <InfoRow label="Internet Package" value={customer.package.name} />
-            )}
+            <InfoRow label="Cable Type" value={customer.cable_type ? <Badge color={cableTypeColor(customer.cable_type)} dot>{cableTypeLabel(customer.cable_type)}</Badge> : '—'} />
+            <InfoRow label="Cable" value={customer.has_cable ? <Badge color="purple" dot>Active</Badge> : <span className="muted" style={{ fontSize: 12 }}>Not subscribed</span>} />
+            <InfoRow label="Internet" value={customer.has_internet ? <Badge color="green" dot>{customer.package?.name ?? 'Active'}</Badge> : <span className="muted" style={{ fontSize: 12 }}>Not subscribed</span>} />
+            <InfoRow label="IPTV" value={customer.iptv ? <Badge color="blue" dot>Active</Badge> : <span className="muted" style={{ fontSize: 12 }}>Not subscribed</span>} />
+            {customer.onu_number && <InfoRow label="ONU Number" value={customer.onu_number} />}
           </div>
         </div>
 
-        <div className="card" style={{ marginBottom: 14 }}>
-          <div className="card-head"><h3>Contact & Location</h3></div>
-          <div className="card-pad" style={{ paddingTop: 8, paddingBottom: 8 }}>
-            <InfoRow label="Phone" value={customer.phone} />
-            <InfoRow label="CNIC" value={customer.cnic} />
-            <InfoRow label="Area" value={customer.area?.name} />
-            <InfoRow label="Status" value={<Badge color={statusColor(displayStatus(customer))} dot>{displayStatus(customer)}</Badge>} />
+        {customer.remarks && (
+          <div className="card" style={{ marginBottom: 14 }}>
+            <div className="card-head"><h3>Remarks</h3></div>
+            <div className="card-pad" style={{ fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.5 }}>{customer.remarks}</div>
           </div>
-        </div>
+        )}
 
         <div className="card">
           <div className="card-head">
@@ -320,7 +355,7 @@ export default function CableSubscribersTab() {
   const [rawSearch, setRawSearch] = useState('');
   const [search, setSearch] = useState('');
   const [areaFilter, setAreaFilter] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
+  const [cableTypeFilter, setCableTypeFilter] = useState<'' | CableType>('');
   const [internetFilter, setInternetFilter] = useState<'all' | 'yes' | 'no'>('all');
   const [reloadToken, setReloadToken] = useState(0);
   const PAGE_SIZE = 50;
@@ -335,7 +370,7 @@ export default function CableSubscribersTab() {
 
   useEffect(() => {
     setPage(0);
-  }, [search, areaFilter, statusFilter, internetFilter, reloadToken]);
+  }, [search, areaFilter, cableTypeFilter, internetFilter, reloadToken]);
 
   useEffect(() => {
     Promise.all([
@@ -362,7 +397,7 @@ export default function CableSubscribersTab() {
       pageSize: PAGE_SIZE,
       search,
       areaId: areaFilter || undefined,
-      status: statusFilter ? (statusFilter as CustomerStatus) : undefined,
+      cableType: cableTypeFilter || undefined,
       hasInternet: internetFilter === 'all' ? undefined : internetFilter === 'yes',
     })
       .then((result) => {
@@ -378,7 +413,7 @@ export default function CableSubscribersTab() {
       });
 
     return () => { cancelled = true; };
-  }, [page, search, areaFilter, statusFilter, internetFilter, reloadToken]);
+  }, [page, search, areaFilter, cableTypeFilter, internetFilter, reloadToken]);
 
   const handleSelect = async (id: string) => {
     const full = await getCustomerById(id);
@@ -408,12 +443,10 @@ export default function CableSubscribersTab() {
           <option value="">All areas</option>
           {areas.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
         </select>
-        <select className="select" style={{ width: 'auto' }} value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
-          <option value="">All status</option>
-          <option value="active">Active</option>
-          <option value="suspended">Suspended</option>
-          <option value="disconnected">Disconnected</option>
-          <option value="tdc">TDC</option>
+        <select className="select" style={{ width: 'auto' }} value={cableTypeFilter} onChange={(e) => setCableTypeFilter(e.target.value as '' | CableType)}>
+          <option value="">All cable types</option>
+          <option value="digital">Digital (DECO)</option>
+          <option value="analog">Analog (ANAL)</option>
         </select>
         <div className="spacer" />
         <div ref={moreFiltersRef} style={{ position: 'relative' }}>
@@ -444,9 +477,10 @@ export default function CableSubscribersTab() {
             <tr>
               <th>Subscriber</th>
               <th>Phone</th>
+              <th>Address</th>
               <th>Area</th>
-              <th>Internet</th>
-              <th>Status</th>
+              <th>Services</th>
+              <th>Cable Type</th>
               <th style={{ textAlign: 'right' }}>Actions</th>
             </tr>
           </thead>
@@ -463,11 +497,14 @@ export default function CableSubscribersTab() {
                   </div>
                 </td>
                 <td className="mono" style={{ fontSize: 12 }}>{c.phone ?? '—'}</td>
+                <td style={{ fontSize: 12, maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{addressDisplay(c)}</td>
                 <td>{c.area?.name ?? '—'}</td>
+                <td><ServiceBadges customer={c} /></td>
                 <td>
-                  <Badge color={c.has_internet ? 'green' : 'red'} dot>{c.has_internet ? 'Yes' : 'No'}</Badge>
+                  {c.cable_type
+                    ? <Badge color={cableTypeColor(c.cable_type)} dot>{cableTypeLabel(c.cable_type)}</Badge>
+                    : <span className="muted" style={{ fontSize: 12 }}>—</span>}
                 </td>
-                <td><Badge color={statusColor(displayStatus(c))} dot>{displayStatus(c)}</Badge></td>
                 <td onClick={(e) => e.stopPropagation()} style={{ textAlign: 'right' }}>
                   <button className="icon-btn" onClick={() => handleSelect(c.id)}><Icon name="eye" size={14} /></button>
                 </td>
@@ -506,11 +543,6 @@ export default function CableSubscribersTab() {
             cablePrice={cablePrice}
             onClose={() => setSelected(null)}
             onEdit={() => { setEditTarget(selected); setSelected(null); }}
-            onUpdated={async () => {
-              const refreshed = await getCustomerById(selected.id);
-              if (refreshed) setSelected(refreshed);
-              setReloadToken((t) => t + 1);
-            }}
           />
         )}
       </Drawer>

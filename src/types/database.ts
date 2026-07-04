@@ -23,6 +23,8 @@ export type CustomerStatus =
   | "tdc";
 export type AddressType = "text" | "id_number";
 
+export type CableType = "digital" | "analog";
+
 export type Customer = {
   id: string;
   customer_code: string;
@@ -43,6 +45,7 @@ export type Customer = {
   iptv: boolean;
   has_cable: boolean;
   has_internet: boolean;
+  cable_type: CableType | null;
   address_type: AddressType;
   address_value: string | null;
   area_id: string | null;
@@ -94,6 +97,11 @@ export type CableListRow = Pick<
   | "is_tdc"
   | "connection_date"
   | "has_internet"
+  | "has_cable"
+  | "iptv"
+  | "cable_type"
+  | "address_type"
+  | "address_value"
 > & {
   area: Pick<Area, "id" | "name"> | null;
 };
@@ -171,6 +179,7 @@ export type NewCustomer = Omit<
   | "unit"
   | "whatsapp"
   | "email"
+  | "cable_type"
 > &
   Partial<
     Pick<
@@ -184,6 +193,7 @@ export type NewCustomer = Omit<
       | "unit"
       | "whatsapp"
       | "email"
+      | "cable_type"
     >
   >;
 
@@ -224,6 +234,7 @@ export type CustomerSignupRequestWithRelations = CustomerSignupRequest & {
 
 export type StaffRole =
   | "technician"
+  | "cable_technician"
   | "recovery_agent"
   | "helper"
   | "admin"
@@ -336,12 +347,19 @@ export type TeamWithMembers = Team & {
   members: (TeamMember & { staff: Pick<Staff, 'id' | 'full_name' | 'role' | 'phone'> })[];
 };
 
+export type ComplaintServiceLine = "internet" | "cable";
+
 export type ComplaintType =
   | "fiber_issue"
   | "no_internet"
   | "device_issue"
   | "payment_issue"
   | "other"
+  | "cable_issue"
+  | "cable_down"
+  | "signal_issue"
+  | "onu_fault"
+  | "no_signal"
   | "connectivity"
   | "speed"
   | "hardware"
@@ -356,6 +374,7 @@ export type Complaint = {
   customer_id: string;
   issue: string;
   type: ComplaintType;
+  service_line?: ComplaintServiceLine;
   priority: ComplaintPriority;
   status: ComplaintStatus;
   assigned_to: string | null;

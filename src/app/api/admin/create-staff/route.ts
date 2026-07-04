@@ -3,7 +3,7 @@ import { supabaseAdmin } from '@/lib/supabase-admin'
 import { createOrReuseStaffAuthUser } from '@/lib/admin/staff-auth-users'
 
 const USERNAME_DOMAIN = '@powernet.local'
-const MOBILE_ROLES = new Set(['technician', 'recovery_agent', 'helper'])
+const MOBILE_ROLES = new Set(['technician', 'cable_technician', 'recovery_agent', 'helper'])
 
 async function getCallerStaffRole(authHeader: string | null): Promise<string | null> {
   if (!authHeader) return null

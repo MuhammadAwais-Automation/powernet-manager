@@ -21,6 +21,7 @@ export type FollowUpCall = {
   id: string;
   customer_id: string;
   bill_id: string | null;
+  cable_bill_id: string | null;
   caller_id: string;
   caller_channel: CallerChannel;
   call_outcome: CallOutcome;
@@ -55,6 +56,7 @@ export type CommitmentEvent = {
 export type RecordFollowUpCallInput = {
   customerId: string;
   billId?: string | null;
+  cableBillId?: string | null;
   callerId: string;
   callerChannel: CallerChannel;
   callOutcome: CallOutcome;
@@ -118,6 +120,7 @@ export async function recordFollowUpCall(
     .insert({
       customer_id: input.customerId,
       bill_id: input.billId ?? null,
+      cable_bill_id: input.cableBillId ?? null,
       caller_id: input.callerId,
       caller_channel: input.callerChannel,
       call_outcome: input.callOutcome,
@@ -127,7 +130,7 @@ export async function recordFollowUpCall(
       next_follow_up_date: input.nextFollowUpDate ?? null,
     })
     .select(
-      "id, customer_id, bill_id, caller_id, caller_channel, call_outcome, commitment_action, promised_date, notes, called_at, next_follow_up_date, created_at",
+      "id, customer_id, bill_id, cable_bill_id, caller_id, caller_channel, call_outcome, commitment_action, promised_date, notes, called_at, next_follow_up_date, created_at",
     )
     .single();
   if (error) throw new Error(getErrorMessage(error, "Could not save call record"));
