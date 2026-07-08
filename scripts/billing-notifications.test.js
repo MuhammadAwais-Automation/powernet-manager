@@ -109,7 +109,7 @@ const partial = billing.buildBillingNotification({
 });
 
 assert.strictEqual(partial.type, "payment_partial");
-assert.strictEqual(partial.title, "Partial payment received");
+assert.strictEqual(partial.title, "Less paid");
 assert.match(partial.message, /Ahmed Javeed paid Rs\. 1,100 in office/);
 assert.match(partial.message, /Recovery Agent 1/);
 assert.strictEqual(partial.read, false);

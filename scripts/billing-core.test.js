@@ -77,4 +77,11 @@ assert.deepStrictEqual(
 assert.strictEqual(core.getPaymentSourceLabel('office'), 'Paid in Office')
 assert.strictEqual(core.getPaymentSourceLabel('agent'), 'Collected by Agent')
 
+assert.strictEqual(core.formatBillCollectionStatusLabel('partial'), 'Less Paid')
+assert.strictEqual(core.formatBillCollectionStatusLabel('paid'), 'Paid')
+assert.strictEqual(core.formatBillCollectionStatusLabel('overdue'), 'Overdue')
+assert.strictEqual(core.formatBillCollectionStatusLabel('pending'), 'Pending')
+assert.strictEqual(core.formatPaymentOutcomeLabel(true), 'Paid in Full')
+assert.strictEqual(core.formatPaymentOutcomeLabel(false), 'Less Paid')
+
 console.log('billing-core tests passed')

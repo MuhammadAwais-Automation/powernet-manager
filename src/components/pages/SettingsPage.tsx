@@ -10,7 +10,7 @@ const notificationTypes = [
   { key: "complaint_in_progress", label: "Complaint In Progress", desc: "When a technician starts working on a complaint", icon: "wrench" },
   { key: "complaint_resolved", label: "Complaint Resolved", desc: "When a complaint is marked as resolved", icon: "checkCircle" },
   { key: "payment_full", label: "Full Payment Received", desc: "When full payment is collected", icon: "dollar" },
-  { key: "payment_partial", label: "Partial Payment Received", desc: "When partial payment is collected", icon: "cash" },
+  { key: "payment_partial", label: "Less Paid Received", desc: "When customer pays less than full due", icon: "cash" },
   { key: "visit", label: "Visit Logged", desc: "When technician or agent logs a visit", icon: "mapPin" },
   { key: "customer_signup_pending", label: "New Customer Signup", desc: "When a new customer signup request is submitted", icon: "users" },
 ];

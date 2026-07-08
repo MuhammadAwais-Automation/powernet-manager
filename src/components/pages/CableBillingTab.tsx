@@ -17,7 +17,7 @@ import {
 } from '@/lib/db/cable-bills';
 import { getCableSettings } from '@/lib/db/cable-settings';
 import { getAreas } from '@/lib/db/areas';
-import { getCurrentBillingMonth } from '@/lib/billing/core';
+import { getCurrentBillingMonth, getBillCollectionStatus } from '@/lib/billing/core';
 import type { Area, CableBillWithRelations, PaymentMethod, Staff } from '@/types/database';
 
 type CableTab = 'All' | 'Unpaid' | 'Paid' | 'Overdue' | 'Partial';
@@ -31,6 +31,13 @@ function statusColor(status: string): 'green' | 'red' | 'amber' | 'purple' {
   if (status === 'partial') return 'purple';
   if (status === 'overdue') return 'red';
   return 'amber';
+}
+
+function cableBillStatusKey(
+  bill: Pick<CableBillWithRelations, 'amount' | 'paid_amount' | 'status'>,
+): string {
+  const status = getBillCollectionStatus(bill);
+  return status === 'partial' ? 'partial' : bill.status;
 }
 
 function CablePaymentModal({
@@ -258,7 +265,7 @@ export default function CableBillingTab({ staff }: { staff: Staff }) {
         items={[
           { value: 'All', label: 'All Bills', count: summary?.totalBills ?? 0 },
           { value: 'Unpaid', label: 'Unpaid', count: summary?.unpaidBills ?? 0 },
-          { value: 'Partial', label: 'Partial' },
+          { value: 'Partial', label: 'Less Paid' },
           { value: 'Paid', label: 'Paid', count: summary?.paidBills ?? 0 },
           { value: 'Overdue', label: 'Overdue', count: summary?.overdueBills ?? 0 },
         ]}
@@ -307,7 +314,7 @@ export default function CableBillingTab({ staff }: { staff: Staff }) {
                   <td className="mono">{fmt(b.amount)}</td>
                   <td className="mono">{fmt(b.paid_amount ?? 0)}</td>
                   <td className="mono">{fmt(rem)}</td>
-                  <td><Badge color={statusColor(label)} dot>{label}</Badge></td>
+                  <td><Badge color={statusColor(cableBillStatusKey(b))} dot>{label}</Badge></td>
                   <td onClick={(e) => e.stopPropagation()} style={{ textAlign: 'right' }}>
                     {rem > 0 && (
                       <button className="btn btn-sm btn-primary" onClick={() => setPaymentBill(b)}>Pay</button>
@@ -357,7 +364,7 @@ export default function CableBillingTab({ staff }: { staff: Staff }) {
               <button className="icon-btn" onClick={() => setDetailBill(null)}><Icon name="close" size={16} /></button>
             </div>
             <div className="modal-body">
-              <Badge color={statusColor(getCableBillStatusLabel(detailBill))} dot>{getCableBillStatusLabel(detailBill)}</Badge>
+              <Badge color={statusColor(cableBillStatusKey(detailBill))} dot>{getCableBillStatusLabel(detailBill)}</Badge>
               <div style={{ marginTop: 14, fontSize: 13 }}>
                 <div>Paid: {fmt(detailBill.paid_amount ?? 0)}</div>
                 <div>Remaining: {fmt(remainingAmount(detailBill))}</div>

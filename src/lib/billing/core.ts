@@ -252,6 +252,20 @@ export function getPaymentSourceLabel(source: PaymentSource): string {
   return "Manual Payment";
 }
 
+export function formatBillCollectionStatusLabel(
+  status: DerivedBillCollectionStatus | BillCollectionSource["status"] | string,
+): string {
+  if (status === "partial") return "Less Paid";
+  if (status === "paid") return "Paid";
+  if (status === "overdue") return "Overdue";
+  if (status === "pending") return "Pending";
+  return status;
+}
+
+export function formatPaymentOutcomeLabel(isFull: boolean): string {
+  return isFull ? "Paid in Full" : "Less Paid";
+}
+
 function normalizeIdentifier(value?: string | null): string | undefined {
   const normalized = value?.trim();
   return normalized ? normalized : undefined;

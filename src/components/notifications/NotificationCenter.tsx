@@ -41,7 +41,7 @@ function notificationBadgeLabel(item: AppNotification): string {
     return item.type === 'complaint_created' ? 'new' : item.type === 'complaint_resolved' ? 'resolved' : 'in progress'
   }
   if (item.kind === 'payment_verification') return 'pending'
-  return item.type === 'payment_full' ? 'paid' : item.type === 'visit' ? 'visited' : 'partial'
+  return item.type === 'payment_full' ? 'paid' : item.type === 'visit' ? 'visited' : 'Less Paid'
 }
 
 function notificationMeta(item: AppNotification): string {

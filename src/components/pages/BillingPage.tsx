@@ -20,6 +20,7 @@ import {
 } from "@/lib/db/bills";
 import { getAreas } from "@/lib/db/areas";
 import {
+  formatBillCollectionStatusLabel,
   getBillCollectionStatus,
   getCurrentBillingMonth,
   getCustomerSecondaryId,
@@ -66,7 +67,7 @@ function statusColor(status: string): "green" | "red" | "amber" | "purple" {
   return "amber";
 }
 
-function statusLabel(
+function billCollectionStatusKey(
   bill: Pick<BillWithRelations, "amount" | "paid_amount" | "status">,
   balance?: Pick<CustomerBalanceSummary, "totalPaid" | "totalOutstanding"> | null,
 ): string {
@@ -86,6 +87,13 @@ function statusLabel(
   }
   const status = getBillCollectionStatus(bill);
   return status === "partial" ? "partial" : bill.status;
+}
+
+function statusLabel(
+  bill: Pick<BillWithRelations, "amount" | "paid_amount" | "status">,
+  balance?: Pick<CustomerBalanceSummary, "totalPaid" | "totalOutstanding"> | null,
+): string {
+  return formatBillCollectionStatusLabel(billCollectionStatusKey(bill, balance));
 }
 
 function getBillChannelSource(
@@ -787,9 +795,9 @@ export default function BillingPage({
               icon: "clock" as IconName,
             },
             {
-              label: "Partial Customers",
+              label: "Less Paid Customers",
               value: ledgerSummary.partialCustomers.toLocaleString(),
-              sub: "Partially paid across months",
+              sub: "Under-paid across months",
               color: "#06B6D4",
               icon: "checkCircle" as IconName,
             },
@@ -871,7 +879,7 @@ export default function BillingPage({
                 },
                 {
                   value: "Partial",
-                  label: "Partial",
+                  label: "Less Paid",
                   count: summary?.partialBills ?? 0,
                 },
                 {
@@ -1079,7 +1087,7 @@ export default function BillingPage({
                         )}
                       </td>
                       <td>
-                        <Badge color={statusColor(statusLabel(b))} dot>
+                        <Badge color={statusColor(billCollectionStatusKey(b))} dot>
                           {statusLabel(b)}
                         </Badge>
                       </td>
@@ -1267,7 +1275,7 @@ export default function BillingPage({
                 #{detailBill.id.slice(0, 8).toUpperCase()}
               </div>
             </div>
-            <Badge color={statusColor(statusLabel(detailBill, detailBalance))} dot>
+            <Badge color={statusColor(billCollectionStatusKey(detailBill, detailBalance))} dot>
               {statusLabel(detailBill, detailBalance)}
             </Badge>
           </div>

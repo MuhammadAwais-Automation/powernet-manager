@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase'
-import { getBillCollectionStatus, normalizeBillingMonth } from '@/lib/billing/core'
+import { formatBillCollectionStatusLabel, getBillCollectionStatus, normalizeBillingMonth } from '@/lib/billing/core'
 import { getBillRange, normalizeBillingSearch, normalizeBillStatusFilter, type BillStatusFilter } from '@/lib/billing/query'
 import type { CableBillWithRelations, PaymentMethod, PaymentSource } from '@/types/database'
 
@@ -276,7 +276,7 @@ export function getCableBillStatusLabel(
   bill: Pick<CableBillWithRelations, 'amount' | 'paid_amount' | 'status'>,
 ): string {
   const status = getBillCollectionStatus(bill)
-  return status === 'partial' ? 'partial' : bill.status
+  return formatBillCollectionStatusLabel(status === 'partial' ? 'partial' : bill.status)
 }
 
 export { normalizeBillingMonth, normalizeBillStatusFilter }

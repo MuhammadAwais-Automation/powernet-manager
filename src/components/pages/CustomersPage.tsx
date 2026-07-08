@@ -9,7 +9,7 @@ import { getAreas } from '@/lib/db/areas';
 import { getPackages } from '@/lib/db/packages';
 import { getBillsByCustomer } from '@/lib/db/bills';
 import { useAuth } from '@/lib/auth/auth-context';
-import { getBillCollectionStatus } from '@/lib/billing/core';
+import { formatBillCollectionStatusLabel, getBillCollectionStatus } from '@/lib/billing/core';
 import type { CustomerWithRelations, Area, Package, CustomerStatus, Bill, CustomerListRow } from '@/types/database';
 
 function customerDisplayStatus(c: { status: CustomerStatus; is_tdc?: boolean }): CustomerStatus {
@@ -467,7 +467,7 @@ function CustomerDetail({
                 </div>
                 <div className="row gap-md">
                   <span className="mono">Rs. {b.amount.toLocaleString()}</span>
-                  <Badge color={badgeColor} dot>{derivedStatus}</Badge>
+                  <Badge color={badgeColor} dot>{formatBillCollectionStatusLabel(derivedStatus)}</Badge>
                 </div>
               </div>
             );

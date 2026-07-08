@@ -578,8 +578,8 @@ function StaffActivityDrawer({ staff, onClose }: {
   const totalRecovered = activity?.payments.reduce((sum, p) => sum + p.amount, 0) ?? 0;
   const internetRecovered = activity?.payments.filter(p => p.service === 'internet').reduce((sum, p) => sum + p.amount, 0) ?? 0;
   const cableRecovered = activity?.payments.filter(p => p.service === 'cable').reduce((sum, p) => sum + p.amount, 0) ?? 0;
-  const partialCount = activity?.payments.filter(p => p.amount < (p.bill?.amount ?? p.amount)).length ?? 0;
-  const fullCount = (activity?.payments.length ?? 0) - partialCount;
+  const lessPaidCount = activity?.payments.filter(p => p.amount < (p.bill?.amount ?? p.amount)).length ?? 0;
+  const fullCount = (activity?.payments.length ?? 0) - lessPaidCount;
   const visitsCount = activity?.visits.length ?? 0;
   const resolvedCount = activity?.resolvedComplaints.length ?? 0;
   const activeCount = activity?.activeComplaints.length ?? 0;
@@ -660,9 +660,9 @@ function StaffActivityDrawer({ staff, onClose }: {
                   <span style={{ fontSize: 16, fontWeight: 700, color: 'var(--purple)' }}>Rs. {cableRecovered.toLocaleString()}</span>
                 </div>
                 <div className="card" style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 4 }}>
-                  <span className="muted" style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase' }}>Payments (F/P)</span>
+                  <span className="muted" style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase' }}>Payments (Full/Less)</span>
                   <span style={{ fontSize: 18, fontWeight: 700, color: 'var(--text)' }}>
-                    {fullCount} <span style={{ fontSize: 12, fontWeight: 400, color: 'var(--text-muted)' }}>full</span> / {partialCount} <span style={{ fontSize: 12, fontWeight: 400, color: 'var(--text-muted)' }}>part</span>
+                    {fullCount} <span style={{ fontSize: 12, fontWeight: 400, color: 'var(--text-muted)' }}>full</span> / {lessPaidCount} <span style={{ fontSize: 12, fontWeight: 400, color: 'var(--text-muted)' }}>less paid</span>
                   </span>
                 </div>
                 <div className="card" style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 4 }}>
@@ -710,8 +710,8 @@ function StaffActivityDrawer({ staff, onClose }: {
                               <Badge color={p.service === 'cable' ? 'purple' : 'blue'}>
                                 {p.service === 'cable' ? 'Cable' : 'Internet'}
                               </Badge>
-                              <Badge color={p.bill?.status === 'paid' ? 'green' : 'amber'}>
-                                {p.bill?.status === 'paid' ? 'Paid' : 'Partial'}
+                              <Badge color={(p.bill?.status === 'paid' || p.amount >= (p.bill?.amount ?? p.amount)) ? 'green' : 'amber'}>
+                                {(p.bill?.status === 'paid' || p.amount >= (p.bill?.amount ?? p.amount)) ? 'Paid' : 'Less Paid'}
                               </Badge>
                             </div>
                           </div>

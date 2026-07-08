@@ -223,7 +223,7 @@ export function buildBillingNotification(
     message = `${source.customerName} paid ${amountText}${paymentSource}${collector}`;
   } else {
     type = "payment_partial";
-    title = "Partial payment received";
+    title = "Less paid";
     message = `${source.customerName} paid ${amountText}${paymentSource}${collector}`;
   }
 
