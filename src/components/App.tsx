@@ -39,7 +39,7 @@ const NAV_BY_ID: Record<PageId, NavEntry> = {
   dashboard:  { id: 'dashboard',  label: 'Dashboard',          icon: 'grid' },
   customers:  { id: 'customers',  label: 'Customers',          icon: 'users' },
   customer_requests: { id: 'customer_requests', label: 'Customer Requests', icon: 'fileText' },
-  payment_approvals: { id: 'payment_approvals', label: 'Payment Approvals', icon: 'check' },
+  payment_approvals: { id: 'payment_approvals', label: 'Payment Approvals', icon: 'cash' },
   billing:    { id: 'billing',    label: 'Billing & Payments', icon: 'card' },
   cable:      { id: 'cable',      label: 'Cable',              icon: 'tv' },
   complaints: { id: 'complaints', label: 'Complaints',         icon: 'alert' },
@@ -50,8 +50,7 @@ const NAV_BY_ID: Record<PageId, NavEntry> = {
 };
 
 const NAV_GROUPS: { label: string; items: PageId[] }[] = [
-  { label: 'Operations', items: ['dashboard', 'customers', 'customer_requests', 'billing', 'cable', 'complaints', 'staff'] },
-  { label: 'Collections', items: ['payment_approvals'] },
+  { label: 'Operations', items: ['dashboard', 'customers', 'customer_requests', 'payment_approvals', 'billing', 'cable', 'complaints', 'staff'] },
   { label: 'Analytics', items: ['areas', 'reports'] },
 ];
 
@@ -103,10 +102,11 @@ function NavLinks({ active, setActive, allowedNav, badges, onNavigate }: {
                   key={n.id}
                   type="button"
                   className={`sidebar-link ${active === n.id ? 'active' : ''}`}
+                  aria-current={active === n.id ? 'page' : undefined}
                   onClick={() => handleClick(n.id)}
                 >
                   <Icon name={n.icon} size={17} />
-                  <span>{n.label}</span>
+                  <span className="sidebar-link-label">{n.label}</span>
                   {badgeVal && badgeVal > 0 ? <span className="count">{badgeVal}</span> : null}
                 </button>
               );
@@ -116,18 +116,56 @@ function NavLinks({ active, setActive, allowedNav, badges, onNavigate }: {
       })}
       {allowedNav.includes('settings') && (
         <>
-          <div className="sidebar-section-label" style={{ paddingTop: 8 }}>System</div>
+          <div className="sidebar-divider" role="separator" />
           <button
             type="button"
             className={`sidebar-link ${active === 'settings' ? 'active' : ''}`}
+            aria-current={active === 'settings' ? 'page' : undefined}
             onClick={() => handleClick('settings')}
           >
             <Icon name="settings" size={17} />
-            <span>Settings</span>
+            <span className="sidebar-link-label">Settings</span>
           </button>
         </>
       )}
     </>
+  );
+}
+
+function SidebarBrand() {
+  return (
+    <div className="sidebar-brand">
+      <span className="bolt" aria-hidden="true">
+        <Icon name="zap" size={18} />
+      </span>
+      <div>
+        <div className="sidebar-brand-title">
+          <span className="power">POWER</span>
+          <span className="net">NET</span>
+        </div>
+        <span className="title-sub">ISP Solution</span>
+      </div>
+    </div>
+  );
+}
+
+function SidebarUser({ staffName, staffRole, onLogout }: {
+  staffName: string;
+  staffRole: string;
+  onLogout: () => void;
+}) {
+  return (
+    <div className="sidebar-user">
+      <div className="avatar">{initials(staffName)}</div>
+      <div className="who">
+        <div className="name">{staffName}</div>
+        <div className="role">{ROLE_LABEL_SHORT[staffRole] ?? staffRole}</div>
+      </div>
+      <button type="button" className="sidebar-logout" aria-label="Sign out" onClick={onLogout}>
+        <Icon name="logout" size={15} />
+        <span>Sign out</span>
+      </button>
+    </div>
   );
 }
 
@@ -142,30 +180,11 @@ function Sidebar({ active, setActive, allowedNav, staffName, staffRole, onLogout
 }) {
   return (
     <aside className="sidebar">
-      <div className="sidebar-brand" style={{ paddingLeft: 4 }}>
-        <div>
-          <div style={{ fontSize: 24, lineHeight: 1.1 }}>
-            <span style={{ fontWeight: 900, color: 'var(--text)', letterSpacing: '-0.03em' }}>POWER</span>
-            <span style={{ fontWeight: 900, color: 'var(--brand)', letterSpacing: '-0.03em' }}>NET</span>
-          </div>
-          <span className="title-sub" style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', color: 'var(--text-muted)', textTransform: 'uppercase', marginTop: 3, display: 'block' }}>ISP Solution</span>
-        </div>
-      </div>
-
-      <nav className="sidebar-nav">
+      <SidebarBrand />
+      <nav className="sidebar-nav" aria-label="Main navigation">
         <NavLinks active={active} setActive={setActive} allowedNav={allowedNav} badges={badges} />
       </nav>
-
-      <div className="sidebar-user">
-        <div className="avatar">{initials(staffName)}</div>
-        <div className="who">
-          <div className="name">{staffName}</div>
-          <div className="role">{ROLE_LABEL_SHORT[staffRole] ?? staffRole}</div>
-        </div>
-        <button className="menu-btn" title="Logout" onClick={onLogout}>
-          <Icon name="logout" size={16} />
-        </button>
-      </div>
+      <SidebarUser staffName={staffName} staffRole={staffRole} onLogout={onLogout} />
     </aside>
   );
 }
@@ -575,22 +594,19 @@ function ShellContent({ staff, logout }: {
         </div>
       </main>
       <Drawer open={mobileNavOpen} onClose={() => setMobileNavOpen(false)} width={280}>
-        <div style={{ padding: '16px 14px 8px' }}>
-          <div style={{ fontSize: 20, fontWeight: 800, letterSpacing: '-0.02em', marginBottom: 4 }}>
-            <span style={{ color: 'var(--text)' }}>POWER</span>
-            <span style={{ color: 'var(--brand)' }}>NET</span>
-          </div>
-          <div style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>ISP Solution</div>
+        <div className="drawer-nav-shell">
+          <SidebarBrand />
+          <nav className="sidebar-nav drawer-nav-scroll" aria-label="Main navigation">
+            <NavLinks
+              active={active}
+              setActive={handlePageChange}
+              allowedNav={allowedNav}
+              badges={badges}
+              onNavigate={() => setMobileNavOpen(false)}
+            />
+          </nav>
+          <SidebarUser staffName={staff.full_name} staffRole={staff.role} onLogout={logout} />
         </div>
-        <nav className="sidebar-nav" style={{ padding: '0 8px' }}>
-          <NavLinks
-            active={active}
-            setActive={handlePageChange}
-            allowedNav={allowedNav}
-            badges={badges}
-            onNavigate={() => setMobileNavOpen(false)}
-          />
-        </nav>
       </Drawer>
       <NotificationDrawer onOpenNotification={handleNotificationOpen} />
       <PaymentToastContainer onOpenNotification={handleNotificationOpen} />
