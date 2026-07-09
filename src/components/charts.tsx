@@ -1,15 +1,16 @@
 'use client';
-import React from 'react';
+import React, { useState } from 'react';
 
 type BarDatum = Record<string, string | number | boolean | undefined>;
 
 export function RevenueLineChart({
   data,
   data2,
-  height = 260,
+  height = 240,
   color = 'var(--brand)',
-  color2 = '#3B82F6',
+  color2 = 'var(--blue)',
   showCableLegend = true,
+  cableEmpty = false,
 }: {
   data: { m: string; v: number }[];
   data2?: { m: string; v: number }[];
@@ -17,9 +18,11 @@ export function RevenueLineChart({
   color?: string;
   color2?: string;
   showCableLegend?: boolean;
+  cableEmpty?: boolean;
 }) {
+  const [hovered, setHovered] = useState<number | null>(null);
   const w = 560, h = height;
-  const pad = { l: 44, r: 20, t: 24, b: 32 };
+  const pad = { l: 44, r: 20, t: 20, b: 32 };
   const innerW = w - pad.l - pad.r, innerH = h - pad.t - pad.b;
   const cableHasData = data2?.some((d) => d.v > 0) ?? false;
   const showCableLine = Boolean(data2?.length) && cableHasData;
@@ -35,48 +38,109 @@ export function RevenueLineChart({
   const points2 = showCableLine ? data2!.map((d, i) => [x(i), y(d.v)] as [number, number]) : [];
   const line2 = points2.map((p, i) => (i === 0 ? 'M' : 'L') + p[0] + ',' + p[1]).join(' ');
   const ticks = [0, Math.round(max / 2), max];
+  const gradId = React.useId().replace(/:/g, '');
+
+  const tooltipFor = (i: number) => {
+    const internet = data[i]?.v ?? 0;
+    const cable = showCableLine ? (data2![i]?.v ?? 0) : null;
+    const labelY = Math.min(points[i][1], h - pad.b) - 14;
+    const lines = [`Internet · Rs. ${internet}k`];
+    if (cable !== null) lines.push(`Cable · Rs. ${cable}k`);
+    const boxH = 10 + lines.length * 14;
+    const boxW = 118;
+    const boxX = Math.min(Math.max(points[i][0] - boxW / 2, pad.l), w - pad.r - boxW);
+    const boxY = Math.max(labelY - boxH, pad.t);
+    return { boxX, boxY, boxW, boxH, lines };
+  };
 
   return (
-    <svg viewBox={`0 0 ${w} ${h}`} width="100%" height={h} style={{ display: 'block' }}>
-      <defs>
-        <linearGradient id="revGrad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={color} stopOpacity="0.25" />
-          <stop offset="100%" stopColor={color} stopOpacity="0" />
-        </linearGradient>
-      </defs>
-      {ticks.map(t => (
-        <g key={t}>
-          <line x1={pad.l} x2={w - pad.r} y1={y(t)} y2={y(t)} stroke="var(--border)" strokeDasharray="3 3" />
-          <text x={pad.l - 10} y={y(t) + 4} fontSize="10" textAnchor="end" fill="var(--text-muted)" fontFamily="JetBrains Mono, monospace">{t}k</text>
-        </g>
-      ))}
-      <path d={area} fill="url(#revGrad)" />
-      {showCableLine && line2 && (
-        <path d={line2} fill="none" stroke={color2} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" strokeDasharray="6 4" />
-      )}
-      <path d={line} fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-      {points.map((p, i) => (
-        <g key={i}>
-          <circle cx={p[0]} cy={p[1]} r="4" fill="var(--bg-elev)" stroke={color} strokeWidth="2" />
-          <text x={p[0]} y={h - pad.b + 18} fontSize="11" textAnchor="middle" fill="var(--text-muted)">{data[i].m}</text>
-          {i === data.length - 1 && (
-            <g>
-              <rect x={p[0] - 34} y={p[1] - 30} width="68" height="22" rx="5" fill="#0F172A" />
-              <text x={p[0]} y={p[1] - 15} fontSize="11" textAnchor="middle" fill="#fff" fontWeight="600">Rs. {data[i].v}k</text>
-            </g>
-          )}
-        </g>
-      ))}
-      {showCableLegend && data2 && data2.length > 0 && (
-        <g transform={`translate(${w - pad.r - 120}, ${pad.t})`}>
-          <rect x="0" y="0" width="110" height="42" rx="6" fill="var(--bg-muted)" stroke="var(--border)" />
-          <line x1="10" y1="14" x2="28" y2="14" stroke={color} strokeWidth="2.5" />
-          <text x="34" y="17" fontSize="10" fill="var(--text-muted)">Internet</text>
-          <line x1="10" y1="30" x2="28" y2="30" stroke={color2} strokeWidth="2" strokeDasharray="6 4" />
-          <text x="34" y="33" fontSize="10" fill="var(--text-muted)">Cable</text>
-        </g>
-      )}
-    </svg>
+    <div className="revenue-chart-wrap">
+      <svg
+        viewBox={`0 0 ${w} ${h}`}
+        width="100%"
+        height={h}
+        style={{ display: 'block' }}
+        onMouseLeave={() => setHovered(null)}
+      >
+        <defs>
+          <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={color} stopOpacity="0.25" />
+            <stop offset="100%" stopColor={color} stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        {ticks.map(t => (
+          <g key={t}>
+            <line x1={pad.l} x2={w - pad.r} y1={y(t)} y2={y(t)} stroke="var(--border)" strokeDasharray="3 3" />
+            <text x={pad.l - 10} y={y(t) + 4} fontSize="10" textAnchor="end" fill="var(--text-muted)" fontFamily="JetBrains Mono, monospace">{t}k</text>
+          </g>
+        ))}
+        <path d={area} fill={`url(#${gradId})`} />
+        {showCableLine && line2 && (
+          <path d={line2} fill="none" stroke={color2} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" strokeDasharray="6 4" />
+        )}
+        <path d={line} fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+        {points.map((p, i) => (
+          <g key={i}>
+            <circle
+              cx={p[0]}
+              cy={p[1]}
+              r={hovered === i ? 6 : 4}
+              fill="var(--bg-elev)"
+              stroke={color}
+              strokeWidth="2"
+              style={{ cursor: 'pointer' }}
+              onMouseEnter={() => setHovered(i)}
+            />
+            <text x={p[0]} y={h - pad.b + 18} fontSize="11" textAnchor="middle" fill="var(--text-muted)">{data[i].m}</text>
+            {hovered === i && (() => {
+              const tip = tooltipFor(i);
+              return (
+                <g pointerEvents="none">
+                  <rect
+                    x={tip.boxX}
+                    y={tip.boxY}
+                    width={tip.boxW}
+                    height={tip.boxH}
+                    rx="6"
+                    fill="var(--text)"
+                    opacity="0.96"
+                  />
+                  {tip.lines.map((lineText, li) => (
+                    <text
+                      key={li}
+                      x={tip.boxX + tip.boxW / 2}
+                      y={tip.boxY + 16 + li * 14}
+                      fontSize="10"
+                      textAnchor="middle"
+                      fill="var(--bg-elev)"
+                      fontWeight={li === 0 ? 600 : 500}
+                    >
+                      {lineText}
+                    </text>
+                  ))}
+                </g>
+              );
+            })()}
+          </g>
+        ))}
+      </svg>
+      {(showCableLegend && data2 && data2.length > 0) || cableEmpty ? (
+        <div className="chart-legend-row">
+          <div className="chart-legend-item">
+            <span className="chart-legend-line solid" style={{ background: color }} />
+            Internet
+          </div>
+          {showCableLine ? (
+            <div className="chart-legend-item">
+              <span className="chart-legend-line dashed" style={{ borderColor: color2 }} />
+              Cable
+            </div>
+          ) : cableEmpty ? (
+            <div className="chart-legend-item muted">Cable — no collections yet</div>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
   );
 }
 

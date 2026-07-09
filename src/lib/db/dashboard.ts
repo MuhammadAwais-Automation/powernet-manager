@@ -31,6 +31,7 @@ export type ActivityItem = {
   lead: string;
   amt: string;
   when: string;
+  at: string;
   service?: "internet" | "cable";
   priority?: "low" | "medium" | "high";
 };
@@ -124,7 +125,7 @@ export async function getRecentActivity(): Promise<ActivityItem[]> {
   if (complaintsRes.error) throw complaintsRes.error;
   if (customersRes.error) throw customersRes.error;
 
-  type TimedItem = ActivityItem & { ts: string };
+  type TimedItem = Omit<ActivityItem, "at"> & { ts: string };
   const items: TimedItem[] = [];
 
   ((paymentsRes.data ?? []) as unknown as RecentPaymentRow[]).forEach((p) => {
@@ -181,8 +182,8 @@ export async function getRecentActivity(): Promise<ActivityItem[]> {
 
   const value = items
     .sort((a, b) => new Date(b.ts).getTime() - new Date(a.ts).getTime())
-    .slice(0, 5)
-    .map(({ ts: _ts, ...rest }) => rest);
+    .slice(0, 8)
+    .map(({ ts, ...rest }) => ({ ...rest, at: ts }));
 
   activityCache = { value, expiresAt: Date.now() + ACTIVITY_CACHE_MS };
   return value;

@@ -1,5 +1,5 @@
 'use client';
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import Icon, { type IconName } from '../Icon';
 import { Badge, IconBadge } from '../ui';
 import { RevenueLineChart, Donut } from '../charts';
@@ -27,6 +27,12 @@ type PickedStats = {
   chartInternet: { m: string; v: number }[];
   chartCable: { m: string; v: number }[];
 };
+
+const SERVICE_FILTERS: { value: ServiceType; label: string }[] = [
+  { value: 'both', label: 'All' },
+  { value: 'internet', label: 'Internet' },
+  { value: 'cable', label: 'Cable' },
+];
 
 function pickStats(s: DashboardStats, filter: ServiceType): PickedStats {
   if (filter === 'internet') {
@@ -74,6 +80,21 @@ function collectionRate(collected: number, expected: number): string {
   return `${Math.round((collected / expected) * 100)}% collected`;
 }
 
+function activityGroupLabel(at: string): string {
+  if (!at) return 'Earlier';
+  const diff = Date.now() - new Date(at).getTime();
+  const hours = diff / 3_600_000;
+  if (hours < 24) return 'Last 24 hours';
+  if (hours < 168) return 'This week';
+  return 'Earlier';
+}
+
+function activityNavigateTarget(kind: ActivityItem['kind']): PageId {
+  if (kind === 'payment') return 'billing';
+  if (kind === 'complaint') return 'complaints';
+  return 'customers';
+}
+
 type StatCard = {
   key: string;
   label: string;
@@ -82,12 +103,22 @@ type StatCard = {
   icon: IconName;
   accent: string;
   pill?: string;
-  pillClass?: 'up' | 'down';
+  pillClass?: 'up' | 'down' | 'neutral';
+  page?: PageId;
 };
 
-function StatCardView({ card }: { card: StatCard }) {
-  return (
-    <div className="stat-v2" style={{ '--stat-accent': card.accent } as React.CSSProperties}>
+function StatCardView({
+  card,
+  onNavigate,
+}: {
+  card: StatCard;
+  onNavigate?: (page: PageId) => void;
+}) {
+  const clickable = Boolean(card.page && onNavigate);
+  const className = `stat-v2${clickable ? ' stat-v2-clickable' : ''}`;
+
+  const inner = (
+    <>
       <div className="stat-v2-glow" />
       <div className="stat-v2-head">
         <span className="stat-v2-icon"><Icon name={card.icon} size={18} /></span>
@@ -102,6 +133,25 @@ function StatCardView({ card }: { card: StatCard }) {
       <div className="stat-v2-foot stat-v2-foot--no-spark">
         <span className="stat-v2-sub">{card.sub}</span>
       </div>
+    </>
+  );
+
+  if (clickable) {
+    return (
+      <button
+        type="button"
+        className={className}
+        style={{ '--stat-accent': card.accent } as React.CSSProperties}
+        onClick={() => onNavigate!(card.page!)}
+      >
+        {inner}
+      </button>
+    );
+  }
+
+  return (
+    <div className={className} style={{ '--stat-accent': card.accent } as React.CSSProperties}>
+      {inner}
     </div>
   );
 }
@@ -205,6 +255,20 @@ export default function DashboardPage({
     );
   };
 
+  const groupedActivity = useMemo(() => {
+    const groups = new Map<string, ActivityItem[]>();
+    for (const item of activity) {
+      const label = activityGroupLabel(item.at);
+      const list = groups.get(label) ?? [];
+      list.push(item);
+      groups.set(label, list);
+    }
+    const order = ['Last 24 hours', 'This week', 'Earlier'];
+    return order
+      .filter((label) => groups.has(label))
+      .map((label) => ({ label, items: groups.get(label)! }));
+  }, [activity]);
+
   if (loading) return (
     <div className="page" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 300 }}>
       <div className="muted">Loading dashboard…</div>
@@ -213,7 +277,7 @@ export default function DashboardPage({
 
   if (error) return (
     <div className="page">
-      <div className="card" style={{ padding: 24 }}>
+      <div className="card card--static" style={{ padding: 24 }}>
         <div style={{ fontWeight: 600, marginBottom: 6 }}>Data load failed</div>
         <div className="muted" style={{ fontSize: 13, marginBottom: 14 }}>{error}</div>
         <button className="btn btn-primary" onClick={handleRefresh}>
@@ -228,88 +292,124 @@ export default function DashboardPage({
   const serviceLabel = getServiceTypeLabel(serviceFilter);
   const rate = collectionRate(picked.collected, picked.expected);
   const rateNum = picked.expected > 0 ? Math.round((picked.collected / picked.expected) * 100) : null;
+  const activePct = s.totalCustomers > 0
+    ? Math.round((s.activeCustomers / s.totalCustomers) * 100)
+    : 0;
 
   const now = new Date();
-  const dayName = now.toLocaleDateString('en-US', { weekday: 'long' });
   const dateStr = now.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
 
-  const row1: StatCard[] = [
+  const collectedPill = picked.collected === 0
+    ? { text: 'No collections yet', cls: 'neutral' as const }
+    : rateNum !== null && rateNum < 50
+      ? { text: rate, cls: 'down' as const }
+      : { text: rate, cls: 'up' as const };
+
+  const heroCards: StatCard[] = [
     {
-      key: 'customers', label: 'Total Customers',
+      key: 'customers',
+      label: 'Total Customers',
       value: s.totalCustomers.toLocaleString(),
-      sub: `${s.activeCustomers.toLocaleString()} active`,
-      icon: 'users', accent: '#F5A623',
+      sub: `${s.activeCustomers.toLocaleString()} active (${activePct}%)`,
+      icon: 'users',
+      accent: 'var(--brand)',
+      page: 'customers',
     },
     {
-      key: 'active', label: 'Active Connections',
-      value: s.activeCustomers.toLocaleString(),
-      sub: `of ${s.totalCustomers.toLocaleString()} total`,
-      icon: 'wifi', accent: '#22C55E',
-    },
-    {
-      key: 'complaints', label: 'Open Complaints',
+      key: 'complaints',
+      label: 'Open Complaints',
       value: s.openComplaints.toLocaleString(),
       sub: `${s.complaintsByStatus.in_progress} in progress`,
-      icon: 'alertTri', accent: '#F59E0B',
+      icon: 'alertTri',
+      accent: 'var(--amber)',
+      page: 'complaints',
     },
     {
-      key: 'agents', label: 'Active Staff',
+      key: 'agents',
+      label: 'Active Staff',
       value: s.activeStaff.toLocaleString(),
-      sub: 'technicians + agents',
-      icon: 'briefcase', accent: '#8B5CF6',
+      sub: 'Technicians and field agents',
+      icon: 'briefcase',
+      accent: 'var(--purple)',
+      page: 'staff',
+    },
+    {
+      key: 'collection-rate',
+      label: 'Collection Rate',
+      value: rateNum !== null ? `${rateNum}%` : '—',
+      sub: picked.expected > 0 ? `${fmt(picked.collected)} of ${fmt(picked.expected)}` : 'No billing expected',
+      icon: 'percent',
+      accent: 'var(--green)',
+      page: 'billing',
     },
   ];
 
-  const row2: StatCard[] = [
+  const financialCards: StatCard[] = [
     {
-      key: 'collected', label: 'Collected This Month',
+      key: 'collected',
+      label: 'Collected This Month',
       value: fmt(picked.collected),
       sub: serviceFilter === 'both'
         ? `${fmt(s.monthlyInternetRevenue)} internet · ${fmt(s.monthlyCableRevenue)} cable`
         : `As of ${dateStr}`,
-      icon: 'dollar', accent: '#F5A623',
-      pill: rate !== '—' ? rate : undefined,
-      pillClass: rateNum !== null && rateNum < 50 ? 'down' : 'up',
+      icon: 'dollar',
+      accent: 'var(--green)',
+      pill: collectedPill.text,
+      pillClass: collectedPill.cls,
+      page: 'billing',
     },
     {
-      key: 'expected', label: 'Expected This Month',
+      key: 'expected',
+      label: 'Expected This Month',
       value: fmt(picked.expected),
       sub: serviceFilter === 'both'
         ? `${fmt(s.expectedInternetRevenue)} internet · ${fmt(s.expectedCableRevenue)} cable`
         : serviceLabel,
-      icon: 'fileText', accent: '#3B82F6',
+      icon: 'fileText',
+      accent: 'var(--text-muted)',
+      page: 'billing',
     },
     {
-      key: 'pending', label: 'Pending Collections',
+      key: 'pending',
+      label: 'Pending Collections',
       value: fmt(picked.pending),
       sub: serviceFilter === 'both'
         ? `${fmt(s.pendingInternetRevenue)} internet · ${fmt(s.pendingCableRevenue)} cable`
         : 'Outstanding bill balance',
-      icon: 'cash', accent: '#EF4444',
+      icon: 'cash',
+      accent: 'var(--red)',
+      page: 'billing',
     },
   ];
 
-  const row3: StatCard[] = [
+  const unpaidCards: StatCard[] = [
     {
-      key: 'unpaid-internet', label: 'Unpaid Internet Bills',
+      key: 'unpaid-internet',
+      label: 'Unpaid Internet Bills',
       value: picked.unpaidInternet.toLocaleString(),
       sub: serviceFilter === 'cable' ? 'Hidden by filter' : 'Internet subscribers',
-      icon: 'alertTri', accent: '#EF4444',
+      icon: 'wifi',
+      accent: 'var(--red)',
+      page: 'billing',
     },
     {
-      key: 'unpaid-cable', label: 'Unpaid Cable Bills',
+      key: 'unpaid-cable',
+      label: 'Unpaid Cable Bills',
       value: picked.unpaidCable.toLocaleString(),
       sub: serviceFilter === 'internet' ? 'Hidden by filter' : 'Cable subscribers',
-      icon: 'tv', accent: '#3B82F6',
+      icon: 'tv',
+      accent: 'var(--blue)',
+      page: 'billing',
     },
   ];
 
   const donutSegs = [
-    { label: 'Open', value: s.complaintsByStatus.open, color: '#EF4444' },
-    { label: 'In Progress', value: s.complaintsByStatus.in_progress, color: '#F59E0B' },
-    { label: 'Resolved', value: s.complaintsByStatus.resolved, color: '#22C55E' },
+    { label: 'Open', value: s.complaintsByStatus.open, color: 'var(--red)' },
+    { label: 'In Progress', value: s.complaintsByStatus.in_progress, color: 'var(--amber)' },
+    { label: 'Resolved', value: s.complaintsByStatus.resolved, color: 'var(--green)' },
   ];
   const totalComplaints = donutSegs.reduce((a, b) => a + b.value, 0);
+  const needsAttention = s.complaintsByStatus.open + s.complaintsByStatus.in_progress;
 
   const showInternetChart = serviceFilter !== 'cable' && picked.chartInternet.length > 0;
   const showCableChart = serviceFilter !== 'internet' && picked.chartCable.length > 0;
@@ -319,29 +419,33 @@ export default function DashboardPage({
   const chartData2 = showInternetChart && showCableChart ? picked.chartCable : undefined;
 
   return (
-    <div className="page">
-      <div className="dashboard-meta-row">
-        <p>Live overview · {dayName}, {dateStr} · {serviceLabel}</p>
-        <div className="dashboard-controls">
+    <div className="page dashboard-page">
+      <div className="dashboard-toolbar">
+        <div className="dashboard-toolbar-left">
+          <div className="segmented-control" role="group" aria-label="Service filter">
+            {SERVICE_FILTERS.map((f) => (
+              <button
+                key={f.value}
+                type="button"
+                className={serviceFilter === f.value ? 'active' : ''}
+                aria-pressed={serviceFilter === f.value}
+                onClick={() => setServiceFilter(f.value)}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
           {lastUpdated && (
             <span className="dashboard-last-updated">
               Updated {lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
             </span>
           )}
-          <select
-            className="select"
-            value={serviceFilter}
-            onChange={(e) => setServiceFilter(e.target.value as ServiceType)}
-            style={{ width: 140 }}
-          >
-            <option value="both">All Services</option>
-            <option value="internet">Internet</option>
-            <option value="cable">Cable</option>
-          </select>
-          <button className="btn btn-secondary" onClick={handleRefresh}>
+        </div>
+        <div className="dashboard-controls">
+          <button className="btn btn-ghost btn-sm" onClick={handleRefresh} title="Refresh data">
             <Icon name="refresh" size={14} />Refresh
           </button>
-          <button className="btn btn-secondary" onClick={handleExport}>
+          <button className="btn btn-secondary btn-sm" onClick={handleExport}>
             <Icon name="download" size={14} />Export
           </button>
         </div>
@@ -349,142 +453,193 @@ export default function DashboardPage({
 
       {onNavigate && (
         <div className="dashboard-quick-actions">
-          <button className="btn btn-secondary" onClick={() => onNavigate('customers')}>
+          <button className="btn btn-primary" onClick={() => onNavigate('customers')}>
             <Icon name="plus" size={14} />Add Customer
           </button>
           <button className="btn btn-secondary" onClick={() => onNavigate('complaints')}>
             <Icon name="alert" size={14} />New Complaint
           </button>
-          <button className="btn btn-secondary" onClick={() => onNavigate('billing')}>
+          <button className="btn btn-ghost" onClick={() => onNavigate('billing')}>
             <Icon name="card" size={14} />Go to Billing
           </button>
         </div>
       )}
 
-      <div className="grid-kpi-4" style={{ marginBottom: 16 }}>
-        {row1.map((c) => <StatCardView key={c.key} card={c} />)}
-      </div>
+      <section className="dashboard-section">
+        <h2 className="dashboard-section-title">Operations</h2>
+        <div className="grid-kpi-4">
+          {heroCards.map((c) => (
+            <StatCardView key={c.key} card={c} onNavigate={onNavigate} />
+          ))}
+        </div>
+      </section>
 
-      <div className="grid-kpi-3" style={{ marginBottom: 16 }}>
-        {row2.map((c) => <StatCardView key={c.key} card={c} />)}
-      </div>
-
-      <div className="grid-kpi-2" style={{ marginBottom: 20 }}>
-        {row3.map((c) => <StatCardView key={c.key} card={c} />)}
-      </div>
-
-      <div className="grid-dashboard-main" style={{ marginBottom: 20 }}>
-        <div className="card">
-          <div className="card-head">
-            <div>
-              <h3>Monthly Revenue</h3>
-              <div className="sub">Last 6 months, Rs. thousands (collected) · {serviceLabel}</div>
+      <section className="dashboard-section">
+        <h2 className="dashboard-section-title">Collections · {serviceLabel}</h2>
+        <div className="grid-kpi-3">
+          {financialCards.map((c) => (
+            <StatCardView key={c.key} card={c} onNavigate={onNavigate} />
+          ))}
+        </div>
+        {picked.expected > 0 && (
+          <div className="collection-progress">
+            <div className="collection-progress-head">
+              <span>Month-to-date collection</span>
+              <span className="num">{rate}</span>
+            </div>
+            <div className="collection-progress-track">
+              <div
+                className="collection-progress-fill"
+                style={{ width: `${Math.min(rateNum ?? 0, 100)}%` }}
+              />
             </div>
           </div>
-          <div className="card-pad" style={{ paddingTop: 8 }}>
-            {chartData.length === 0 ? (
-              <div className="muted" style={{ padding: 32, fontSize: 13, textAlign: 'center' }}>
-                No revenue data for this filter
+        )}
+      </section>
+
+      <section className="dashboard-section">
+        <h2 className="dashboard-section-title">Outstanding bills</h2>
+        <div className="grid-kpi-2">
+          {unpaidCards.map((c) => (
+            <StatCardView key={c.key} card={c} onNavigate={onNavigate} />
+          ))}
+        </div>
+      </section>
+
+      <section className="dashboard-section">
+        <h2 className="dashboard-section-title">Insights</h2>
+        <div className="grid-dashboard-main">
+          <div className="card card--static">
+            <div className="card-head">
+              <div>
+                <h3>Monthly Revenue</h3>
+                <div className="sub">Last 6 months · Rs. thousands · {serviceLabel}</div>
               </div>
-            ) : (
-              <>
+            </div>
+            <div className="card-pad chart-card-pad">
+              {chartData.length === 0 ? (
+                <div className="chart-empty-state">No revenue data for this filter</div>
+              ) : (
                 <RevenueLineChart
                   data={chartData}
                   data2={chartData2}
                   showCableLegend={serviceFilter === 'both'}
+                  cableEmpty={showCableChart && !cableHasCollections}
                 />
-                {showCableChart && !cableHasCollections && (
-                  <div className="muted" style={{ fontSize: 12, textAlign: 'center', marginTop: 8 }}>
-                    No cable collections yet — cable line will appear when payments are recorded
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-        </div>
-
-        <div className="card">
-          <div className="card-head">
-            <div>
-              <h3>Complaints by Status</h3>
-              <div className="sub">Current snapshot</div>
+              )}
             </div>
           </div>
-          <div className="card-pad" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
-            {totalComplaints === 0 ? (
-              <div className="muted" style={{ padding: 32, fontSize: 13 }}>No complaints yet</div>
-            ) : (
-              <>
-                <Donut segments={donutSegs} center={{ value: totalComplaints, label: 'Total' }} />
-                <div className="legend" style={{ justifyContent: 'center' }}>
-                  {donutSegs.map((seg) => (
-                    <div key={seg.label} className="item">
-                      <span className="sw" style={{ background: seg.color }} />
-                      {seg.label} · <strong style={{ color: 'var(--text)' }}>{seg.value}</strong>
-                    </div>
-                  ))}
-                </div>
-              </>
-            )}
-          </div>
-        </div>
-      </div>
 
-      <div className="card">
-        <div className="card-head">
-          <div>
-            <h3>Recent Activity</h3>
-            <div className="sub">Latest payments, complaints and onboarding</div>
+          <div className="card card--static dashboard-complaints-card">
+            <div className="card-head">
+              <div>
+                <h3>Complaints by Status</h3>
+                <div className="sub">{needsAttention} need attention</div>
+              </div>
+            </div>
+            <div className="card-pad dashboard-donut-wrap">
+              {totalComplaints === 0 ? (
+                <div className="chart-empty-state">No complaints yet</div>
+              ) : (
+                <>
+                  <Donut
+                    segments={donutSegs}
+                    size={176}
+                    thickness={24}
+                    center={{ value: needsAttention, label: 'Active' }}
+                  />
+                  <div className="legend">
+                    {donutSegs.map((seg) => (
+                      <div key={seg.label} className="item">
+                        <span className="sw" style={{ background: seg.color }} />
+                        {seg.label} · <strong className="num">{seg.value}</strong>
+                      </div>
+                    ))}
+                  </div>
+                  {onNavigate && needsAttention > 0 && (
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm dashboard-donut-cta"
+                      onClick={() => onNavigate('complaints')}
+                    >
+                      View open complaints
+                      <Icon name="arrowRight" size={14} />
+                    </button>
+                  )}
+                </>
+              )}
+            </div>
           </div>
         </div>
-        {activity.length === 0 ? (
-          <div style={{ padding: '24px 20px', color: 'var(--text-muted)', fontSize: 13 }}>
-            No recent activity — add customers, log complaints or record payments to see events here.
+      </section>
+
+      <section className="dashboard-section">
+        <div className="card card--static">
+          <div className="card-head">
+            <div>
+              <h3>Recent Activity</h3>
+              <div className="sub">Latest payments, complaints and onboarding</div>
+            </div>
           </div>
-        ) : (
-          <div>
-            {activity.map((a, i) => (
-              <div
-                key={i}
-                className={`activity-item${a.kind === 'complaint' && onNavigate ? ' clickable' : ''}`}
-                onClick={a.kind === 'complaint' && onNavigate ? () => onNavigate('complaints') : undefined}
-                role={a.kind === 'complaint' && onNavigate ? 'button' : undefined}
-                tabIndex={a.kind === 'complaint' && onNavigate ? 0 : undefined}
-                onKeyDown={a.kind === 'complaint' && onNavigate ? (e) => {
-                  if (e.key === 'Enter' || e.key === ' ') onNavigate('complaints');
-                } : undefined}
-              >
-                <IconBadge name={a.icon} color={a.color} size={32} />
-                <div className="main">
-                  <div className="lead lead-truncate">{a.lead}</div>
-                  <div className="when">
-                    <Icon name="clock" size={10} style={{ verticalAlign: -1, marginRight: 4 }} />
-                    {a.when}
-                  </div>
+          {activity.length === 0 ? (
+            <div className="activity-empty-state">
+              No recent activity — add customers, log complaints or record payments to see events here.
+            </div>
+          ) : (
+            <div>
+              {groupedActivity.map((group) => (
+                <div key={group.label}>
+                  <div className="activity-group-label">{group.label}</div>
+                  {group.items.map((a) => {
+                    const clickable = Boolean(onNavigate);
+                    const target = activityNavigateTarget(a.kind);
+                    return (
+                      <div
+                        key={`${a.kind}-${a.at}-${a.lead}`}
+                        className={`activity-item${clickable ? ' clickable' : ''}`}
+                        onClick={clickable ? () => onNavigate!(target) : undefined}
+                        role={clickable ? 'button' : undefined}
+                        tabIndex={clickable ? 0 : undefined}
+                        onKeyDown={clickable ? (e) => {
+                          if (e.key === 'Enter' || e.key === ' ') onNavigate!(target);
+                        } : undefined}
+                      >
+                        <IconBadge name={a.icon} color={a.color} size={32} />
+                        <div className="main">
+                          <div className="lead lead-truncate">{a.lead}</div>
+                          <div className="when">
+                            <Icon name="clock" size={10} style={{ verticalAlign: -1, marginRight: 4 }} />
+                            {a.when}
+                          </div>
+                        </div>
+                        <div className="amt-col">
+                          {a.kind === 'payment' && (
+                            <>
+                              <Badge color="green">Paid</Badge>
+                              {a.service && (
+                                <Badge color={a.service === 'cable' ? 'blue' : 'gray'}>
+                                  {a.service === 'cable' ? 'Cable' : 'Internet'}
+                                </Badge>
+                              )}
+                            </>
+                          )}
+                          {a.kind === 'complaint' && a.priority && (
+                            <Badge color={priorityBadgeColor(a.priority)} dot>
+                              {a.priority === 'high' ? 'High' : a.priority === 'medium' ? 'Medium' : 'Low'}
+                            </Badge>
+                          )}
+                          {a.kind === 'customer' && <Badge color="blue">New</Badge>}
+                          {a.amt && <div className="amt">{a.amt}</div>}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
-                <div className="amt-col">
-                  {a.kind === 'payment' && (
-                    <>
-                      <Badge color="green">Paid</Badge>
-                      {a.service && (
-                        <Badge color={a.service === 'cable' ? 'blue' : 'gray'}>
-                          {a.service === 'cable' ? 'Cable' : 'Internet'}
-                        </Badge>
-                      )}
-                    </>
-                  )}
-                  {a.kind === 'complaint' && a.priority && (
-                    <Badge color={priorityBadgeColor(a.priority)} dot>
-                      {a.priority === 'high' ? 'High' : a.priority === 'medium' ? 'Medium' : 'Low'}
-                    </Badge>
-                  )}
-                  {a.amt && <div className="amt">{a.amt}</div>}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
     </div>
   );
 }
