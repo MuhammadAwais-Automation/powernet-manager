@@ -1,7 +1,7 @@
 import { supabase } from '@/lib/supabase'
 import type { Staff, StaffWithArea, Area } from '@/types/database'
 
-const COLS = 'id, full_name, role, phone, area_id, area_ids, username, auth_user_id, is_active, created_at'
+const COLS = 'id, full_name, role, phone, area_id, area_ids, cable_area_ids, username, auth_user_id, is_active, created_at'
 let staffCache: { data: StaffWithArea[]; expiresAt: number } | null = null
 const CACHE_MS = 60_000
 
@@ -34,9 +34,12 @@ export async function getStaff(): Promise<StaffWithArea[]> {
     const row = s as Staff & { area: Area | null }
     const sAreaIds = row.area_ids || []
     const sAreas = areasList.filter(a => sAreaIds.includes(a.id))
+    const sCableAreaIds = row.cable_area_ids || []
+    const sCableAreas = areasList.filter(a => sCableAreaIds.includes(a.id))
     return {
       ...row,
       areas: sAreas,
+      cable_areas: sCableAreas,
       area: row.area || sAreas[0] || null
     }
   }) as unknown as StaffWithArea[]
@@ -51,6 +54,7 @@ export async function createStaff(input: {
   phone: string | null
   area_id: string | null
   area_ids?: string[] | null
+  cable_area_ids?: string[] | null
   is_active: boolean
   username: string | null
   password?: string
@@ -89,6 +93,7 @@ export async function updateStaff(id: string, input: Partial<{
   phone: string | null
   area_id: string | null
   area_ids: string[] | null
+  cable_area_ids: string[] | null
   username: string | null
   is_active: boolean
 }>): Promise<Staff> {

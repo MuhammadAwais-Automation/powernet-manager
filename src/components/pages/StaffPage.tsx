@@ -62,6 +62,7 @@ function StaffFormModal({ open, onClose, areas, onSaved, editTarget }: {
     phone:     editTarget?.phone     ?? '',
     role:      editTarget?.role      ?? 'technician',
     area_ids:  editTarget?.area_ids  ?? (editTarget?.area_id ? [editTarget.area_id] : []),
+    cable_area_ids: editTarget?.cable_area_ids ?? [],
     username:  editTarget?.username  ?? '',
     password:  '',
   });
@@ -85,6 +86,7 @@ function StaffFormModal({ open, onClose, areas, onSaved, editTarget }: {
           role:      form.role,
           phone:     form.phone || null,
           area_ids:  form.area_ids,
+          cable_area_ids: form.cable_area_ids,
         };
         if (form.username.trim()) patch.username = form.username.trim().toLowerCase();
         saved = await updateStaff(editTarget.id, patch);
@@ -100,6 +102,7 @@ function StaffFormModal({ open, onClose, areas, onSaved, editTarget }: {
               full_name: form.full_name.trim(),
               phone:     form.phone || null,
               area_ids:  form.area_ids,
+              cable_area_ids: form.cable_area_ids,
               role:      form.role,
             }),
           });
@@ -119,6 +122,7 @@ function StaffFormModal({ open, onClose, areas, onSaved, editTarget }: {
               full_name: form.full_name.trim(),
               phone:     form.phone || null,
               area_ids:  form.area_ids,
+              cable_area_ids: form.cable_area_ids,
               role:      form.role,
             }),
           });
@@ -193,43 +197,85 @@ function StaffFormModal({ open, onClose, areas, onSaved, editTarget }: {
           </div>
         </div>
 
-        <div className="field" style={{ marginBottom: 16 }}>
-          <label style={{ display: 'block', marginBottom: 6, fontWeight: 500 }}>Assigned Areas (Multiple)</label>
-          <div style={{
-            border: '1px solid var(--border)',
-            borderRadius: 8,
-            maxHeight: 120,
-            overflowY: 'auto',
-            padding: '8px 12px',
-            background: 'var(--bg-muted)',
-            display: 'grid',
-            gridTemplateColumns: '1fr 1fr',
-            gap: '8px 12px'
-          }}>
-            {areas.map(a => {
-              const checked = form.area_ids.includes(a.id);
-              return (
-                <label key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer', userSelect: 'none' }}>
-                  <input
-                    type="checkbox"
-                    checked={checked}
-                    style={{
-                      accentColor: 'var(--brand)',
-                      cursor: 'pointer'
-                    }}
-                    onChange={() => {
-                      setForm(f => {
-                        const ids = f.area_ids.includes(a.id)
-                          ? f.area_ids.filter(id => id !== a.id)
-                          : [...f.area_ids, a.id];
-                        return { ...f, area_ids: ids };
-                      });
-                    }}
-                  />
-                  <span>{a.name}</span>
-                </label>
-              );
-            })}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
+          <div className="field">
+            <label style={{ display: 'block', marginBottom: 6, fontWeight: 500 }}>Assigned Internet Areas</label>
+            <div style={{
+              border: '1px solid var(--border)',
+              borderRadius: 8,
+              maxHeight: 120,
+              overflowY: 'auto',
+              padding: '8px 12px',
+              background: 'var(--bg-muted)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 8
+            }}>
+              {areas.map(a => {
+                const checked = form.area_ids.includes(a.id);
+                return (
+                  <label key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer', userSelect: 'none' }}>
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      style={{
+                        accentColor: 'var(--brand)',
+                        cursor: 'pointer'
+                      }}
+                      onChange={() => {
+                        setForm(f => {
+                          const ids = f.area_ids.includes(a.id)
+                            ? f.area_ids.filter(id => id !== a.id)
+                            : [...f.area_ids, a.id];
+                          return { ...f, area_ids: ids };
+                        });
+                      }}
+                    />
+                    <span>{a.name}</span>
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="field">
+            <label style={{ display: 'block', marginBottom: 6, fontWeight: 500 }}>Assigned Cable Areas</label>
+            <div style={{
+              border: '1px solid var(--border)',
+              borderRadius: 8,
+              maxHeight: 120,
+              overflowY: 'auto',
+              padding: '8px 12px',
+              background: 'var(--bg-muted)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 8
+            }}>
+              {areas.map(a => {
+                const checked = form.cable_area_ids.includes(a.id);
+                return (
+                  <label key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer', userSelect: 'none' }}>
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      style={{
+                        accentColor: 'var(--brand)',
+                        cursor: 'pointer'
+                      }}
+                      onChange={() => {
+                        setForm(f => {
+                          const ids = f.cable_area_ids.includes(a.id)
+                            ? f.cable_area_ids.filter(id => id !== a.id)
+                            : [...f.cable_area_ids, a.id];
+                          return { ...f, cable_area_ids: ids };
+                        });
+                      }}
+                    />
+                    <span>{a.name}</span>
+                  </label>
+                );
+              })}
+            </div>
           </div>
         </div>
 

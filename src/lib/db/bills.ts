@@ -67,6 +67,8 @@ export type BillingSummary = {
   unpaidBills: number;
   overdueBills: number;
   visitedBills: number;
+  callToActionBills: number;
+  followUpBills: number;
   totalBilled: number;
   totalPaid: number;
   totalRemaining: number;
@@ -316,7 +318,14 @@ export async function getBillsPage(
     else if (params.status === "partial")
       query = query.neq("status", "paid").gt("paid_amount", 0);
     else if (params.status === "visited")
-      query = query.eq("payment_method", "visit");
+      query = query.eq("payment_method", "visit")
+        .or("payment_note.is.null,payment_note.not.in.(house_locked,new_promise_date,will_pay_office,will_pay_field,refused,already_paid,callback_later)");
+    else if (params.status === "call_to_action")
+      query = query.eq("payment_method", "visit")
+        .eq("payment_note", "house_locked");
+    else if (params.status === "follow_up")
+      query = query.eq("payment_method", "visit")
+        .in("payment_note", ["new_promise_date", "will_pay_office", "will_pay_field", "refused", "already_paid", "callback_later"]);
     else if (params.status) query = query.eq("status", params.status);
     if (params.source) query = query.eq("payment_source", params.source);
     
@@ -387,6 +396,44 @@ export async function getBillingSummary(
   if (error) throw error;
 
   const summary = data as BillingSummary;
+
+  let visitedQ = supabase
+    .from("bills")
+    .select("id" + (areaId ? ", customer:customers!inner(area_id)" : ""), { count: "exact", head: true })
+    .eq("month", month)
+    .eq("payment_method", "visit")
+    .or("payment_note.is.null,payment_note.not.in.(house_locked,new_promise_date,will_pay_office,will_pay_field,refused,already_paid,callback_later)");
+
+  let ctaQ = supabase
+    .from("bills")
+    .select("id" + (areaId ? ", customer:customers!inner(area_id)" : ""), { count: "exact", head: true })
+    .eq("month", month)
+    .eq("payment_method", "visit")
+    .eq("payment_note", "house_locked");
+
+  let followUpQ = supabase
+    .from("bills")
+    .select("id" + (areaId ? ", customer:customers!inner(area_id)" : ""), { count: "exact", head: true })
+    .eq("month", month)
+    .eq("payment_method", "visit")
+    .in("payment_note", ["new_promise_date", "will_pay_office", "will_pay_field", "refused", "already_paid", "callback_later"]);
+
+  if (areaId) {
+    visitedQ = visitedQ.eq("customer.area_id", areaId);
+    ctaQ = ctaQ.eq("customer.area_id", areaId);
+    followUpQ = followUpQ.eq("customer.area_id", areaId);
+  }
+
+  const [visitedRes, ctaRes, followUpRes] = await Promise.all([
+    visitedQ,
+    ctaQ,
+    followUpQ
+  ]);
+
+  summary.visitedBills = visitedRes.count ?? 0;
+  summary.callToActionBills = ctaRes.count ?? 0;
+  summary.followUpBills = followUpRes.count ?? 0;
+
   billingSummaryCache[key] = {
     data: summary,
     expiresAt: Date.now() + CACHE_MS,
@@ -570,6 +617,8 @@ function emptyBillingSummary(month: string): BillingSummary {
     unpaidBills: 0,
     overdueBills: 0,
     visitedBills: 0,
+    callToActionBills: 0,
+    followUpBills: 0,
     totalBilled: 0,
     totalPaid: 0,
     totalRemaining: 0,
@@ -851,7 +900,15 @@ async function fetchBillActivityRowsForMonth(
         .eq("month", params.month)
         .range(from, from + SUPABASE_PAGE_SIZE - 1);
       if (params.status === "unpaid") query = query.neq("status", "paid");
-      else if (params.status === "visited") query = query.eq("payment_method", "visit");
+      else if (params.status === "visited")
+        query = query.eq("payment_method", "visit")
+          .or("payment_note.is.null,payment_note.not.in.(house_locked,new_promise_date,will_pay_office,will_pay_field,refused,already_paid,callback_later)");
+      else if (params.status === "call_to_action")
+        query = query.eq("payment_method", "visit")
+          .eq("payment_note", "house_locked");
+      else if (params.status === "follow_up")
+        query = query.eq("payment_method", "visit")
+          .in("payment_note", ["new_promise_date", "will_pay_office", "will_pay_field", "refused", "already_paid", "callback_later"]);
       else if (params.status) query = query.eq("status", params.status);
       if (chunk) query = query.in("customer_id", chunk);
 
@@ -1351,4 +1408,30 @@ export async function searchBills(q: string, limit = 5): Promise<GlobalBillHit[]
   // 3. fallback ilike on payment_note or receipt (already covered)
 
   return hits.slice(0, limit);
+}
+
+export async function deleteBillingWorkflowState(billId: string): Promise<void> {
+  const { error: billError } = await supabase
+    .from("bills")
+    .update({
+      payment_method: null,
+      payment_note: null,
+      promised_date: null,
+    })
+    .eq("id", billId);
+  if (billError) throw billError;
+
+  const { error: callsError } = await supabase
+    .from("follow_up_calls")
+    .delete()
+    .eq("bill_id", billId);
+  if (callsError) throw callsError;
+
+  const { error: eventsError } = await supabase
+    .from("customer_commitment_events")
+    .delete()
+    .eq("bill_id", billId);
+  if (eventsError) throw eventsError;
+
+  clearBillsCache();
 }

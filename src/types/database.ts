@@ -247,13 +247,14 @@ export type Staff = {
   phone: string | null;
   area_id: string | null;
   area_ids: string[] | null;
+  cable_area_ids: string[] | null;
   username: string | null;
   auth_user_id: string | null;
   is_active: boolean;
   created_at: string;
 };
 
-export type StaffWithArea = Staff & { area: Area | null; areas: Area[] };
+export type StaffWithArea = Staff & { area: Area | null; areas: Area[]; cable_areas?: Area[] };
 
 export type BillStatus = "pending" | "paid" | "overdue";
 

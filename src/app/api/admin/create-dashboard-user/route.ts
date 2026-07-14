@@ -26,9 +26,10 @@ export async function POST(req: Request) {
   const body = await req.json().catch(() => null)
   if (!body) return NextResponse.json({ error: 'Bad request' }, { status: 400 })
 
-  const { username, password, full_name, phone, area_id, area_ids, role: newRole } = body as {
+  const { username, password, full_name, phone, area_id, area_ids, cable_area_ids, role: newRole } = body as {
     username?: string; password?: string; full_name?: string;
-    phone?: string | null; area_id?: string | null; area_ids?: string[] | null; role?: string;
+    phone?: string | null; area_id?: string | null; area_ids?: string[] | null;
+    cable_area_ids?: string[] | null; role?: string;
   }
 
   if (!username || !password || !full_name || !newRole) {
@@ -76,11 +77,12 @@ export async function POST(req: Request) {
       phone: phone ?? null,
       area_id: finalAreaId,
       area_ids: finalAreaIds,
+      cable_area_ids: cable_area_ids ?? null,
       username: normalizedUsername,
       auth_user_id: authUser.id,
       is_active: true,
     })
-    .select('id, full_name, role, phone, area_id, area_ids, username, auth_user_id, is_active, created_at')
+    .select('id, full_name, role, phone, area_id, area_ids, cable_area_ids, username, auth_user_id, is_active, created_at')
     .single()
 
   if (staffErr || !staffRow) {

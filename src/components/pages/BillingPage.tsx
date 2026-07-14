@@ -12,6 +12,7 @@ import {
   getCustomerBalanceSummary,
   recordBillPayment,
   getBillPayments,
+  deleteBillingWorkflowState,
   type BillingBillRow,
   type BillingSummary,
   type CustomerLedgerSummary,
@@ -31,7 +32,7 @@ import {
   formatPromisedDate,
   formatVisitNote,
 } from "@/lib/notifications/billing";
-import { getBillCallStats } from "@/lib/db/follow-ups";
+import { getBillCallStats, getFollowUpCallsForBill, type FollowUpCall } from "@/lib/db/follow-ups";
 import { FollowUpCallModal } from "./FollowUpCallModal";
 import {
   normalizeBillingSearch,
@@ -309,7 +310,7 @@ export default function BillingPage({
   const [followUpBill, setFollowUpBill] = useState<BillWithRelations | null>(null);
 
   const PAGE_SIZE = 50;
-  const isCallToActionTab = tab === "CallToAction";
+  const showCallAndVisitDetails = tab === "CallToAction" || tab === "FollowUp";
 
   // ── Debounce search ──────────────────────────────────────────────────────────
   useEffect(() => {
@@ -393,7 +394,7 @@ export default function BillingPage({
       setSummary(billingSummary);
       setLedgerSummary(ledger);
       setAreas(areaRows);
-      if (tab0 === "CallToAction" && billPage.rows.length > 0) {
+      if ((tab0 === "CallToAction" || tab0 === "FollowUp") && billPage.rows.length > 0) {
         const stats = await getBillCallStats(billPage.rows.map((b) => b.id));
         setCallStats(stats);
       } else {
@@ -461,6 +462,7 @@ export default function BillingPage({
   const [detailBalance, setDetailBalance] =
     useState<CustomerBalanceSummary | null>(null);
   const [billPayments, setBillPayments] = useState<PaymentEventWithRelations[]>([]);
+  const [billCalls, setBillCalls] = useState<FollowUpCall[]>([]);
   const [paymentBill, setPaymentBill] = useState<BillWithRelations | null>(
     null,
   );
@@ -493,6 +495,7 @@ export default function BillingPage({
     if (!detailBill) {
       setDetailBalance(null);
       setBillPayments([]);
+      setBillCalls([]);
       return;
     }
 
@@ -520,6 +523,14 @@ export default function BillingPage({
       })
       .catch((err) => {
         console.error("Failed to load bill payments:", err);
+      });
+
+    getFollowUpCallsForBill(detailBill.id)
+      .then((calls) => {
+        if (!cancelled) setBillCalls(calls);
+      })
+      .catch((err) => {
+        console.error("Failed to load follow up calls:", err);
       });
 
     return () => {
@@ -900,7 +911,12 @@ export default function BillingPage({
                 {
                   value: "CallToAction",
                   label: "Call to Action",
-                  count: summary?.visitedBills ?? 0,
+                  count: summary?.callToActionBills ?? 0,
+                },
+                {
+                  value: "FollowUp",
+                  label: "Follow Up",
+                  count: summary?.followUpBills ?? 0,
                 },
               ]}
             />
@@ -1012,7 +1028,7 @@ export default function BillingPage({
                     <th>Remaining</th>
                     <th>Status</th>
                     <th>Channel</th>
-                    {isCallToActionTab && (
+                    {showCallAndVisitDetails && (
                       <>
                         <th>Visit</th>
                         <th>Calls</th>
@@ -1108,7 +1124,7 @@ export default function BillingPage({
                           <span className="muted" style={{ fontSize: 11 }}>—</span>
                         )}
                       </td>
-                      {isCallToActionTab && (
+                       {showCallAndVisitDetails && (
                         <>
                           <td style={{ fontSize: 11 }}>
                             {b.payment_method === "visit" ? (
@@ -1144,7 +1160,7 @@ export default function BillingPage({
                           className="row gap-sm"
                           style={{ justifyContent: "flex-end" }}
                         >
-                          {isCallToActionTab && b.payment_method === "visit" && (
+                          {showCallAndVisitDetails && b.payment_method === "visit" && (
                             <button
                               className="btn btn-secondary btn-sm"
                               style={{ fontSize: 11, padding: "4px 8px" }}
@@ -1169,6 +1185,27 @@ export default function BillingPage({
                               onClick={() => setPaymentBill(b)}
                             >
                               <Icon name="cash" size={14} />
+                            </button>
+                          )}
+                          {(tab === "Visited" || tab === "CallToAction" || tab === "FollowUp") && (
+                            <button
+                              className="icon-btn"
+                              style={{ width: 28, height: 28, color: "var(--red)" }}
+                              title="Delete workflow state"
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                if (confirm("Delete this visit/follow-up entry?")) {
+                                  try {
+                                    await deleteBillingWorkflowState(b.id);
+                                    setMessage("Workflow state deleted");
+                                    setReloadToken((t) => t + 1);
+                                  } catch (err) {
+                                    setError(err instanceof Error ? err.message : "Failed to delete");
+                                  }
+                                }
+                              }}
+                            >
+                              <Icon name="trash" size={14} />
                             </button>
                           )}
                         </div>
@@ -1587,6 +1624,54 @@ export default function BillingPage({
                                   "-"
                                 )}
                               </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
+                {/* Call History List (table) - scrollable */}
+                {billCalls.length > 0 && (
+                  <div className="bill-detail-card" style={{ maxHeight: 180, overflowY: "auto", marginTop: 14 }}>
+                    <span className="label">Call History</span>
+                    <table className="payment-history-table">
+                      <thead>
+                        <tr>
+                          <th>Date/Time</th>
+                          <th>Outcome</th>
+                          <th>Commitment</th>
+                          <th>Caller</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {billCalls.map((c) => {
+                          const date = c.called_at ? new Date(c.called_at) : null;
+                          const formatted = date && !isNaN(date.getTime())
+                            ? `${date.toLocaleDateString("en-US", { month: "short", day: "numeric" })} ${date.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true })}`
+                            : "-";
+                          return (
+                            <tr key={c.id}>
+                              <td>
+                                <div>{formatted}</div>
+                                {c.notes && <div className="muted" style={{ fontSize: 11, fontStyle: "italic", marginTop: 2 }}>{c.notes}</div>}
+                              </td>
+                              <td style={{ textTransform: "capitalize" }}>{c.call_outcome.replace("_", " ")}</td>
+                              <td>
+                                <div>{c.commitment_action ? c.commitment_action.replace(/_/g, " ") : "None"}</div>
+                                {c.promised_date && (
+                                  <div style={{ color: "var(--cyan)", fontSize: 10, marginTop: 2 }}>
+                                    Promise: {formatPromisedDate(c.promised_date)}
+                                  </div>
+                                )}
+                                {c.next_follow_up_date && (
+                                  <div className="muted" style={{ fontSize: 10, marginTop: 2 }}>
+                                    Next call: {formatPromisedDate(c.next_follow_up_date)}
+                                  </div>
+                                )}
+                              </td>
+                              <td>{c.caller?.full_name ?? "—"}</td>
                             </tr>
                           );
                         })}

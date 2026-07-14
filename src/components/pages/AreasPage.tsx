@@ -180,6 +180,7 @@ function AreaCard({
   onEdit: () => void;
 }) {
   const techs = assignedStaff.filter((s) => s.role === "technician");
+  const cableTechs = assignedStaff.filter((s) => s.role === "cable_technician");
   const agents = assignedStaff.filter((s) => s.role === "recovery_agent");
 
   return (
@@ -318,6 +319,13 @@ function AreaCard({
               <span>{techs.map((s) => s.full_name).join(", ")}</span>
             </div>
           )}
+          {cableTechs.length > 0 && (
+            <div className="row gap-sm" style={{ fontSize: 12 }}>
+              <Icon name="tv" size={12} style={{ color: "var(--purple)" }} />
+              <span className="muted">Cable Tech:</span>
+              <span>{cableTechs.map((s) => s.full_name).join(", ")}</span>
+            </div>
+          )}
           {agents.length > 0 && (
             <div className="row gap-sm" style={{ fontSize: 12 }}>
               <Icon
@@ -427,7 +435,10 @@ export default function AreasPage() {
   const civilianAreas = areas.filter((a) => a.type === "civilian");
   const staffForArea = (id: string) =>
     staff.filter(
-      (s) => (s.area_ids && s.area_ids.includes(id)) || s.area_id === id,
+      (s) =>
+        (s.area_ids && s.area_ids.includes(id)) ||
+        s.area_id === id ||
+        (s.cable_area_ids && s.cable_area_ids.includes(id)),
     );
   const totalCustomers = Object.values(counts).reduce((s, v) => s + v, 0);
 

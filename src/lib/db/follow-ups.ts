@@ -1,5 +1,6 @@
 import { supabase } from "@/lib/supabase";
 import { getErrorMessage } from "@/lib/utils";
+import { clearBillsCache } from "./bills";
 
 export type CallerChannel = "office" | "recovery_agent";
 export type CallOutcome =
@@ -134,6 +135,22 @@ export async function recordFollowUpCall(
     )
     .single();
   if (error) throw new Error(getErrorMessage(error, "Could not save call record"));
+
+  if (input.billId && input.commitmentAction && input.commitmentAction !== "none") {
+    const { error: updateError } = await supabase
+      .from("bills")
+      .update({
+        payment_note: input.commitmentAction,
+        promised_date: input.promisedDate || null,
+      })
+      .eq("id", input.billId);
+    if (updateError) {
+      console.error("Failed to update bill during follow up call:", updateError);
+    } else {
+      clearBillsCache();
+    }
+  }
+
   return data as FollowUpCall;
 }
 

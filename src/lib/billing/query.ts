@@ -5,13 +5,16 @@ export type BillingTab =
   | "Overdue"
   | "Partial"
   | "Visited"
-  | "CallToAction";
+  | "CallToAction"
+  | "FollowUp";
 export type BillStatus = "pending" | "paid" | "overdue";
 export type BillStatusFilter =
   | BillStatus
   | "unpaid"
   | "partial"
   | "visited"
+  | "call_to_action"
+  | "follow_up"
   | undefined;
 export type BillsPageQuery = {
   month: string;
@@ -47,7 +50,8 @@ export function normalizeBillStatusFilter(tab: BillingTab): BillStatusFilter {
   if (tab === "Unpaid") return "unpaid";
   if (tab === "Partial") return "partial";
   if (tab === "Visited") return "visited";
-  if (tab === "CallToAction") return "visited";
+  if (tab === "CallToAction") return "call_to_action";
+  if (tab === "FollowUp") return "follow_up";
   return undefined;
 }
 
