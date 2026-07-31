@@ -1024,21 +1024,22 @@ function StaffCard({ s, onEdit, onViewCreds, onToggleActive, onDelete, onViewAct
   const accent = ROLE_ACCENT[s.role] ?? 'var(--border-strong)';
   const [menuOpen, setMenuOpen] = useState(false);
 
-  const internetAreas = s.areas?.length
-    ? s.areas.map(a => a.name).join(', ')
-    : (s.area?.name ?? null);
-  const cableAreas = s.cable_areas?.length
-    ? s.cable_areas.map(a => a.name).join(', ')
-    : null;
+  const areaBits: string[] = [];
+  if (s.areas?.length) areaBits.push(...s.areas.map(a => a.name));
+  else if (s.area?.name) areaBits.push(s.area.name);
+  if (s.cable_areas?.length) areaBits.push(...s.cable_areas.map(a => a.name));
+  const areaText = areaBits.length > 0
+    ? [...new Set(areaBits)].join(', ')
+    : 'No area assigned';
 
   const pages = s.role === 'complaint_manager' ? getAllowedPages(s) : [];
-  const pagePreview = pages.slice(0, 3);
+  const pagePreview = pages.slice(0, 2);
   const pageExtra = pages.length - pagePreview.length;
 
-  const typeLabel = s.role === 'admin'
-    ? 'Full dashboard'
+  const accessLabel = s.role === 'admin'
+    ? 'Full access'
     : s.role === 'complaint_manager'
-      ? `${pages.length} page${pages.length === 1 ? '' : 's'}`
+      ? 'Custom pages'
       : 'Mobile app';
 
   return (
@@ -1046,23 +1047,22 @@ function StaffCard({ s, onEdit, onViewCreds, onToggleActive, onDelete, onViewAct
       <div className="role-accent" style={{ background: accent }} />
       <div className="staff-card-body">
         <div className="head">
-          <span className={`av ${avClass(s.full_name)}`} style={{ width: 44, height: 44, fontSize: 14, flexShrink: 0 }}>
+          <span className={`av ${avClass(s.full_name)}`} style={{ width: 40, height: 40, fontSize: 13, flexShrink: 0 }}>
             {initials(s.full_name)}
           </span>
           <div className="who">
             <div className="nm" title={s.full_name}>{s.full_name}</div>
-            <div className="ph">
+            <div className="ph" title={s.username ? `@${s.username}` : undefined}>
               {s.username
-                ? <span style={{ color: 'var(--brand)', fontWeight: 600 }}>@{s.username}</span>
+                ? <span className="uname">@{s.username}</span>
                 : <span style={{ fontStyle: 'italic' }}>no username</span>}
             </div>
           </div>
-          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 4, position: 'relative', flexShrink: 0 }}>
-            <Badge color={roleColor}>{roleLabel}</Badge>
+          <div className="head-actions">
             <div style={{ position: 'relative' }}>
               <button
                 className="icon-btn"
-                style={{ width: 28, height: 28, borderRadius: 8 }}
+                style={{ width: 30, height: 30, borderRadius: 8 }}
                 onClick={() => setMenuOpen(v => !v)}
                 title="More actions"
                 aria-label="More actions"
@@ -1090,48 +1090,39 @@ function StaffCard({ s, onEdit, onViewCreds, onToggleActive, onDelete, onViewAct
           </div>
         </div>
 
+        <div className="role-row">
+          <Badge color={roleColor}>{roleLabel}</Badge>
+        </div>
+
         <div className="meta-list">
           <div className="meta-row">
             <Icon name="pin" size={13} />
-            <span title={internetAreas ?? 'No internet area'}>
-              {internetAreas ? `Internet · ${internetAreas}` : 'No internet area'}
-            </span>
+            <span title={areaText}>{areaText}</span>
           </div>
-          {cableAreas && (
-            <div className="meta-row">
-              <Icon name="tv" size={13} />
-              <span title={cableAreas}>Cable · {cableAreas}</span>
-            </div>
-          )}
-          {s.phone && (
+          {s.phone ? (
             <div className="meta-row">
               <Icon name="phone" size={13} />
-              <span className="mono">{s.phone}</span>
+              <span className="mono" title={s.phone}>{s.phone}</span>
+            </div>
+          ) : (
+            <div className="meta-row" style={{ visibility: 'hidden' }} aria-hidden>
+              <Icon name="phone" size={13} />
+              <span>—</span>
             </div>
           )}
         </div>
 
-        <div className="stats-row">
-          <div className="stat-mini">
-            <div className="k">Access</div>
-            <div className="v">{typeLabel}</div>
-          </div>
-          <div className="stat-mini">
-            <div className="k">Status</div>
-            <div className="v" style={{ color: s.is_active ? 'var(--green)' : 'var(--text-muted)' }}>
-              {s.is_active ? 'Active' : 'Inactive'}
+        <div className="access-strip" title={s.role === 'complaint_manager' ? pages.map(p => PAGE_LABELS[p]).join(', ') : accessLabel}>
+          <span className="access-label">{accessLabel}</span>
+          {s.role === 'complaint_manager' && pagePreview.length > 0 && (
+            <div className="access-pills">
+              {pagePreview.map(page => (
+                <span key={page} className="access-pill">{PAGE_LABELS[page]}</span>
+              ))}
+              {pageExtra > 0 && <span className="access-pill more">+{pageExtra}</span>}
             </div>
-          </div>
+          )}
         </div>
-
-        {s.role === 'complaint_manager' && pagePreview.length > 0 && (
-          <div className="access-pills">
-            {pagePreview.map(page => (
-              <span key={page} className="access-pill">{PAGE_LABELS[page]}</span>
-            ))}
-            {pageExtra > 0 && <span className="access-pill more">+{pageExtra} more</span>}
-          </div>
-        )}
       </div>
 
       <div className="foot">
@@ -1139,11 +1130,9 @@ function StaffCard({ s, onEdit, onViewCreds, onToggleActive, onDelete, onViewAct
           <Switch on={s.is_active} onChange={onToggleActive} />
           <span>{s.is_active ? 'Active' : 'Inactive'}</span>
         </div>
-        {s.role !== 'admin' && (
-          <button className="btn btn-secondary btn-sm" onClick={onViewActivity} style={{ borderRadius: 8, gap: 6 }}>
-            <Icon name="chart" size={12} /> Activity
-          </button>
-        )}
+        <button className="btn btn-secondary btn-sm" onClick={onViewActivity}>
+          <Icon name="chart" size={12} /> Activity
+        </button>
       </div>
     </div>
   );
