@@ -1043,8 +1043,10 @@ function StaffCard({ s, onEdit, onViewCreds, onToggleActive, onDelete, onViewAct
       : 'Mobile app';
 
   return (
-    <div className={`card staff-card lift${s.is_active ? '' : ' is-inactive'}`} style={{ position: 'relative', overflow: 'visible' }}>
-      <div className="role-accent" style={{ background: accent }} />
+    <div
+      className={`card staff-card lift${s.is_active ? '' : ' is-inactive'}`}
+      style={{ position: 'relative', ['--staff-accent' as keyof React.CSSProperties]: accent } as React.CSSProperties}
+    >
       <div className="staff-card-body">
         <div className="head">
           <span className={`av ${avClass(s.full_name)}`} style={{ width: 40, height: 40, fontSize: 13, flexShrink: 0 }}>
