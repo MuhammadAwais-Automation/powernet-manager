@@ -18,16 +18,34 @@ const ROLE_LABELS: Record<string, string> = {
   recovery_agent:    'Recovery Agent',
   helper:            'Helper',
   admin:             'Admin',
-  complaint_manager: 'Custom access',
+  complaint_manager: 'Custom Access',
 };
 
-const ROLE_COLORS: Record<string, 'blue' | 'amber' | 'green' | 'purple' | 'gray'> = {
+const ROLE_COLORS: Record<string, 'blue' | 'amber' | 'green' | 'purple' | 'gray' | 'teal'> = {
   technician:        'blue',
   cable_technician:  'purple',
   recovery_agent:    'amber',
   helper:            'green',
   admin:             'gray',
-  complaint_manager: 'purple',
+  complaint_manager: 'teal',
+};
+
+const ROLE_ACCENT: Record<string, string> = {
+  technician:        'var(--blue)',
+  cable_technician:  'var(--purple)',
+  recovery_agent:    'var(--amber)',
+  helper:            'var(--green)',
+  admin:             'var(--color-primary)',
+  complaint_manager: '#0D9488',
+};
+
+const ROLE_DOT: Record<string, string> = {
+  admin:             'var(--color-primary)',
+  complaint_manager: '#0D9488',
+  technician:        'var(--blue)',
+  cable_technician:  'var(--purple)',
+  recovery_agent:    'var(--amber)',
+  helper:            'var(--green)',
 };
 
 const DASHBOARD_ROLES = new Set(['admin', 'complaint_manager']);
@@ -41,7 +59,7 @@ const MOBILE_STAFF_ROLE_OPTIONS = [
 
 const DASHBOARD_STAFF_ROLE_OPTIONS = [
   { value: 'admin', label: 'Admin' },
-  { value: 'complaint_manager', label: 'Custom access' },
+  { value: 'complaint_manager', label: 'Custom Access' },
 ] as const;
 
 const DEFAULT_CUSTOM_PAGES: PageId[] = ['complaints', 'customers'];
@@ -667,6 +685,10 @@ function StaffActivityDrawer({ staff, onClose }: {
   const [activity, setActivity] = useState<StaffActivity | null>(null);
   const [activeTab, setActiveTab] = useState<string>('');
 
+  const isFieldCollector = staff.role === 'recovery_agent' || staff.role === 'helper';
+  const isTech = staff.role === 'technician' || staff.role === 'cable_technician';
+  const isCustom = staff.role === 'complaint_manager';
+
   useEffect(() => {
     let active = true;
     setLoading(true);
@@ -679,18 +701,13 @@ function StaffActivityDrawer({ staff, onClose }: {
       .then(data => {
         if (!active) return;
         setActivity(data);
-        
-        // Auto-select tab based on role and data
-        if (staff.role === 'recovery_agent') {
-          setActiveTab('payments');
-        } else if (staff.role === 'technician' || staff.role === 'cable_technician') {
-          setActiveTab('active');
-        } else {
-          if (data.payments.length > 0) setActiveTab('payments');
-          else if (data.activeComplaints.length > 0) setActiveTab('active');
-          else if (data.visits.length > 0) setActiveTab('visits');
-          else setActiveTab('resolved');
-        }
+        if (isFieldCollector) setActiveTab('payments');
+        else if (isTech) setActiveTab('active');
+        else if (isCustom) setActiveTab(data.activeComplaints.length > 0 ? 'active' : 'resolved');
+        else if (data.payments.length > 0) setActiveTab('payments');
+        else if (data.activeComplaints.length > 0) setActiveTab('active');
+        else if (data.visits.length > 0) setActiveTab('visits');
+        else setActiveTab('resolved');
       })
       .catch(e => {
         if (!active) return;
@@ -700,10 +717,8 @@ function StaffActivityDrawer({ staff, onClose }: {
         if (active) setLoading(false);
       });
 
-    return () => {
-      active = false;
-    };
-  }, [staff.id, staff.role, dateStr]);
+    return () => { active = false; };
+  }, [staff.id, staff.role, dateStr, isFieldCollector, isTech, isCustom]);
 
   const formatTime = (isoString: string | null) => {
     if (!isoString) return '';
@@ -731,311 +746,256 @@ function StaffActivityDrawer({ staff, onClose }: {
   const resolvedCount = activity?.resolvedComplaints.length ?? 0;
   const activeCount = activity?.activeComplaints.length ?? 0;
 
-  const tabsList = [];
-  if (staff.role === 'recovery_agent' || staff.role === 'helper' || (activity && (activity.payments.length > 0 || activity.visits.length > 0))) {
+  const tabsList: { value: string; label: string; count: number }[] = [];
+  if (isFieldCollector || (activity && (activity.payments.length > 0 || activity.visits.length > 0))) {
     tabsList.push({ value: 'payments', label: 'Payments', count: activity?.payments.length ?? 0 });
-    tabsList.push({ value: 'visits', label: 'Visits Logged', count: visitsCount });
+    tabsList.push({ value: 'visits', label: 'Visits', count: visitsCount });
   }
-  if (staff.role === 'technician' || staff.role === 'cable_technician' || staff.role === 'complaint_manager' || (activity && (activity.resolvedComplaints.length > 0 || activity.activeComplaints.length > 0))) {
-    tabsList.push({ value: 'active', label: 'Active Complaints', count: activeCount });
-    tabsList.push({ value: 'resolved', label: 'Resolved Today', count: resolvedCount });
+  if (isTech || isCustom || (activity && (activity.resolvedComplaints.length > 0 || activity.activeComplaints.length > 0))) {
+    tabsList.push({ value: 'active', label: 'Active', count: activeCount });
+    tabsList.push({ value: 'resolved', label: 'Resolved', count: resolvedCount });
   }
-
   if (tabsList.length === 0) {
     tabsList.push({ value: 'payments', label: 'Payments', count: 0 });
     tabsList.push({ value: 'visits', label: 'Visits', count: 0 });
   }
 
   const currentTab = tabsList.some(t => t.value === activeTab) ? activeTab : (tabsList[0]?.value || 'payments');
+  const roleLabel = ROLE_LABELS[staff.role] ?? staff.role;
+  const roleColor = ROLE_COLORS[staff.role] ?? 'gray';
 
   return (
-    <Drawer open onClose={onClose} width={480}>
-      <div className="drawer-head">
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <span className={`av ${avClass(staff.full_name)}`} style={{ width: 38, height: 38, fontSize: 13 }}>
+    <Drawer open onClose={onClose} width={500}>
+      <div className="drawer-head staff-activity-drawer">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
+          <span className={`av ${avClass(staff.full_name)}`} style={{ width: 42, height: 42, fontSize: 14, flexShrink: 0 }}>
             {initials(staff.full_name)}
           </span>
-          <div>
-            <div style={{ fontSize: 15, fontWeight: 600 }}>{staff.full_name}</div>
-            <div className="muted" style={{ fontSize: 11, textTransform: 'capitalize' }}>
-              {ROLE_LABELS[staff.role] ?? staff.role} · Activity Report
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: 16, fontWeight: 700, letterSpacing: '-0.02em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {staff.full_name}
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4, flexWrap: 'wrap' }}>
+              <Badge color={roleColor}>{roleLabel}</Badge>
+              <span className="muted" style={{ fontSize: 11 }}>Daily activity</span>
             </div>
           </div>
         </div>
-        <button className="icon-btn" onClick={onClose}>
+        <button className="icon-btn" onClick={onClose} aria-label="Close">
           <Icon name="close" size={16} />
         </button>
       </div>
 
       <div className="drawer-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-        <div className="card" style={{ padding: 12, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--text-muted)', fontSize: 13 }}>
-            <Icon name="calendar" size={15} />
-            <span>Select Report Date</span>
+        <div className="staff-activity-date">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--text)', fontSize: 13, fontWeight: 600 }}>
+            <Icon name="calendar" size={15} style={{ color: 'var(--brand)' }} />
+            Report date
           </div>
           <input
             type="date"
             className="input"
             value={dateStr}
             onChange={e => setDateStr(e.target.value)}
-            style={{ width: 'auto', padding: '4px 8px', height: 32, borderRadius: 6, fontSize: 13 }}
+            style={{ width: 'auto', minWidth: 148, padding: '5px 10px', height: 34, borderRadius: 8, fontSize: 13 }}
           />
         </div>
 
         {loading ? (
-          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 120 }}>
-            <span className="muted" style={{ fontSize: 13 }}>Loading activity logs…</span>
+          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 140 }}>
+            <span className="muted" style={{ fontSize: 13 }}>Loading activity…</span>
           </div>
         ) : error ? (
-          <div style={{ padding: '12px 14px', background: '#fef2f2', color: '#dc2626', borderRadius: 8, fontSize: 13 }}>
+          <div style={{ padding: '12px 14px', background: 'var(--red-50)', color: 'var(--red)', borderRadius: 10, fontSize: 13 }}>
             {error}
           </div>
         ) : (
           <>
-            {staff.role === 'recovery_agent' ? (
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                <div className="card" style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 4, gridColumn: 'span 2' }}>
-                  <span className="muted" style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase' }}>Total Recovered</span>
-                  <span style={{ fontSize: 18, fontWeight: 700, color: 'var(--brand)' }}>Rs. {totalRecovered.toLocaleString()}</span>
-                </div>
-                <div className="card" style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 4 }}>
-                  <span className="muted" style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase' }}>Internet</span>
-                  <span style={{ fontSize: 16, fontWeight: 700, color: 'var(--blue)' }}>Rs. {internetRecovered.toLocaleString()}</span>
-                </div>
-                <div className="card" style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 4 }}>
-                  <span className="muted" style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase' }}>Cable</span>
-                  <span style={{ fontSize: 16, fontWeight: 700, color: 'var(--purple)' }}>Rs. {cableRecovered.toLocaleString()}</span>
-                </div>
-                <div className="card" style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 4 }}>
-                  <span className="muted" style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase' }}>Payments (Full/Less)</span>
-                  <span style={{ fontSize: 18, fontWeight: 700, color: 'var(--text)' }}>
-                    {fullCount} <span style={{ fontSize: 12, fontWeight: 400, color: 'var(--text-muted)' }}>full</span> / {lessPaidCount} <span style={{ fontSize: 12, fontWeight: 400, color: 'var(--text-muted)' }}>less paid</span>
-                  </span>
-                </div>
-                <div className="card" style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 4 }}>
-                  <span className="muted" style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase' }}>Visits Logged Today</span>
-                  <span style={{ fontSize: 18, fontWeight: 700, color: 'var(--amber)' }}>{visitsCount} customer visits</span>
-                </div>
-              </div>
-            ) : staff.role === 'technician' || staff.role === 'cable_technician' ? (
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                <div className="card" style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 4 }}>
-                  <span className="muted" style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase' }}>Resolved Today</span>
-                  <span style={{ fontSize: 18, fontWeight: 700, color: 'var(--green)' }}>{resolvedCount} jobs</span>
-                </div>
-                <div className="card" style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 4 }}>
-                  <span className="muted" style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase' }}>In Progress</span>
-                  <span style={{ fontSize: 18, fontWeight: 700, color: 'var(--blue)' }}>{activeCount} pending</span>
-                </div>
-              </div>
-            ) : null}
+            <div className="staff-activity-kpis">
+              {isFieldCollector ? (
+                <>
+                  <div className="kpi span-2">
+                    <span className="k">Total recovered</span>
+                    <span className="v brand">Rs. {totalRecovered.toLocaleString()}</span>
+                  </div>
+                  <div className="kpi">
+                    <span className="k">Internet</span>
+                    <span className="v blue">Rs. {internetRecovered.toLocaleString()}</span>
+                  </div>
+                  <div className="kpi">
+                    <span className="k">Cable</span>
+                    <span className="v purple">Rs. {cableRecovered.toLocaleString()}</span>
+                  </div>
+                  <div className="kpi">
+                    <span className="k">Payments</span>
+                    <span className="v">{fullCount}<span className="sub"> full</span> / {lessPaidCount}<span className="sub"> less</span></span>
+                  </div>
+                  <div className="kpi">
+                    <span className="k">Visits</span>
+                    <span className="v amber">{visitsCount}</span>
+                    <span className="sub">customers visited</span>
+                  </div>
+                </>
+              ) : isTech ? (
+                <>
+                  <div className="kpi">
+                    <span className="k">Resolved today</span>
+                    <span className="v green">{resolvedCount}</span>
+                    <span className="sub">jobs closed</span>
+                  </div>
+                  <div className="kpi">
+                    <span className="k">In progress</span>
+                    <span className="v blue">{activeCount}</span>
+                    <span className="sub">open tickets</span>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="kpi">
+                    <span className="k">Active</span>
+                    <span className="v blue">{activeCount}</span>
+                    <span className="sub">complaints</span>
+                  </div>
+                  <div className="kpi">
+                    <span className="k">Resolved</span>
+                    <span className="v green">{resolvedCount}</span>
+                    <span className="sub">today</span>
+                  </div>
+                  {(activity?.payments.length ?? 0) > 0 && (
+                    <div className="kpi span-2">
+                      <span className="k">Payments logged</span>
+                      <span className="v brand">Rs. {totalRecovered.toLocaleString()}</span>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
 
             <Tabs value={currentTab} onChange={setActiveTab} items={tabsList} />
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, flex: 1 }}>
+            <div className="staff-activity-list">
               {currentTab === 'payments' && (
-                <>
-                  {activity?.payments.length === 0 ? (
-                    <div style={{ textAlign: 'center', padding: '30px 10px', color: 'var(--text-muted)', fontSize: 13 }}>
-                      No payments collected on this day.
-                    </div>
-                  ) : (
-                    activity?.payments.map(p => (
-                      <div className="card lift" key={p.id} style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                          <div>
-                            <div style={{ fontWeight: 600, fontSize: 14 }}>{p.customer?.full_name}</div>
-                            <div style={{ fontSize: 11, color: 'var(--brand)', fontFamily: 'monospace', marginTop: 2 }}>
-                              {p.customer?.customer_code}
-                            </div>
-                          </div>
-                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
-                            <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--green)' }}>
-                              Rs. {p.amount.toLocaleString()}
-                            </span>
-                            <div style={{ display: 'flex', gap: 4 }}>
-                              <Badge color={p.service === 'cable' ? 'purple' : 'blue'}>
-                                {p.service === 'cable' ? 'Cable' : 'Internet'}
-                              </Badge>
-                              <Badge color={(p.bill?.status === 'paid' || p.amount >= (p.bill?.amount ?? p.amount)) ? 'green' : 'amber'}>
-                                {(p.bill?.status === 'paid' || p.amount >= (p.bill?.amount ?? p.amount)) ? 'Paid' : 'Less Paid'}
-                              </Badge>
-                            </div>
-                          </div>
-                        </div>
-
-                        <div style={{ fontSize: 12, color: 'var(--text-muted)', display: 'flex', flexDirection: 'column', gap: 4, borderTop: '1px solid var(--border)', paddingTop: 8, marginTop: 4 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                            <Icon name="pin" size={13} style={{ color: 'var(--text-muted)' }} />
-                            <span>{getAddress(p.customer)}</span>
-                          </div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                            <Icon name="clock" size={13} style={{ color: 'var(--text-muted)' }} />
-                            <span>Received at {formatTime(p.paid_at)} via <span style={{ textTransform: 'capitalize' }}>{p.method}</span></span>
-                          </div>
-                          {p.receipt_no && (
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, fontFamily: 'monospace' }}>
-                              <Icon name="checkCircle" size={12} style={{ color: 'var(--text-faint)' }} />
-                              <span>Receipt: {p.receipt_no}</span>
-                            </div>
-                          )}
-                          {p.note && (
-                            <div style={{ marginTop: 4, padding: '4px 8px', background: 'var(--bg-muted)', borderRadius: 4, fontStyle: 'italic', fontSize: 11 }}>
-                              Note: {p.note}
-                            </div>
-                          )}
-                          {p.receipt_url && (
-                            <a
-                              href={p.receipt_url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              style={{
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: 6,
-                                marginTop: 4,
-                                fontSize: 11,
-                                fontWeight: 600,
-                                color: 'var(--brand)',
-                              }}
-                            >
-                              <Icon name="eye" size={12} />
-                              View payment proof
-                            </a>
-                          )}
+                activity?.payments.length === 0 ? (
+                  <div className="staff-activity-empty">No payments collected on this day.</div>
+                ) : activity?.payments.map(p => (
+                  <div className="staff-activity-row" key={p.id}>
+                    <div className="row-top">
+                      <div style={{ minWidth: 0 }}>
+                        <div className="row-name">{p.customer?.full_name}</div>
+                        <div className="row-code">{p.customer?.customer_code}</div>
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 5 }}>
+                        <span className="row-amt">Rs. {p.amount.toLocaleString()}</span>
+                        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                          <Badge color={p.service === 'cable' ? 'purple' : 'blue'}>
+                            {p.service === 'cable' ? 'Cable' : 'Internet'}
+                          </Badge>
+                          <Badge color={(p.bill?.status === 'paid' || p.amount >= (p.bill?.amount ?? p.amount)) ? 'green' : 'amber'}>
+                            {(p.bill?.status === 'paid' || p.amount >= (p.bill?.amount ?? p.amount)) ? 'Paid' : 'Less Paid'}
+                          </Badge>
                         </div>
                       </div>
-                    ))
-                  )}
-                </>
+                    </div>
+                    <div className="row-meta">
+                      <div className="row-meta-line"><Icon name="pin" size={13} /><span>{getAddress(p.customer)}</span></div>
+                      <div className="row-meta-line">
+                        <Icon name="clock" size={13} />
+                        <span>Received at {formatTime(p.paid_at)} · <span style={{ textTransform: 'capitalize' }}>{p.method}</span></span>
+                      </div>
+                      {p.receipt_no && (
+                        <div className="row-meta-line"><Icon name="checkCircle" size={12} /><span>Receipt {p.receipt_no}</span></div>
+                      )}
+                      {p.note && <div className="row-note">Note: {p.note}</div>}
+                      {p.receipt_url && (
+                        <a href={p.receipt_url} target="_blank" rel="noopener noreferrer"
+                          style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, color: 'var(--brand)' }}>
+                          <Icon name="eye" size={12} /> View payment proof
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                ))
               )}
 
               {currentTab === 'visits' && (
-                <>
-                  {activity?.visits.length === 0 ? (
-                    <div style={{ textAlign: 'center', padding: '30px 10px', color: 'var(--text-muted)', fontSize: 13 }}>
-                      No customer visits logged on this day.
+                activity?.visits.length === 0 ? (
+                  <div className="staff-activity-empty">No customer visits logged on this day.</div>
+                ) : activity?.visits.map(v => (
+                  <div className="staff-activity-row" key={v.id}>
+                    <div className="row-top">
+                      <div>
+                        <div className="row-name">{v.customer?.full_name}</div>
+                        <div className="row-code">{v.customer?.customer_code}</div>
+                      </div>
+                      <Badge color="amber">Visit</Badge>
                     </div>
-                  ) : (
-                    activity?.visits.map(v => (
-                      <div className="card lift" key={v.id} style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                          <div>
-                            <div style={{ fontWeight: 600, fontSize: 14 }}>{v.customer?.full_name}</div>
-                            <div style={{ fontSize: 11, color: 'var(--brand)', fontFamily: 'monospace', marginTop: 2 }}>
-                              {v.customer?.customer_code}
-                            </div>
-                          </div>
-                          <Badge color="amber">Visited Only</Badge>
-                        </div>
-
-                        <div style={{ fontSize: 12, color: 'var(--text-muted)', display: 'flex', flexDirection: 'column', gap: 4, borderTop: '1px solid var(--border)', paddingTop: 8, marginTop: 4 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                            <Icon name="pin" size={13} style={{ color: 'var(--text-muted)' }} />
-                            <span>{getAddress(v.customer)}</span>
-                          </div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                            <Icon name="clock" size={13} style={{ color: 'var(--text-muted)' }} />
-                            <span>Visited today (Target Bill: Rs. {v.amount})</span>
-                          </div>
-                          {v.payment_note && (
-                            <div style={{ marginTop: 4, padding: '6px 8px', background: 'var(--bg-muted)', borderRadius: 4, fontSize: 12, color: 'var(--text)' }}>
-                              <strong>Visit:</strong> {formatVisitNote(v.payment_note)}
-                              {v.payment_note === 'promise_to_pay' && v.promised_date && (
-                                <span> — <strong>Promised:</strong> {formatPromisedDate(v.promised_date)}</span>
-                              )}
-                            </div>
+                    <div className="row-meta">
+                      <div className="row-meta-line"><Icon name="pin" size={13} /><span>{getAddress(v.customer)}</span></div>
+                      <div className="row-meta-line">
+                        <Icon name="cash" size={13} />
+                        <span>Target bill Rs. {v.amount.toLocaleString()}</span>
+                      </div>
+                      {v.payment_note && (
+                        <div className="row-note">
+                          <strong>Visit:</strong> {formatVisitNote(v.payment_note)}
+                          {v.payment_note === 'promise_to_pay' && v.promised_date && (
+                            <> — <strong>Promised:</strong> {formatPromisedDate(v.promised_date)}</>
                           )}
                         </div>
-                      </div>
-                    ))
-                  )}
-                </>
+                      )}
+                    </div>
+                  </div>
+                ))
               )}
 
               {currentTab === 'active' && (
-                <>
-                  {activity?.activeComplaints.length === 0 ? (
-                    <div style={{ textAlign: 'center', padding: '30px 10px', color: 'var(--text-muted)', fontSize: 13 }}>
-                      No active complaints assigned.
-                    </div>
-                  ) : (
-                    activity?.activeComplaints.map(c => (
-                      <div className="card lift" key={c.id} style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                          <div>
-                            <div style={{ fontWeight: 600, fontSize: 14 }}>{c.customer?.full_name}</div>
-                            <div style={{ fontSize: 11, color: 'var(--brand)', fontFamily: 'monospace', marginTop: 2 }}>
-                              {c.complaint_code}
-                            </div>
-                          </div>
-                          <div style={{ display: 'flex', gap: 6 }}>
-                            <Badge color={c.priority === 'high' ? 'red' : c.priority === 'medium' ? 'amber' : 'blue'}>
-                              {c.priority}
-                            </Badge>
-                            <Badge color={c.status === 'in_progress' ? 'blue' : 'gray'}>
-                              {c.status === 'in_progress' ? 'In Progress' : 'Open'}
-                            </Badge>
-                          </div>
-                        </div>
-
-                        <div style={{ fontSize: 13, background: 'var(--bg-muted)', padding: '6px 8px', borderRadius: 4, marginTop: 4 }}>
-                          <strong>Issue:</strong> {c.issue}
-                        </div>
-
-                        <div style={{ fontSize: 12, color: 'var(--text-muted)', display: 'flex', flexDirection: 'column', gap: 4, borderTop: '1px solid var(--border)', paddingTop: 8 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                            <Icon name="pin" size={13} style={{ color: 'var(--text-muted)' }} />
-                            <span>{getAddress(c.customer)}</span>
-                          </div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                            <Icon name="clock" size={13} style={{ color: 'var(--text-muted)' }} />
-                            <span>Assigned/Opened: {new Date(c.opened_at).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
-                          </div>
-                        </div>
+                activity?.activeComplaints.length === 0 ? (
+                  <div className="staff-activity-empty">No active complaints assigned.</div>
+                ) : activity?.activeComplaints.map(c => (
+                  <div className="staff-activity-row" key={c.id}>
+                    <div className="row-top">
+                      <div>
+                        <div className="row-name">{c.customer?.full_name}</div>
+                        <div className="row-code">{c.complaint_code}</div>
                       </div>
-                    ))
-                  )}
-                </>
+                      <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                        <Badge color={c.priority === 'high' ? 'red' : c.priority === 'medium' ? 'amber' : 'blue'}>{c.priority}</Badge>
+                        <Badge color={c.status === 'in_progress' ? 'blue' : 'gray'}>
+                          {c.status === 'in_progress' ? 'In Progress' : 'Open'}
+                        </Badge>
+                      </div>
+                    </div>
+                    <div className="row-note"><strong>Issue:</strong> {c.issue}</div>
+                    <div className="row-meta">
+                      <div className="row-meta-line"><Icon name="pin" size={13} /><span>{getAddress(c.customer)}</span></div>
+                      <div className="row-meta-line">
+                        <Icon name="clock" size={13} />
+                        <span>Opened {new Date(c.opened_at).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                      </div>
+                    </div>
+                  </div>
+                ))
               )}
 
               {currentTab === 'resolved' && (
-                <>
-                  {activity?.resolvedComplaints.length === 0 ? (
-                    <div style={{ textAlign: 'center', padding: '30px 10px', color: 'var(--text-muted)', fontSize: 13 }}>
-                      No complaints resolved on this day.
-                    </div>
-                  ) : (
-                    activity?.resolvedComplaints.map(c => (
-                      <div className="card lift" key={c.id} style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                          <div>
-                            <div style={{ fontWeight: 600, fontSize: 14 }}>{c.customer?.full_name}</div>
-                            <div style={{ fontSize: 11, color: 'var(--brand)', fontFamily: 'monospace', marginTop: 2 }}>
-                              {c.complaint_code}
-                            </div>
-                          </div>
-                          <Badge color="green">Resolved</Badge>
-                        </div>
-
-                        <div style={{ fontSize: 13, background: 'var(--bg-muted)', padding: '6px 8px', borderRadius: 4, marginTop: 4 }}>
-                          <strong>Resolved Issue:</strong> {c.issue}
-                        </div>
-
-                        <div style={{ fontSize: 12, color: 'var(--text-muted)', display: 'flex', flexDirection: 'column', gap: 4, borderTop: '1px solid var(--border)', paddingTop: 8 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                            <Icon name="pin" size={13} style={{ color: 'var(--text-muted)' }} />
-                            <span>{getAddress(c.customer)}</span>
-                          </div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                            <Icon name="clock" size={13} style={{ color: 'var(--text-muted)' }} />
-                            <span>Resolved at {formatTime(c.resolved_at)}</span>
-                          </div>
-                        </div>
+                activity?.resolvedComplaints.length === 0 ? (
+                  <div className="staff-activity-empty">No complaints resolved on this day.</div>
+                ) : activity?.resolvedComplaints.map(c => (
+                  <div className="staff-activity-row" key={c.id}>
+                    <div className="row-top">
+                      <div>
+                        <div className="row-name">{c.customer?.full_name}</div>
+                        <div className="row-code">{c.complaint_code}</div>
                       </div>
-                    ))
-                  )}
-                </>
+                      <Badge color="green">Resolved</Badge>
+                    </div>
+                    <div className="row-note"><strong>Issue:</strong> {c.issue}</div>
+                    <div className="row-meta">
+                      <div className="row-meta-line"><Icon name="pin" size={13} /><span>{getAddress(c.customer)}</span></div>
+                      <div className="row-meta-line"><Icon name="clock" size={13} /><span>Resolved at {formatTime(c.resolved_at)}</span></div>
+                    </div>
+                  </div>
+                ))
               )}
             </div>
           </>
@@ -1043,7 +1003,7 @@ function StaffActivityDrawer({ staff, onClose }: {
       </div>
 
       <div className="drawer-foot">
-        <button className="btn btn-primary" onClick={onClose}>Done</button>
+        <button className="btn btn-secondary" onClick={onClose}>Close</button>
       </div>
     </Drawer>
   );
@@ -1061,156 +1021,127 @@ function StaffCard({ s, onEdit, onViewCreds, onToggleActive, onDelete, onViewAct
 }) {
   const roleLabel = ROLE_LABELS[s.role] ?? s.role;
   const roleColor = ROLE_COLORS[s.role] ?? 'gray';
+  const accent = ROLE_ACCENT[s.role] ?? 'var(--border-strong)';
   const [menuOpen, setMenuOpen] = useState(false);
 
+  const internetAreas = s.areas?.length
+    ? s.areas.map(a => a.name).join(', ')
+    : (s.area?.name ?? null);
+  const cableAreas = s.cable_areas?.length
+    ? s.cable_areas.map(a => a.name).join(', ')
+    : null;
+
+  const pages = s.role === 'complaint_manager' ? getAllowedPages(s) : [];
+  const pagePreview = pages.slice(0, 3);
+  const pageExtra = pages.length - pagePreview.length;
+
+  const typeLabel = s.role === 'admin'
+    ? 'Full dashboard'
+    : s.role === 'complaint_manager'
+      ? `${pages.length} page${pages.length === 1 ? '' : 's'}`
+      : 'Mobile app';
+
   return (
-    <div className="card staff-card lift" style={{ position: 'relative', overflow: 'visible' }}>
-      <div className="head" style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1, minWidth: 0 }}>
-          <span className={`av ${avClass(s.full_name)}`} style={{ width: 44, height: 44, fontSize: 14 }}>
+    <div className={`card staff-card lift${s.is_active ? '' : ' is-inactive'}`} style={{ position: 'relative', overflow: 'visible' }}>
+      <div className="role-accent" style={{ background: accent }} />
+      <div className="staff-card-body">
+        <div className="head">
+          <span className={`av ${avClass(s.full_name)}`} style={{ width: 44, height: 44, fontSize: 14, flexShrink: 0 }}>
             {initials(s.full_name)}
           </span>
-          <div className="who" style={{ flex: 1, minWidth: 0 }}>
-            <div className="nm" style={{ fontWeight: 600, fontSize: 15, textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>{s.full_name}</div>
-            <div className="ph mono" style={{ fontSize: 11, marginTop: 2 }}>
+          <div className="who">
+            <div className="nm" title={s.full_name}>{s.full_name}</div>
+            <div className="ph">
               {s.username
-                ? <span style={{ color: 'var(--brand)' }}>@{s.username}</span>
-                : <span style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>no username</span>
-              }
+                ? <span style={{ color: 'var(--brand)', fontWeight: 600 }}>@{s.username}</span>
+                : <span style={{ fontStyle: 'italic' }}>no username</span>}
+            </div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 4, position: 'relative', flexShrink: 0 }}>
+            <Badge color={roleColor}>{roleLabel}</Badge>
+            <div style={{ position: 'relative' }}>
+              <button
+                className="icon-btn"
+                style={{ width: 28, height: 28, borderRadius: 8 }}
+                onClick={() => setMenuOpen(v => !v)}
+                title="More actions"
+                aria-label="More actions"
+              >
+                <Icon name="moreV" size={15} />
+              </button>
+              {menuOpen && (
+                <>
+                  <div style={{ position: 'fixed', inset: 0, zIndex: 15 }} onClick={() => setMenuOpen(false)} />
+                  <div className="staff-menu">
+                    <button type="button" onClick={() => { setMenuOpen(false); onEdit(); }}>
+                      <Icon name="edit" size={13} /> Edit details
+                    </button>
+                    <button type="button" onClick={() => { setMenuOpen(false); onViewCreds(); }}>
+                      <Icon name="key" size={13} /> Credentials
+                    </button>
+                    <div className="menu-sep" />
+                    <button type="button" className="danger" onClick={() => { setMenuOpen(false); onDelete(); }}>
+                      <Icon name="trash" size={13} /> Remove staff
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>
-        
-        <div style={{ display: 'flex', alignItems: 'center', gap: 4, position: 'relative' }}>
-          <Badge color={roleColor}>{roleLabel}</Badge>
-          
-          <div style={{ position: 'relative' }}>
-            <button 
-              className="icon-btn" 
-              style={{ width: 28, height: 28, borderRadius: '50%', border: 'none', background: 'none' }}
-              onClick={() => setMenuOpen(!menuOpen)}
-              title="More actions"
-            >
-              <Icon name="moreV" size={16} />
-            </button>
-            
-            {menuOpen && (
-              <>
-                <div 
-                  style={{ position: 'fixed', inset: 0, zIndex: 998 }} 
-                  onClick={() => setMenuOpen(false)} 
-                />
-                <div style={{
-                  position: 'absolute',
-                  right: 0,
-                  top: '100%',
-                  marginTop: 4,
-                  background: 'var(--bg-elev)',
-                  border: '1px solid var(--border)',
-                  borderRadius: 10,
-                  boxShadow: '0 8px 24px rgba(0, 0, 0, 0.12)',
-                  zIndex: 999,
-                  minWidth: 160,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  overflow: 'hidden',
-                  padding: '4px 0'
-                }}>
-                  <button 
-                    className="menu-item-btn"
-                    style={{
-                      display: 'flex', alignItems: 'center', gap: 8, width: '100%', border: 'none',
-                      background: 'none', padding: '8px 12px', fontSize: 13, cursor: 'pointer',
-                      textAlign: 'left', color: 'var(--text)', transition: 'background 0.2s'
-                    }}
-                    onClick={() => { setMenuOpen(false); onEdit(); }}
-                    onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-muted)')}
-                    onMouseLeave={e => (e.currentTarget.style.background = 'none')}
-                  >
-                    <Icon name="edit" size={13} />
-                    Edit Details
-                  </button>
-                  <button 
-                    className="menu-item-btn"
-                    style={{
-                      display: 'flex', alignItems: 'center', gap: 8, width: '100%', border: 'none',
-                      background: 'none', padding: '8px 12px', fontSize: 13, cursor: 'pointer',
-                      textAlign: 'left', color: 'var(--text)', transition: 'background 0.2s'
-                    }}
-                    onClick={() => { setMenuOpen(false); onViewCreds(); }}
-                    onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-muted)')}
-                    onMouseLeave={e => (e.currentTarget.style.background = 'none')}
-                  >
-                    <Icon name="key" size={13} />
-                    Credentials
-                  </button>
-                  <div style={{ borderTop: '1px solid var(--border)', margin: '4px 0' }} />
-                  <button 
-                    className="menu-item-btn"
-                    style={{
-                      display: 'flex', alignItems: 'center', gap: 8, width: '100%', border: 'none',
-                      background: 'none', padding: '8px 12px', fontSize: 13, cursor: 'pointer',
-                      textAlign: 'left', color: 'var(--red)', transition: 'background 0.2s'
-                    }}
-                    onClick={() => { setMenuOpen(false); onDelete(); }}
-                    onMouseEnter={e => (e.currentTarget.style.background = 'var(--red-50)')}
-                    onMouseLeave={e => (e.currentTarget.style.background = 'none')}
-                  >
-                    <Icon name="trash" size={13} style={{ color: 'var(--red)' }} />
-                    Remove Staff
-                  </button>
-                </div>
-              </>
-            )}
+
+        <div className="meta-list">
+          <div className="meta-row">
+            <Icon name="pin" size={13} />
+            <span title={internetAreas ?? 'No internet area'}>
+              {internetAreas ? `Internet · ${internetAreas}` : 'No internet area'}
+            </span>
+          </div>
+          {cableAreas && (
+            <div className="meta-row">
+              <Icon name="tv" size={13} />
+              <span title={cableAreas}>Cable · {cableAreas}</span>
+            </div>
+          )}
+          {s.phone && (
+            <div className="meta-row">
+              <Icon name="phone" size={13} />
+              <span className="mono">{s.phone}</span>
+            </div>
+          )}
+        </div>
+
+        <div className="stats-row">
+          <div className="stat-mini">
+            <div className="k">Access</div>
+            <div className="v">{typeLabel}</div>
+          </div>
+          <div className="stat-mini">
+            <div className="k">Status</div>
+            <div className="v" style={{ color: s.is_active ? 'var(--green)' : 'var(--text-muted)' }}>
+              {s.is_active ? 'Active' : 'Inactive'}
+            </div>
           </div>
         </div>
-      </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, margin: '8px 0 12px 0' }}>
-        <div className="row gap-sm" style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-          <Icon name="pin" size={13} />
-          <span style={{
-            textOverflow: 'ellipsis',
-            overflow: 'hidden',
-            whiteSpace: 'nowrap',
-            flex: 1
-          }} title={s.areas && s.areas.length > 0 ? s.areas.map(a => a.name).join(', ') : (s.area?.name ?? 'No area assigned')}>
-            {s.areas && s.areas.length > 0
-              ? s.areas.map(a => a.name).join(', ')
-              : (s.area?.name ?? 'No area assigned')
-            }
-          </span>
-        </div>
-        {s.phone && (
-          <div className="row gap-sm" style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-            <Icon name="phone" size={13} />
-            <span className="mono" style={{ flex: 1 }}>{s.phone}</span>
+        {s.role === 'complaint_manager' && pagePreview.length > 0 && (
+          <div className="access-pills">
+            {pagePreview.map(page => (
+              <span key={page} className="access-pill">{PAGE_LABELS[page]}</span>
+            ))}
+            {pageExtra > 0 && <span className="access-pill more">+{pageExtra} more</span>}
           </div>
         )}
       </div>
 
-      <div className="foot" style={{ 
-        display: 'flex', 
-        alignItems: 'center', 
-        justifyContent: 'space-between', 
-        gap: 12, 
-        paddingTop: 12, 
-        borderTop: '1px solid var(--border)',
-        marginTop: 'auto'
-      }}>
-        <div className="row gap-sm">
+      <div className="foot">
+        <div className="foot-status">
           <Switch on={s.is_active} onChange={onToggleActive} />
-          <span style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 500 }}>
-            {s.is_active ? 'Active' : 'Inactive'}
-          </span>
+          <span>{s.is_active ? 'Active' : 'Inactive'}</span>
         </div>
         {s.role !== 'admin' && (
-          <button 
-            className="btn btn-secondary btn-sm" 
-            onClick={onViewActivity}
-            style={{ padding: '6px 12px', borderRadius: 8, display: 'flex', alignItems: 'center', gap: 6 }}
-          >
-            <Icon name="chart" size={12} />Activity
+          <button className="btn btn-secondary btn-sm" onClick={onViewActivity} style={{ borderRadius: 8, gap: 6 }}>
+            <Icon name="chart" size={12} /> Activity
           </button>
         )}
       </div>
@@ -1252,7 +1183,15 @@ export default function StaffPage({ onCatalogChange }: { onCatalogChange?: () =>
     const sAreaIds = saved.area_ids || [];
     const sAreas = areas.filter(a => sAreaIds.includes(a.id));
     const area = areas.find(a => a.id === saved.area_id) ?? sAreas[0] ?? null;
-    const withArea: StaffWithArea = { ...saved, area, areas: sAreas };
+    const sCableAreaIds = saved.cable_area_ids || [];
+    const sCableAreas = areas.filter(a => sCableAreaIds.includes(a.id));
+    const withArea: StaffWithArea = {
+      ...saved,
+      area,
+      areas: sAreas,
+      cable_areas: sCableAreas,
+      allowed_pages: saved.allowed_pages ?? null,
+    };
     setStaff(prev => {
       const idx = prev.findIndex(s => s.id === saved.id);
       if (idx >= 0) { const next = [...prev]; next[idx] = withArea; return next; }
@@ -1330,19 +1269,21 @@ export default function StaffPage({ onCatalogChange }: { onCatalogChange?: () =>
   );
 
   const byRole = (role: StaffRole) => visibleStaff.filter(s => s.role === role);
-  const dashUsers   = visibleStaff.filter(s => DASHBOARD_ROLES.has(s.role));
+  const admins = byRole('admin');
+  const customAccess = byRole('complaint_manager');
   const technicians = byRole('technician');
   const cableTechnicians = byRole('cable_technician');
-  const agents      = byRole('recovery_agent');
-  const helpers     = byRole('helper');
+  const agents = byRole('recovery_agent');
+  const helpers = byRole('helper');
 
   const roleFilters = [
     { value: 'all', label: 'All', count: visibleStaff.length },
-    { value: 'dashboard', label: 'Dashboard Users', count: dashUsers.length, color: 'var(--purple)' },
-    { value: 'technician', label: 'Internet Technicians', count: technicians.length, color: 'var(--blue)' },
-    { value: 'cable_technician', label: 'Cable Technicians', count: cableTechnicians.length, color: 'var(--purple)' },
-    { value: 'recovery_agent', label: 'Recovery Agents', count: agents.length, color: 'var(--amber)' },
-    { value: 'helper', label: 'Helpers', count: helpers.length, color: 'var(--green)' }
+    { value: 'admin', label: 'Admins', count: admins.length, color: ROLE_DOT.admin },
+    { value: 'complaint_manager', label: 'Custom Access', count: customAccess.length, color: ROLE_DOT.complaint_manager },
+    { value: 'technician', label: 'Internet Technicians', count: technicians.length, color: ROLE_DOT.technician },
+    { value: 'cable_technician', label: 'Cable Technicians', count: cableTechnicians.length, color: ROLE_DOT.cable_technician },
+    { value: 'recovery_agent', label: 'Recovery Agents', count: agents.length, color: ROLE_DOT.recovery_agent },
+    { value: 'helper', label: 'Helpers', count: helpers.length, color: ROLE_DOT.helper },
   ];
 
   const filteredStaff = visibleStaff.filter(s => {
@@ -1359,7 +1300,7 @@ export default function StaffPage({ onCatalogChange }: { onCatalogChange?: () =>
           <p>
             {activePageTab === 'members' ? (
               <>
-                {visibleStaff.length} total · {dashUsers.length} dashboard · {technicians.length} technicians · {cableTechnicians.length} cable techs · {agents.length} recovery agents
+                {visibleStaff.length} total · {admins.length} admin · {customAccess.length} custom · {technicians.length} internet · {cableTechnicians.length} cable · {agents.length} recovery
                 {helpers.length > 0 ? ` · ${helpers.length} helpers` : ''}
               </>
             ) : (
@@ -1457,56 +1398,48 @@ export default function StaffPage({ onCatalogChange }: { onCatalogChange?: () =>
         </div>
       ) : (
         <>
-          <div style={{ display: 'flex', gap: 8, marginBottom: 18, flexWrap: 'wrap', alignItems: 'center' }}>
+          <div className="staff-role-chips" role="tablist" aria-label="Filter staff by role">
             {roleFilters.map(filter => {
               const isActive = selectedRoleFilter === filter.value;
               return (
                 <button
                   key={filter.value}
-                  className={`btn ${isActive ? 'btn-primary' : 'btn-secondary'} btn-sm`}
-                  style={{
-                    borderRadius: 20,
-                    padding: '6px 14px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 6,
-                    fontSize: 12,
-                    fontWeight: 600,
-                    border: '1px solid var(--border)',
-                    boxShadow: isActive ? '0 2px 8px rgba(240, 90, 43, 0.2)' : 'none'
-                  }}
+                  type="button"
+                  role="tab"
+                  aria-selected={isActive}
+                  className={`staff-role-chip${isActive ? ' is-active' : ''}`}
                   onClick={() => setSelectedRoleFilter(filter.value)}
                 >
-                  {filter.color && (
-                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: filter.color }} />
-                  )}
+                  {filter.color && <span className="chip-dot" style={{ background: filter.color }} />}
                   {filter.label}
-                  <span style={{ 
-                    fontSize: 10, 
-                    background: isActive ? 'rgba(255,255,255,0.2)' : 'var(--bg-muted)', 
-                    padding: '1px 6px', 
-                    borderRadius: 10,
-                    color: isActive ? 'white' : 'var(--text-muted)'
-                  }}>{filter.count}</span>
+                  <span className="chip-count">{filter.count}</span>
                 </button>
               );
             })}
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 14 }}>
-            {filteredStaff.map(s => (
-              <StaffCard key={s.id} s={s}
-                onEdit={() => setEditTarget(s)}
-                onViewCreds={() => setCredsTarget(s)}
-                onToggleActive={v => handleToggleActive(s, v)}
-                onDelete={() => setDeleteTarget(s)}
-                onViewActivity={() => setActivityTarget(s)} />
-            ))}
-          </div>
+          {filteredStaff.length === 0 ? (
+            <div className="card" style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)' }}>
+              <Icon name="filter" size={26} style={{ color: 'var(--text-faint)', marginBottom: 12 }} />
+              <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text)', marginBottom: 4 }}>No staff in this filter</div>
+              <div style={{ fontSize: 13 }}>Try another role chip or add a new staff member.</div>
+            </div>
+          ) : (
+            <div className="staff-grid">
+              {filteredStaff.map(s => (
+                <StaffCard key={s.id} s={s}
+                  onEdit={() => setEditTarget(s)}
+                  onViewCreds={() => setCredsTarget(s)}
+                  onToggleActive={v => handleToggleActive(s, v)}
+                  onDelete={() => setDeleteTarget(s)}
+                  onViewActivity={() => setActivityTarget(s)} />
+              ))}
+            </div>
+          )}
         </>
       )}
 
-      {visibleStaff.length === 0 && (
+      {activePageTab === 'members' && visibleStaff.length === 0 && (
         <div className="card" style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)' }}>
           <Icon name="briefcase" size={28} style={{ color: 'var(--text-faint)', marginBottom: 12 }} />
           <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text)', marginBottom: 4 }}>No staff yet</div>
