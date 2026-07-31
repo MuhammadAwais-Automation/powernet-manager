@@ -310,7 +310,7 @@ export default function BillingPage({
   const [followUpBill, setFollowUpBill] = useState<BillWithRelations | null>(null);
 
   const PAGE_SIZE = 50;
-  const showCallAndVisitDetails = tab === "CallToAction" || tab === "FollowUp";
+  const showCallAndVisitDetails = tab === "Visited" || tab === "FollowUp";
 
   // ── Debounce search ──────────────────────────────────────────────────────────
   useEffect(() => {
@@ -394,7 +394,7 @@ export default function BillingPage({
       setSummary(billingSummary);
       setLedgerSummary(ledger);
       setAreas(areaRows);
-      if ((tab0 === "CallToAction" || tab0 === "FollowUp") && billPage.rows.length > 0) {
+      if ((tab0 === "Visited" || tab0 === "FollowUp") && billPage.rows.length > 0) {
         const stats = await getBillCallStats(billPage.rows.map((b) => b.id));
         setCallStats(stats);
       } else {
@@ -909,11 +909,6 @@ export default function BillingPage({
                   count: summary?.visitedBills ?? 0,
                 },
                 {
-                  value: "CallToAction",
-                  label: "Call to Action",
-                  count: summary?.callToActionBills ?? 0,
-                },
-                {
                   value: "FollowUp",
                   label: "Follow Up",
                   count: summary?.followUpBills ?? 0,
@@ -1187,7 +1182,7 @@ export default function BillingPage({
                               <Icon name="cash" size={14} />
                             </button>
                           )}
-                          {(tab === "Visited" || tab === "CallToAction" || tab === "FollowUp") && (
+                          {(tab === "Visited" || tab === "FollowUp") && (
                             <button
                               className="icon-btn"
                               style={{ width: 28, height: 28, color: "var(--red)" }}

@@ -250,6 +250,8 @@ export type Staff = {
   cable_area_ids: string[] | null;
   username: string | null;
   auth_user_id: string | null;
+  /** Dashboard page IDs for custom access. Null = role default. Ignored for admin. */
+  allowed_pages: string[] | null;
   is_active: boolean;
   created_at: string;
 };

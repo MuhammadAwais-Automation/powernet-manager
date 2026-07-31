@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { createOrReuseStaffAuthUser } from '@/lib/admin/staff-auth-users'
+import { sanitizeAllowedPages, type PageId } from '@/lib/auth/permissions'
 
 const USERNAME_DOMAIN = '@powernet.local'
 
@@ -26,10 +27,14 @@ export async function POST(req: Request) {
   const body = await req.json().catch(() => null)
   if (!body) return NextResponse.json({ error: 'Bad request' }, { status: 400 })
 
-  const { username, password, full_name, phone, area_id, area_ids, cable_area_ids, role: newRole } = body as {
+  const {
+    username, password, full_name, phone, area_id, area_ids, cable_area_ids,
+    role: newRole, allowed_pages,
+  } = body as {
     username?: string; password?: string; full_name?: string;
     phone?: string | null; area_id?: string | null; area_ids?: string[] | null;
     cable_area_ids?: string[] | null; role?: string;
+    allowed_pages?: string[] | null;
   }
 
   if (!username || !password || !full_name || !newRole) {
@@ -37,6 +42,14 @@ export async function POST(req: Request) {
   }
   if (newRole !== 'admin' && newRole !== 'complaint_manager') {
     return NextResponse.json({ error: 'Invalid dashboard role' }, { status: 400 })
+  }
+
+  let pages: PageId[] | null = null
+  if (newRole === 'complaint_manager') {
+    pages = sanitizeAllowedPages(allowed_pages)
+    if (pages.length === 0) {
+      return NextResponse.json({ error: 'Select at least one page for custom access' }, { status: 400 })
+    }
   }
 
   const normalizedUsername = username.trim().toLowerCase()
@@ -80,9 +93,10 @@ export async function POST(req: Request) {
       cable_area_ids: cable_area_ids ?? null,
       username: normalizedUsername,
       auth_user_id: authUser.id,
+      allowed_pages: newRole === 'admin' ? null : pages,
       is_active: true,
     })
-    .select('id, full_name, role, phone, area_id, area_ids, cable_area_ids, username, auth_user_id, is_active, created_at')
+    .select('id, full_name, role, phone, area_id, area_ids, cable_area_ids, username, auth_user_id, allowed_pages, is_active, created_at')
     .single()
 
   if (staffErr || !staffRow) {

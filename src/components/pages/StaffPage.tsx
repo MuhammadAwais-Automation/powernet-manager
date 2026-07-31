@@ -3,11 +3,12 @@ import React, { useState, useEffect } from 'react';
 import Icon from '../Icon';
 import { Badge, Switch, Modal, Drawer, Tabs } from '../ui';
 import { supabase } from '@/lib/supabase';
-import { getStaff, updateStaff, updateStaffPassword, deleteStaff, getStaffActivity, invalidateStaffCache, type StaffActivity } from '@/lib/db/staff';
+import { getStaff, updateStaff, updateStaffPassword, getStaffActivity, invalidateStaffCache, type StaffActivity } from '@/lib/db/staff';
 import { getAreas } from '@/lib/db/areas';
 import { getTeams, createTeam, updateTeam, deleteTeam, updateTeamMembers } from '@/lib/db/teams';
 import { initials, avClass } from '@/lib/utils';
 import { useAuth } from '@/lib/auth/auth-context';
+import { ALL_PAGE_IDS, PAGE_LABELS, getAllowedPages, type PageId } from '@/lib/auth/permissions';
 import { formatPromisedDate, formatVisitNote } from '@/lib/notifications/billing';
 import type { Staff, StaffWithArea, Area, StaffRole, Team, TeamWithMembers } from '@/types/database';
 
@@ -17,7 +18,7 @@ const ROLE_LABELS: Record<string, string> = {
   recovery_agent:    'Recovery Agent',
   helper:            'Helper',
   admin:             'Admin',
-  complaint_manager: 'Complaint Manager',
+  complaint_manager: 'Custom access',
 };
 
 const ROLE_COLORS: Record<string, 'blue' | 'amber' | 'green' | 'purple' | 'gray'> = {
@@ -39,8 +40,11 @@ const MOBILE_STAFF_ROLE_OPTIONS = [
 ] as const;
 
 const DASHBOARD_STAFF_ROLE_OPTIONS = [
-  { value: 'complaint_manager', label: 'Complaint Manager' },
+  { value: 'admin', label: 'Admin' },
+  { value: 'complaint_manager', label: 'Custom access' },
 ] as const;
+
+const DEFAULT_CUSTOM_PAGES: PageId[] = ['complaints', 'customers'];
 
 async function getAuthHeaders(): Promise<Record<string, string>> {
   const { data: { session } } = await supabase.auth.getSession();
@@ -50,13 +54,20 @@ async function getAuthHeaders(): Promise<Record<string, string>> {
 
 // ── Add / Edit Staff Modal ────────────────────────────────────────────────────
 
-function StaffFormModal({ open, onClose, areas, onSaved, editTarget }: {
+function StaffFormModal({ open, onClose, areas, onSaved, editTarget, activeAdminCount }: {
   open: boolean;
   onClose: () => void;
   areas: Area[];
   onSaved: (s: Staff) => void;
   editTarget?: StaffWithArea;
+  activeAdminCount: number;
 }) {
+  const initialPages = editTarget
+    ? (editTarget.role === 'admin'
+      ? [...ALL_PAGE_IDS]
+      : getAllowedPages(editTarget))
+    : [...DEFAULT_CUSTOM_PAGES];
+
   const [form, setForm] = useState({
     full_name: editTarget?.full_name ?? '',
     phone:     editTarget?.phone     ?? '',
@@ -65,6 +76,7 @@ function StaffFormModal({ open, onClose, areas, onSaved, editTarget }: {
     cable_area_ids: editTarget?.cable_area_ids ?? [],
     username:  editTarget?.username  ?? '',
     password:  '',
+    allowed_pages: initialPages as PageId[],
   });
   const [showPw, setShowPw]   = useState(false);
   const [saving, setSaving]   = useState(false);
@@ -72,10 +84,49 @@ function StaffFormModal({ open, onClose, areas, onSaved, editTarget }: {
 
   const set = (k: string, v: string | string[]) => setForm(f => ({ ...f, [k]: v }));
 
+  const isDashboardRole = DASHBOARD_ROLES.has(form.role);
+  const isAdminRole = form.role === 'admin';
+  const isCustomAccess = form.role === 'complaint_manager';
+
+  const handleRoleChange = (role: string) => {
+    const nextRole = role as StaffRole;
+    setForm(f => {
+      let pages = f.allowed_pages;
+      if (nextRole === 'admin') pages = [...ALL_PAGE_IDS];
+      else if (nextRole === 'complaint_manager' && (f.role === 'admin' || pages.length === 0)) {
+        pages = [...DEFAULT_CUSTOM_PAGES];
+      }
+      return { ...f, role: nextRole, allowed_pages: pages };
+    });
+  };
+
+  const togglePage = (page: PageId) => {
+    if (isAdminRole) return;
+    setForm(f => {
+      const has = f.allowed_pages.includes(page);
+      const next = has
+        ? f.allowed_pages.filter(p => p !== page)
+        : [...f.allowed_pages, page];
+      return { ...f, allowed_pages: next };
+    });
+  };
+
   const handleSubmit = async () => {
     if (!form.full_name.trim()) { setError('Name required'); return; }
     if (!editTarget && !form.username.trim()) { setError('Username required'); return; }
     if (!editTarget && !form.password.trim()) { setError('Password required'); return; }
+    if (isCustomAccess && form.allowed_pages.length === 0) {
+      setError('Select at least one page for custom access');
+      return;
+    }
+    if (
+      editTarget?.role === 'admin' &&
+      form.role !== 'admin' &&
+      activeAdminCount <= 1
+    ) {
+      setError('Cannot demote the last active admin');
+      return;
+    }
     setSaving(true);
     setError(null);
     try {
@@ -87,6 +138,11 @@ function StaffFormModal({ open, onClose, areas, onSaved, editTarget }: {
           phone:     form.phone || null,
           area_ids:  form.area_ids,
           cable_area_ids: form.cable_area_ids,
+          allowed_pages: form.role === 'admin'
+            ? null
+            : form.role === 'complaint_manager'
+              ? form.allowed_pages
+              : null,
         };
         if (form.username.trim()) patch.username = form.username.trim().toLowerCase();
         saved = await updateStaff(editTarget.id, patch);
@@ -104,6 +160,7 @@ function StaffFormModal({ open, onClose, areas, onSaved, editTarget }: {
               area_ids:  form.area_ids,
               cable_area_ids: form.cable_area_ids,
               role:      form.role,
+              allowed_pages: form.role === 'complaint_manager' ? form.allowed_pages : null,
             }),
           });
           if (!res.ok) {
@@ -144,7 +201,7 @@ function StaffFormModal({ open, onClose, areas, onSaved, editTarget }: {
   };
 
   return (
-    <Modal open={open} onClose={onClose} width={480}>
+    <Modal open={open} onClose={onClose} width={520}>
       <div className="modal-head">
         <div>
           <div style={{ fontSize: 17, fontWeight: 600, letterSpacing: '-0.01em' }}>
@@ -178,8 +235,7 @@ function StaffFormModal({ open, onClose, areas, onSaved, editTarget }: {
           </div>
           <div className="field" style={{ gridColumn: 'span 2' }}>
             <label>Role *</label>
-            <select className="select" value={form.role} onChange={e => set('role', e.target.value)}>
-              {editTarget?.role === 'admin' && <option value="admin">Admin (fixed)</option>}
+            <select className="select" value={form.role} onChange={e => handleRoleChange(e.target.value)}>
               <optgroup label="Mobile App Roles">
                 {MOBILE_STAFF_ROLE_OPTIONS.map(role => (
                   <option key={role.value} value={role.value}>{role.label}</option>
@@ -192,10 +248,55 @@ function StaffFormModal({ open, onClose, areas, onSaved, editTarget }: {
               </optgroup>
             </select>
             <div className="muted" style={{ fontSize: 11, marginTop: 6 }}>
-              Internet and Cable technicians handle field complaints in the mobile app.
+              Admin has full access. Custom access lets you pick sections below.
             </div>
           </div>
         </div>
+
+        {isDashboardRole && (
+          <div className="field" style={{ marginBottom: 16 }}>
+            <label style={{ display: 'block', marginBottom: 6, fontWeight: 500 }}>Page access</label>
+            <div style={{
+              border: '1px solid var(--border)',
+              borderRadius: 8,
+              padding: '10px 12px',
+              background: 'var(--bg-muted)',
+              display: 'grid',
+              gridTemplateColumns: '1fr 1fr',
+              gap: 8,
+            }}>
+              {ALL_PAGE_IDS.map(page => {
+                const checked = isAdminRole || form.allowed_pages.includes(page);
+                return (
+                  <label key={page} style={{
+                    display: 'flex', alignItems: 'center', gap: 8, fontSize: 13,
+                    cursor: isAdminRole ? 'default' : 'pointer', userSelect: 'none',
+                    opacity: isAdminRole ? 0.85 : 1,
+                  }}>
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      disabled={isAdminRole}
+                      style={{ accentColor: 'var(--brand)', cursor: isAdminRole ? 'default' : 'pointer' }}
+                      onChange={() => togglePage(page)}
+                    />
+                    <span>{PAGE_LABELS[page]}</span>
+                  </label>
+                );
+              })}
+            </div>
+            {isAdminRole && (
+              <div className="muted" style={{ fontSize: 11, marginTop: 6 }}>
+                Admins always have access to every section.
+              </div>
+            )}
+            {isCustomAccess && (
+              <div className="muted" style={{ fontSize: 11, marginTop: 6 }}>
+                Only selected sections appear in their sidebar.
+              </div>
+            )}
+          </div>
+        )}
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
           <div className="field">
@@ -1161,6 +1262,10 @@ export default function StaffPage({ onCatalogChange }: { onCatalogChange?: () =>
   };
 
   const handleToggleActive = async (s: StaffWithArea, val: boolean) => {
+    if (!val && s.role === 'admin' && activeAdminCount <= 1) {
+      setError('Cannot deactivate the last active admin');
+      return;
+    }
     setStaff(prev => prev.map(m => m.id === s.id ? { ...m, is_active: val } : m));
     try {
       const { updateStaff } = await import('@/lib/db/staff');
@@ -1172,8 +1277,18 @@ export default function StaffPage({ onCatalogChange }: { onCatalogChange?: () =>
     }
   };
 
+  const activeAdminCount = staff.filter(s => s.role === 'admin' && s.is_active).length;
+
   const handleDelete = async (s: StaffWithArea) => {
-    await deleteStaff(s.id);
+    const res = await fetch('/api/admin/delete-staff', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json', ...(await getAuthHeaders()) },
+      body: JSON.stringify({ staff_id: s.id }),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error ?? 'Could not delete staff');
+    }
     invalidateStaffCache();
     setStaff(prev => prev.filter(m => m.id !== s.id));
     setDeleteTarget(null);
@@ -1400,12 +1515,12 @@ export default function StaffPage({ onCatalogChange }: { onCatalogChange?: () =>
       )}
 
       <StaffFormModal open={addOpen} onClose={() => setAddOpen(false)}
-        areas={areas} onSaved={handleSaved} />
+        areas={areas} onSaved={handleSaved} activeAdminCount={activeAdminCount} />
 
       {editTarget && (
         <StaffFormModal open onClose={() => setEditTarget(null)}
           areas={areas} onSaved={s => { handleSaved(s); setEditTarget(null); }}
-          editTarget={editTarget} />
+          editTarget={editTarget} activeAdminCount={activeAdminCount} />
       )}
 
       {credsTarget && (
@@ -1635,7 +1750,7 @@ function TeamFormModal({ open, onClose, staff, onSaved, editTarget }: {
             {renderStaffSection('Cable Technicians', cableTechnicians, 'var(--purple)')}
             {renderStaffSection('Helpers', helpers, 'var(--green)')}
             {renderStaffSection('Recovery Agents', recoveryAgents, 'var(--amber)')}
-            {renderStaffSection('Complaint Managers', complaintManagers, 'var(--purple)')}
+            {renderStaffSection('Custom Access', complaintManagers, 'var(--purple)')}
           </div>
         </div>
       </div>

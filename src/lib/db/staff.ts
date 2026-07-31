@@ -1,7 +1,7 @@
 import { supabase } from '@/lib/supabase'
 import type { Staff, StaffWithArea, Area } from '@/types/database'
 
-const COLS = 'id, full_name, role, phone, area_id, area_ids, cable_area_ids, username, auth_user_id, is_active, created_at'
+const COLS = 'id, full_name, role, phone, area_id, area_ids, cable_area_ids, username, auth_user_id, allowed_pages, is_active, created_at'
 let staffCache: { data: StaffWithArea[]; expiresAt: number } | null = null
 const CACHE_MS = 60_000
 
@@ -95,6 +95,7 @@ export async function updateStaff(id: string, input: Partial<{
   area_ids: string[] | null
   cable_area_ids: string[] | null
   username: string | null
+  allowed_pages: string[] | null
   is_active: boolean
 }>): Promise<Staff> {
   // Backward compatibility: sync area_id with first element of area_ids if provided

@@ -20,7 +20,7 @@ import { AuthProvider, useAuth } from '@/lib/auth/auth-context';
 import { NotificationsProvider, useNotifications } from '@/lib/notifications/notifications-context';
 import { getDashboardRefreshToken } from '@/lib/dashboard/summary';
 import { getNotificationNavigationTarget } from '@/lib/notifications/navigation';
-import { NAV_BY_ROLE, DEFAULT_PAGE_BY_ROLE, canAccessPage, VALID_PAGE_IDS, type PageId } from '@/lib/auth/permissions';
+import { getAllowedPages, defaultPageForStaff, canAccessPage, VALID_PAGE_IDS, type PageId } from '@/lib/auth/permissions';
 import { initials } from '@/lib/utils';
 import type { Staff } from '@/types/database';
 import { globalSearch, type SearchResult } from '@/lib/search';
@@ -419,19 +419,19 @@ function ShellContent({ staff, logout }: {
     if (!staff) return;
     try {
       const saved = sessionStorage.getItem('powernet_current_page');
-      if (saved && VALID_PAGE_IDS.has(saved) && canAccessPage(staff.role, saved as PageId)) return;
+      if (saved && VALID_PAGE_IDS.has(saved) && canAccessPage(staff, saved as PageId)) return;
     } catch { /* SSR guard */ }
-    handlePageChange(DEFAULT_PAGE_BY_ROLE[staff.role]);
+    handlePageChange(defaultPageForStaff(staff));
   }, [staff, handlePageChange]);
 
-  const allowedNav = useMemo(() => staff ? NAV_BY_ROLE[staff.role] : [], [staff]);
+  const allowedNav = useMemo(() => staff ? getAllowedPages(staff) : [], [staff]);
   const dashboardRefreshToken = getDashboardRefreshToken(billingVersion, complaintsVersion);
 
   const meta = PAGE_META[active];
 
   const handleNotificationOpen = useCallback((item: unknown) => {
     const target = getNotificationNavigationTarget(item);
-    if (!target || !canAccessPage(staff.role, target.page)) return;
+    if (!target || !canAccessPage(staff, target.page)) return;
 
     handlePageChange(target.page);
     setNotificationFocus(current => {
@@ -446,7 +446,7 @@ function ShellContent({ staff, logout }: {
         requestId: (current?.requestId ?? 0) + 1,
       };
     });
-  }, [handlePageChange, staff.role]);
+  }, [handlePageChange, staff]);
 
   return (
     <div className="app">
@@ -514,19 +514,19 @@ function ShellContent({ staff, logout }: {
           </div>
         )}
         <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
-          {!canAccessPage(staff.role, active) ? <AccessDenied /> : (
+          {!canAccessPage(staff, active) ? <AccessDenied /> : (
             <>
-              {canAccessPage(staff.role, 'dashboard') && (
+              {canAccessPage(staff, 'dashboard') && (
                 <div style={{ display: active === 'dashboard' ? 'contents' : 'none' }}>
                   <DashboardPage refreshToken={dashboardRefreshToken} onNavigate={handlePageChange} />
                 </div>
               )}
-              {canAccessPage(staff.role, 'customers') && (
+              {canAccessPage(staff, 'customers') && (
                 <div style={{ display: active === 'customers' ? 'contents' : 'none' }}>
                   <CustomersPage />
                 </div>
               )}
-              {canAccessPage(staff.role, 'customer_requests') && (
+              {canAccessPage(staff, 'customer_requests') && (
                 <div style={{ display: active === 'customer_requests' ? 'contents' : 'none' }}>
                   <CustomerRequestsPage
                     refreshToken={customerRequestsVersion}
@@ -534,7 +534,7 @@ function ShellContent({ staff, logout }: {
                     focusToken={notificationFocus?.page === 'customer_requests' ? notificationFocus.requestId : 0}
                   />
                 </div>
-              )}              {canAccessPage(staff.role, 'payment_approvals') && (
+              )}              {canAccessPage(staff, 'payment_approvals') && (
                 <div style={{ display: active === 'payment_approvals' ? 'contents' : 'none' }}>
                   <PaymentApprovalsPage
                     staffId={staff.id}
@@ -543,7 +543,7 @@ function ShellContent({ staff, logout }: {
                 </div>
               )}
 
-              {canAccessPage(staff.role, 'billing') && (
+              {canAccessPage(staff, 'billing') && (
                 <div style={{ display: active === 'billing' ? 'contents' : 'none' }}>
                   <BillingPage
                     staff={staff}
@@ -553,12 +553,12 @@ function ShellContent({ staff, logout }: {
                   />
                 </div>
               )}
-              {canAccessPage(staff.role, 'cable') && (
+              {canAccessPage(staff, 'cable') && (
                 <div style={{ display: active === 'cable' ? 'contents' : 'none' }}>
                   <CablePage staff={staff} />
                 </div>
               )}
-              {canAccessPage(staff.role, 'complaints') && (
+              {canAccessPage(staff, 'complaints') && (
                 <div style={{ display: active === 'complaints' ? 'contents' : 'none' }}>
                   <ComplaintsPage
                     refreshToken={complaintsVersion}
@@ -569,22 +569,22 @@ function ShellContent({ staff, logout }: {
                   />
                 </div>
               )}
-              {canAccessPage(staff.role, 'staff') && (
+              {canAccessPage(staff, 'staff') && (
                 <div style={{ display: active === 'staff' ? 'contents' : 'none' }}>
                   <StaffPage onCatalogChange={bumpStaffCatalog} />
                 </div>
               )}
-              {canAccessPage(staff.role, 'areas') && (
+              {canAccessPage(staff, 'areas') && (
                 <div style={{ display: active === 'areas' ? 'contents' : 'none' }}>
                   <AreasPage />
                 </div>
               )}
-              {canAccessPage(staff.role, 'reports') && (
+              {canAccessPage(staff, 'reports') && (
                 <div style={{ display: active === 'reports' ? 'contents' : 'none' }}>
                   <ReportsPage />
                 </div>
               )}
-              {canAccessPage(staff.role, 'settings') && (
+              {canAccessPage(staff, 'settings') && (
                 <div style={{ display: active === 'settings' ? 'contents' : 'none' }}>
                   <SettingsPage />
                 </div>
