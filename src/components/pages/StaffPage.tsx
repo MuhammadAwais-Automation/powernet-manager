@@ -453,25 +453,44 @@ function CredentialsModal({ staff, onClose, onPasswordReset }: {
   onClose: () => void;
   onPasswordReset: (s: StaffWithArea, newPw: string) => Promise<void>;
 }) {
-  const [resetMode, setResetMode] = useState(false);
-  const [newPw, setNewPw]         = useState('');
-  const [showPw, setShowPw]       = useState(false);
-  const [saving, setSaving]       = useState(false);
-  const [copied, setCopied]       = useState<string | null>(null);
-  const [error, setError]         = useState<string | null>(null);
+  const [resetMode, setResetMode]           = useState(false);
+  const [newPw, setNewPw]                   = useState('');
+  const [activePassword, setActivePassword] = useState<string | null>(null);
+  const [showPw, setShowPw]                 = useState(true);
+  const [saving, setSaving]                 = useState(false);
+  const [copied, setCopied]                 = useState<string | null>(null);
+  const [error, setError]                   = useState<string | null>(null);
+
+  const initials  = getInitials(staff.full_name);
+  const roleLabel = getRoleLabel(staff.role);
+  const roleColor = getRoleBadgeColor(staff.role);
 
   const copy = (text: string, key: string) => {
     navigator.clipboard.writeText(text);
     setCopied(key);
-    setTimeout(() => setCopied(null), 1800);
+    setTimeout(() => setCopied(null), 2000);
   };
 
-  const handleReset = async () => {
-    if (!newPw.trim()) { setError('Password required'); return; }
+  const generateRandomPassword = () => {
+    const chars = '23456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz';
+    let randStr = '';
+    for (let i = 0; i < 6; i++) {
+      randStr += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    const gen = `Pass@${randStr}`;
+    setNewPw(gen);
+    setShowPw(true);
+  };
+
+  const handleReset = async (pwToSet?: string) => {
+    const targetPw = (pwToSet || newPw).trim();
+    if (!targetPw) { setError('Password required'); return; }
     setSaving(true);
     setError(null);
     try {
-      await onPasswordReset(staff, newPw.trim());
+      await onPasswordReset(staff, targetPw);
+      setActivePassword(targetPw);
+      setShowPw(true);
       setResetMode(false);
       setNewPw('');
     } catch (e: unknown) {
@@ -481,81 +500,198 @@ function CredentialsModal({ staff, onClose, onPasswordReset }: {
     }
   };
 
+  const shareText = `🔐 PowerNet Staff Access\nStaff: ${staff.full_name}\nUsername: ${staff.username || 'Not set'}\nPassword: ${activePassword || '(Not changed)'}\nRole: ${roleLabel}\nApp: Mobile Staff App`;
+
   return (
-    <Modal open onClose={onClose} width={420}>
-      <div className="modal-head">
-        <div>
-          <div style={{ fontSize: 16, fontWeight: 600 }}>Login Credentials</div>
-          <div className="muted" style={{ fontSize: 12, marginTop: 2 }}>{staff.full_name}</div>
+    <Modal open onClose={onClose} width={440}>
+      <div className="modal-head" style={{ borderBottom: '1px solid var(--border)', padding: '16px 20px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{
+            width: 42,
+            height: 42,
+            borderRadius: '50%',
+            background: 'linear-gradient(135deg, var(--brand), #ff7a50)',
+            color: '#fff',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontWeight: 700,
+            fontSize: 15,
+            boxShadow: '0 2px 8px rgba(240, 90, 43, 0.25)'
+          }}>
+            {initials}
+          </div>
+          <div>
+            <div style={{ fontSize: 16, fontWeight: 700, lineHeight: 1.2 }}>{staff.full_name}</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
+              <Badge color={roleColor}>{roleLabel}</Badge>
+              <span style={{ fontSize: 11, color: staff.is_active ? 'var(--green)' : 'var(--text-muted)', fontWeight: 600 }}>
+                • {staff.is_active ? 'Active Account' : 'Inactive'}
+              </span>
+            </div>
+          </div>
         </div>
         <button className="icon-btn" onClick={onClose}><Icon name="close" size={16} /></button>
       </div>
-      <div className="modal-body">
-        {/* Username row */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px',
-                      background: 'var(--bg-muted)', borderRadius: 10, marginBottom: 10,
-                      border: '1px solid var(--border)' }}>
-          <div style={{ flex: 1 }}>
-            <div className="muted" style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase',
-                                             letterSpacing: '0.06em', marginBottom: 2 }}>Username</div>
-            <div className="mono" style={{ fontSize: 14, fontWeight: 600 }}>
+
+      <div className="modal-body" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+        {/* Username Card */}
+        <div style={{
+          padding: '14px 16px',
+          background: 'var(--bg-muted)',
+          borderRadius: 12,
+          border: '1px solid var(--border)',
+          borderLeft: '4px solid var(--brand)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between'
+        }}>
+          <div>
+            <div className="muted" style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>
+              Username / Login ID
+            </div>
+            <div className="mono" style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-main)' }}>
               {staff.username ?? <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>Not set</span>}
             </div>
           </div>
           {staff.username && (
-            <button className="btn btn-secondary btn-sm" onClick={() => copy(staff.username!, 'user')}>
-              {copied === 'user' ? <Icon name="check" size={12} /> : <Icon name="copy" size={12} />}
-              {copied === 'user' ? 'Copied!' : 'Copy'}
+            <button className="btn btn-secondary btn-sm" style={{ borderRadius: 8, gap: 6 }} onClick={() => copy(staff.username!, 'user')}>
+              {copied === 'user' ? <Icon name="check" size={13} /> : <Icon name="copy" size={13} />}
+              {copied === 'user' ? 'Copied' : 'Copy'}
             </button>
           )}
         </div>
 
-        {/* Password reset section */}
-        {!resetMode ? (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                        padding: '12px 14px', background: 'var(--bg-muted)', borderRadius: 10,
-                        border: '1px solid var(--border)' }}>
+        {/* Password Card */}
+        <div style={{
+          padding: '14px 16px',
+          background: 'var(--bg-muted)',
+          borderRadius: 12,
+          border: '1px solid var(--border)',
+          borderLeft: '4px solid #3b82f6',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 12
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div>
-              <div className="muted" style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase',
-                                               letterSpacing: '0.06em', marginBottom: 2 }}>Password</div>
-              <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>••••••••  (hashed, not viewable)</div>
+              <div className="muted" style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>
+                Account Password
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span className="mono" style={{ fontSize: 15, fontWeight: 700, letterSpacing: showPw ? '0.02em' : '0.15em' }}>
+                  {activePassword
+                    ? (showPw ? activePassword : '••••••••••••')
+                    : (showPw ? '••••••••' : '••••••••')}
+                </span>
+                {activePassword && (
+                  <span style={{ fontSize: 10, background: 'rgba(34, 197, 94, 0.15)', color: 'var(--green)', padding: '2px 6px', borderRadius: 4, fontWeight: 600 }}>
+                    Newly Updated
+                  </span>
+                )}
+              </div>
             </div>
-            <button className="btn btn-secondary btn-sm" onClick={() => setResetMode(true)}>
-              <Icon name="key" size={12} />Reset
-            </button>
+            <div style={{ display: 'flex', gap: 6 }}>
+              {(activePassword || resetMode) && (
+                <button className="btn btn-ghost btn-sm" style={{ padding: '6px 8px' }} onClick={() => setShowPw(v => !v)} title={showPw ? 'Hide password' : 'Show password'}>
+                  <Icon name={showPw ? 'eyeOff' : 'eye'} size={14} />
+                </button>
+              )}
+              {activePassword && (
+                <button className="btn btn-secondary btn-sm" style={{ borderRadius: 8, gap: 6 }} onClick={() => copy(activePassword, 'pw')}>
+                  {copied === 'pw' ? <Icon name="check" size={13} /> : <Icon name="copy" size={13} />}
+                  {copied === 'pw' ? 'Copied' : 'Copy'}
+                </button>
+              )}
+              {!resetMode && (
+                <button className="btn btn-secondary btn-sm" style={{ borderRadius: 8, gap: 4 }} onClick={() => setResetMode(true)}>
+                  <Icon name="key" size={13} /> {activePassword ? 'Change' : 'Set / Reset'}
+                </button>
+              )}
+            </div>
           </div>
-        ) : (
-          <div style={{ padding: '12px 14px', background: 'var(--bg-muted)', borderRadius: 10,
-                        border: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {error && <div style={{ fontSize: 12, color: 'var(--red)' }}>{error}</div>}
-            <div className="field">
-              <label>New Password</label>
-              <div style={{ position: 'relative' }}>
-                <input className="input" type={showPw ? 'text' : 'password'}
-                  placeholder="Enter new password" value={newPw}
-                  onChange={e => setNewPw(e.target.value)} style={{ paddingRight: 36 }} />
-                <button type="button" onClick={() => setShowPw(v => !v)}
-                  style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)',
-                           background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 2 }}>
-                  <Icon name={showPw ? 'eye' : 'eyeOff'} size={14} />
+
+          {/* Reset / Set Password Form */}
+          {resetMode && (
+            <div style={{
+              marginTop: 4,
+              paddingTop: 12,
+              borderTop: '1px dashed var(--border)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 10
+            }}>
+              {error && <div style={{ fontSize: 12, color: 'var(--red)', fontWeight: 500 }}>{error}</div>}
+              <div className="field" style={{ margin: 0 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                  <label style={{ fontSize: 11, fontWeight: 600 }}>New Password</label>
+                  <button type="button" onClick={generateRandomPassword} style={{ background: 'none', border: 'none', color: 'var(--brand)', cursor: 'pointer', fontSize: 11, fontWeight: 600, padding: 0 }}>
+                    ⚡ Quick Generate
+                  </button>
+                </div>
+                <div style={{ position: 'relative' }}>
+                  <input
+                    className="input"
+                    type={showPw ? 'text' : 'password'}
+                    placeholder="Enter or generate password"
+                    value={newPw}
+                    onChange={e => setNewPw(e.target.value)}
+                    style={{ paddingRight: 38, fontSize: 13 }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPw(v => !v)}
+                    style={{
+                      position: 'absolute',
+                      right: 8,
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      color: 'var(--text-muted)',
+                      padding: 4
+                    }}
+                  >
+                    <Icon name={showPw ? 'eyeOff' : 'eye'} size={14} />
+                  </button>
+                </div>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 2 }}>
+                <button className="btn btn-ghost btn-sm" onClick={() => { setResetMode(false); setNewPw(''); setError(null); }}>
+                  Cancel
+                </button>
+                <button className="btn btn-primary btn-sm" onClick={() => handleReset()} disabled={saving}>
+                  <Icon name="check" size={13} />
+                  {saving ? 'Saving…' : 'Save & View Password'}
                 </button>
               </div>
             </div>
-            <div className="row gap-sm">
-              <button className="btn btn-ghost btn-sm" onClick={() => { setResetMode(false); setNewPw(''); }}>Cancel</button>
-              <button className="btn btn-primary btn-sm" onClick={handleReset} disabled={saving}>
-                {saving ? 'Saving…' : 'Set Password'}
-              </button>
-            </div>
-          </div>
-        )}
+          )}
+        </div>
 
-        <div style={{ marginTop: 14, padding: '10px 14px', background: 'var(--brand-50)',
-                      borderRadius: 8, fontSize: 12, color: 'var(--text-muted)' }}>
-          <strong style={{ color: 'var(--brand)' }}>Flutter App:</strong> Staff will use these credentials to log in to the mobile app.
+        {/* Share Credentials Box */}
+        <div style={{
+          padding: '12px 14px',
+          background: 'var(--bg-elev)',
+          borderRadius: 10,
+          border: '1px solid var(--border)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between'
+        }}>
+          <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+            <strong style={{ color: 'var(--text-main)', display: 'block', marginBottom: 2 }}>Mobile App Access:</strong>
+            Send login details to staff for Android / iOS login.
+          </div>
+          <button className="btn btn-ghost btn-sm" style={{ color: 'var(--brand)', fontWeight: 600, gap: 6, flexShrink: 0 }} onClick={() => copy(shareText, 'share')}>
+            {copied === 'share' ? <Icon name="check" size={13} /> : <Icon name="share" size={13} />}
+            {copied === 'share' ? 'Copied All!' : 'Copy All'}
+          </button>
         </div>
       </div>
-      <div className="modal-foot">
+
+      <div className="modal-foot" style={{ borderTop: '1px solid var(--border)', padding: '14px 20px' }}>
         <button className="btn btn-primary" onClick={onClose}>Done</button>
       </div>
     </Modal>
