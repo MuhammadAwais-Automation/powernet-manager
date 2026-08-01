@@ -70,31 +70,31 @@ function statusColor(status: string): "green" | "red" | "amber" | "purple" {
 
 function billCollectionStatusKey(
   bill: Pick<BillWithRelations, "amount" | "paid_amount" | "status">,
-  balance?: Pick<CustomerBalanceSummary, "totalPaid" | "totalOutstanding"> | null,
 ): string {
-  const paid = bill.paid_amount ?? 0;
-  const isOpen = bill.status !== "paid" && paid < bill.amount;
-  const ledgerStatus = (
-    bill as Pick<BillWithRelations, "amount" | "paid_amount" | "status"> & {
-      ledger_collection_status?: string;
-    }
-  ).ledger_collection_status;
-  if (
-    isOpen &&
-    (ledgerStatus === "partial" ||
-      ((balance?.totalPaid ?? 0) > 0 && (balance?.totalOutstanding ?? 0) > 0))
-  ) {
-    return "partial";
-  }
-  const status = getBillCollectionStatus(bill);
-  return status === "partial" ? "partial" : bill.status;
+  // Status reflects THIS bill only. Cross-month dues show under Remaining.
+  return getBillCollectionStatus(bill);
 }
 
 function statusLabel(
   bill: Pick<BillWithRelations, "amount" | "paid_amount" | "status">,
-  balance?: Pick<CustomerBalanceSummary, "totalPaid" | "totalOutstanding"> | null,
 ): string {
-  return formatBillCollectionStatusLabel(billCollectionStatusKey(bill, balance));
+  return formatBillCollectionStatusLabel(billCollectionStatusKey(bill));
+}
+
+function padDailyCollections(
+  daily: { d: string; v: number }[],
+  month: string,
+): { d: string; v: number }[] {
+  const parts = month.split("-").map(Number);
+  const year = parts[0];
+  const mon = parts[1];
+  if (!year || !mon) return daily;
+  const daysInMonth = new Date(year, mon, 0).getDate();
+  const byDay = new Map(daily.map((row) => [row.d, row.v]));
+  return Array.from({ length: daysInMonth }, (_, i) => {
+    const d = String(i + 1).padStart(2, "0");
+    return { d, v: byDay.get(d) ?? 0 };
+  });
 }
 
 function getBillChannelSource(
@@ -764,25 +764,20 @@ export default function BillingPage({
       )}
 
       <div
-        className="grid-responsive-4"
+        className="billing-kpi-grid"
         style={{
-          marginBottom: 20,
           opacity: loading ? 0.6 : 1,
           transition: "opacity 0.15s",
         }}
       >
         {kpiCards.map((s, i) => (
-          <div
-            key={i}
-            className="card card-pad"
-            style={{ display: "flex", alignItems: "center", gap: 14 }}
-          >
-            <IconBadge name={s.icon} color={s.color} size={40} />
+          <div key={i} className="card billing-stat-card">
+            <IconBadge name={s.icon} color={s.color} size={34} />
             <div style={{ flex: 1, minWidth: 0 }}>
               <div
                 className="muted"
                 style={{
-                  fontSize: 11,
+                  fontSize: 10,
                   textTransform: "uppercase",
                   letterSpacing: "0.06em",
                   fontWeight: 600,
@@ -792,10 +787,10 @@ export default function BillingPage({
               </div>
               <div
                 style={{
-                  fontSize: 19,
+                  fontSize: 17,
                   fontWeight: 700,
                   letterSpacing: "-0.02em",
-                  marginTop: 2,
+                  marginTop: 1,
                 }}
                 className="num"
               >
@@ -803,9 +798,9 @@ export default function BillingPage({
               </div>
               <div
                 style={{
-                  fontSize: 12,
+                  fontSize: 11,
                   color: "var(--text-muted)",
-                  marginTop: 2,
+                  marginTop: 1,
                 }}
               >
                 {s.count} bills
@@ -817,14 +812,7 @@ export default function BillingPage({
 
       {/* ── Ledger Overview: cross-month customer-level summary ── */}
       {ledgerSummary && (
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(3, 1fr)",
-            gap: 12,
-            marginBottom: 4,
-          }}
-        >
+        <div className="billing-ledger-grid">
           {[
             {
               label: "Total Outstanding",
@@ -848,21 +836,12 @@ export default function BillingPage({
               icon: "checkCircle" as IconName,
             },
           ].map((item) => (
-            <div
-              key={item.label}
-              className="card"
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 14,
-                padding: "14px 18px",
-              }}
-            >
+            <div key={item.label} className="card billing-stat-card">
               <div
                 style={{
-                  width: 38,
-                  height: 38,
-                  borderRadius: 10,
+                  width: 34,
+                  height: 34,
+                  borderRadius: 9,
                   background: `${item.color}18`,
                   display: "flex",
                   alignItems: "center",
@@ -870,8 +849,7 @@ export default function BillingPage({
                   flexShrink: 0,
                 }}
               >
-                <Icon name={item.icon} size={18} style={{ color: item.color }} />
-
+                <Icon name={item.icon} size={16} style={{ color: item.color }} />
               </div>
               <div style={{ minWidth: 0 }}>
                 <div
@@ -881,14 +859,14 @@ export default function BillingPage({
                     letterSpacing: "0.06em",
                     fontWeight: 700,
                     color: "var(--text-muted)",
-                    marginBottom: 2,
+                    marginBottom: 1,
                   }}
                 >
                   {item.label}
                 </div>
                 <div
                   style={{
-                    fontSize: 17,
+                    fontSize: 16,
                     fontWeight: 800,
                     letterSpacing: "-0.02em",
                     color: item.color,
@@ -1112,7 +1090,16 @@ export default function BillingPage({
                       <td className="num" style={{ fontWeight: 600 }}>
                         {fmt(b.amount)}
                       </td>
-                      <td className="num" style={{ color: "var(--green)" }}>
+                      <td
+                        className="num"
+                        style={{
+                          color:
+                            (b.paid_amount ?? 0) > 0
+                              ? "var(--green)"
+                              : "var(--text-muted)",
+                          fontWeight: (b.paid_amount ?? 0) > 0 ? 600 : 500,
+                        }}
+                      >
                         {fmt(b.paid_amount ?? 0)}
                       </td>
                       <td className="num">
@@ -1129,13 +1116,7 @@ export default function BillingPage({
                         </div>
                         {ledgerRemainingAmount(b) > remainingAmount(b) && (
                           <div
-                            className="muted"
-                            style={{
-                              fontSize: 10,
-                              color: "var(--red)",
-                              marginTop: 2,
-                              whiteSpace: "nowrap",
-                            }}
+                            className="billing-dues-sub"
                             title={`Total outstanding across all months: ${fmt(ledgerRemainingAmount(b))}`}
                           >
                             +{fmt(ledgerRemainingAmount(b) - remainingAmount(b))} dues
@@ -1211,26 +1192,26 @@ export default function BillingPage({
                           )}
                           <button
                             className="icon-btn"
-                            style={{ width: 28, height: 28 }}
+                            style={{ width: 32, height: 32, color: "var(--text)" }}
                             title="Bill details"
                             onClick={() => setDetailBill(b)}
                           >
-                            <Icon name="fileText" size={14} />
+                            <Icon name="fileText" size={16} />
                           </button>
                           {ledgerRemainingAmount(b) > 0 && (
                             <button
                               className="icon-btn"
-                              style={{ width: 28, height: 28 }}
+                              style={{ width: 32, height: 32, color: "var(--text)" }}
                               title="Record payment"
                               onClick={() => setPaymentBill(b)}
                             >
-                              <Icon name="cash" size={14} />
+                              <Icon name="cash" size={16} />
                             </button>
                           )}
                           {(tab === "Visited" || tab === "FollowUp") && (
                             <button
                               className="icon-btn"
-                              style={{ width: 28, height: 28, color: "var(--red)" }}
+                              style={{ width: 32, height: 32, color: "var(--red)" }}
                               title="Delete workflow state"
                               onClick={async (e) => {
                                 e.stopPropagation();
@@ -1245,7 +1226,7 @@ export default function BillingPage({
                                 }
                               }}
                             >
-                              <Icon name="trash" size={14} />
+                              <Icon name="trash" size={16} />
                             </button>
                           )}
                         </div>
@@ -1328,7 +1309,10 @@ export default function BillingPage({
                 </div>
               ) : (
                 <BarChart
-                  data={summary?.dailyCollections ?? []}
+                  data={padDailyCollections(
+                    summary?.dailyCollections ?? [],
+                    billingMonth,
+                  )}
                   accent="var(--brand)"
                   labelKey="d"
                 />
@@ -1352,8 +1336,8 @@ export default function BillingPage({
                 #{detailBill.id.slice(0, 8).toUpperCase()}
               </div>
             </div>
-            <Badge color={statusColor(billCollectionStatusKey(detailBill, detailBalance))} dot>
-              {statusLabel(detailBill, detailBalance)}
+            <Badge color={statusColor(billCollectionStatusKey(detailBill))} dot>
+              {statusLabel(detailBill)}
             </Badge>
           </div>
 

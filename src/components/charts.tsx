@@ -213,8 +213,10 @@ export function BarChart({ data, height = 220, accent, labelKey = 'd', valueKey 
   };
 
 
-  const barW = Math.max(innerW / (data.length || 1) * 0.55, 12);
-  const gap = innerW / (data.length || 1);
+  const slotW = innerW / (data.length || 1);
+  // Cap bar width so sparse / single-day charts don't look broken.
+  const barW = Math.min(Math.max(slotW * 0.55, 10), 36);
+  const gap = slotW;
   const ticks = [0, Math.round(max / 2), max];
   const hatchId = `hatch-${Math.random().toString(36).slice(2, 8)}`;
 
@@ -243,11 +245,27 @@ export function BarChart({ data, height = 220, accent, labelKey = 'd', valueKey 
           const bh = Math.max((scaled / max) * innerH, value > 0 ? 3 : 0);
           const yy = pad.t + innerH - bh;
           const rx = Math.min(barW / 2, 8);
+          const labelStep = data.length > 20 ? 5 : data.length > 14 ? 2 : 1;
+          const showXLabel =
+            value > 0 ||
+            i === 0 ||
+            i === data.length - 1 ||
+            i % labelStep === 0;
           return (
             <g key={i}>
-              <rect x={bx} y={yy} width={barW} height={bh} fill={fill} rx={rx} opacity={0.88} />
-              <text x={bx + barW / 2} y={h - pad.b + 16} fontSize="11" textAnchor="middle" fill="var(--text-muted)">{String(d[labelKey] ?? '')}</text>
-              {value > 0 && (
+              <rect
+                x={bx}
+                y={yy}
+                width={barW}
+                height={bh}
+                fill={fill}
+                rx={rx}
+                opacity={value > 0 ? 0.88 : 0.18}
+              />
+              {showXLabel && (
+                <text x={bx + barW / 2} y={h - pad.b + 16} fontSize="10" textAnchor="middle" fill="var(--text-muted)">{String(d[labelKey] ?? '')}</text>
+              )}
+              {value > 0 && data.length <= 16 && (
                 <text x={bx + barW / 2} y={yy - 5} fontSize="9" textAnchor="middle" fill="var(--text)" fontWeight="600" fontFamily="JetBrains Mono, monospace">{formatBarLabel(value)}</text>
               )}
             </g>

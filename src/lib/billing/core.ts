@@ -258,7 +258,7 @@ export function formatBillCollectionStatusLabel(
   if (status === "partial") return "Less Paid";
   if (status === "paid") return "Paid";
   if (status === "overdue") return "Overdue";
-  if (status === "pending") return "Pending";
+  if (status === "pending") return "Unpaid";
   return status;
 }
 
