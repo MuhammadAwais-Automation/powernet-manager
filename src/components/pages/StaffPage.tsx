@@ -684,7 +684,7 @@ function CredentialsModal({ staff, onClose, onPasswordReset }: {
             Send login details to staff for Android / iOS login.
           </div>
           <button className="btn btn-ghost btn-sm" style={{ color: 'var(--brand)', fontWeight: 600, gap: 6, flexShrink: 0 }} onClick={() => copy(shareText, 'share')}>
-            {copied === 'share' ? <Icon name="check" size={13} /> : <Icon name="share" size={13} />}
+            {copied === 'share' ? <Icon name="check" size={13} /> : <Icon name="copy" size={13} />}
             {copied === 'share' ? 'Copied All!' : 'Copy All'}
           </button>
         </div>
