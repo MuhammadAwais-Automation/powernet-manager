@@ -710,10 +710,22 @@ table.data tr.selected { background: var(--blue-50); }
 .cell-user .sub { font-size: 11px; color: var(--text-muted); }
 
 /* Tabs */
-.tabs { display: inline-flex; background: var(--bg-muted); padding: 4px; border-radius: 8px; gap: 2px; border: 1px solid var(--border); }
+.tabs {
+  display: inline-flex;
+  background: var(--bg-muted);
+  padding: 4px;
+  border-radius: 8px;
+  gap: 2px;
+  border: 1px solid var(--border);
+  overflow-x: auto;
+  max-width: 100%;
+  scrollbar-width: none;
+}
+.tabs::-webkit-scrollbar { display: none; }
 .tabs button {
   padding: 6px 14px; font-size: 13px; font-weight: 500; color: var(--text-muted);
   border-radius: 6px; transition: background .15s, color .15s; cursor: pointer;
+  white-space: nowrap; flex-shrink: 0;
 }
 .tabs button.active { background: var(--bg-elev); color: var(--text); box-shadow: var(--shadow-sm); }
 .tabs button:hover:not(.active) { color: var(--text); }
@@ -808,9 +820,10 @@ table.data tr.selected { background: var(--blue-50); }
   gap: 8px;
   flex: 1;
   min-width: 320px;
+  flex-wrap: wrap;
 }
 .billing-search {
-  min-width: 280px;
+  min-width: 200px;
   max-width: 520px;
   height: 36px;
   border: 1px solid var(--border);

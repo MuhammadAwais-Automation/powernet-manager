@@ -89,6 +89,8 @@ export type BillsPageParams = {
   search?: string;
   areaId?: string;
   source?: string;
+  sortBy?: string;
+  sortOrder?: "asc" | "desc";
 };
 
 export type BillsPageResult = {
@@ -271,12 +273,6 @@ export async function getCustomerLedgerSummary(
 export async function getBillsPage(
   params: BillsPageParams,
 ): Promise<BillsPageResult> {
-  try {
-    await supabase.rpc("transition_pending_bills_to_overdue");
-  } catch (e) {
-    console.error("Failed to transition pending bills to overdue:", e);
-  }
-
   const { from, to } = getBillRange(params.page, params.pageSize);
   const key = buildBillsPageCacheKey(params);
   if (billsPageCache[key] && billsPageCache[key].expiresAt > Date.now())
@@ -308,10 +304,19 @@ export async function getBillsPage(
     let query = supabase
       .from("bills")
       .select(select, { count: "exact" })
-      .eq("month", params.month)
-      .order("paid_at", { ascending: false, nullsFirst: false })
-      .order("created_at", { ascending: false })
-      .range(from, to);
+      .eq("month", params.month);
+
+    if (params.sortBy) {
+      query = query.order(params.sortBy, {
+        ascending: params.sortOrder === "asc",
+        nullsFirst: false,
+      });
+    } else {
+      query = query
+        .order("paid_at", { ascending: false, nullsFirst: false })
+        .order("created_at", { ascending: false });
+    }
+    query = query.range(from, to);
 
     if (params.status === "unpaid") query = query.neq("status", "paid");
     else if (params.status === "partial")

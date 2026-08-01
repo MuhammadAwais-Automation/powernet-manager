@@ -309,6 +309,23 @@ export default function BillingPage({
   >({});
   const [followUpBill, setFollowUpBill] = useState<BillWithRelations | null>(null);
 
+  const [sortBy, setSortBy] = useState<string>("");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+
+  const handleSort = (field: string) => {
+    if (sortBy === field) {
+      if (sortOrder === "desc") {
+        setSortOrder("asc");
+      } else {
+        setSortBy("");
+        setSortOrder("desc");
+      }
+    } else {
+      setSortBy(field);
+      setSortOrder("desc");
+    }
+  };
+
   const PAGE_SIZE = 50;
   const showCallAndVisitDetails = tab === "Visited" || tab === "FollowUp";
 
@@ -336,8 +353,19 @@ export default function BillingPage({
     debouncedSearch,
     areaFilter,
     sourceFilter,
+    sortBy,
+    sortOrder,
   });
-  latestRef.current = { billingMonth, page, tab, debouncedSearch, areaFilter, sourceFilter };
+  latestRef.current = {
+    billingMonth,
+    page,
+    tab,
+    debouncedSearch,
+    areaFilter,
+    sourceFilter,
+    sortBy,
+    sortOrder,
+  };
 
   // ── Reset page + bump loadKey when any filter changes ───────────────────────
   // We keep page reset here; if page was already 0, setPage(0) is a no-op, but
@@ -345,7 +373,7 @@ export default function BillingPage({
   useEffect(() => {
     setPage(0);
     setLoadKey((k) => k + 1);
-  }, [billingMonth, tab, debouncedSearch, areaFilter, sourceFilter]);
+  }, [billingMonth, tab, debouncedSearch, areaFilter, sourceFilter, sortBy, sortOrder]);
 
   // ── Bump loadKey when page changes (pagination clicks) ───────────────────────
   // Note: page change triggered by the filter-reset above will have already been
@@ -368,6 +396,8 @@ export default function BillingPage({
       debouncedSearch: search0,
       areaFilter: area0,
       sourceFilter: source0,
+      sortBy: sortBy0,
+      sortOrder: sortOrder0,
     } = latestRef.current;
     setLoading(true);
     setBills([]); // Clear previous results immediately — prevents stale skeleton
@@ -384,6 +414,8 @@ export default function BillingPage({
           search: search0,
           areaId: area0 || undefined,
           source: source0 || undefined,
+          sortBy: sortBy0 || undefined,
+          sortOrder: sortOrder0,
         }),
         getBillingSummary(month, area0 || undefined),
         getAreas(),
@@ -569,7 +601,10 @@ export default function BillingPage({
       }
 
       const escape = (v: string | number | null | undefined) => {
-        const s = String(v ?? "");
+        let s = String(v ?? "");
+        if (/^[=+@-]/.test(s)) {
+          s = "'" + s;
+        }
         return `"${s.replace(/"/g, '""')}"`;
       };
 
@@ -1016,12 +1051,22 @@ export default function BillingPage({
               <table className="data">
                 <thead>
                   <tr>
-                    <th>Bill ID</th>
+                    <th onClick={() => handleSort("id")} style={{ cursor: "pointer", userSelect: "none" }}>
+                      Bill ID {sortBy === "id" ? (sortOrder === "asc" ? "▲" : "▼") : ""}
+                    </th>
                     <th>Customer</th>
-                    <th>Amount</th>
-                    <th>Paid</th>
-                    <th>Remaining</th>
-                    <th>Status</th>
+                    <th onClick={() => handleSort("amount")} style={{ cursor: "pointer", userSelect: "none" }}>
+                      Amount {sortBy === "amount" ? (sortOrder === "asc" ? "▲" : "▼") : ""}
+                    </th>
+                    <th onClick={() => handleSort("paid_amount")} style={{ cursor: "pointer", userSelect: "none" }}>
+                      Paid {sortBy === "paid_amount" ? (sortOrder === "asc" ? "▲" : "▼") : ""}
+                    </th>
+                    <th onClick={() => handleSort("amount")} style={{ cursor: "pointer", userSelect: "none" }}>
+                      Remaining {sortBy === "amount" ? (sortOrder === "asc" ? "▲" : "▼") : ""}
+                    </th>
+                    <th onClick={() => handleSort("status")} style={{ cursor: "pointer", userSelect: "none" }}>
+                      Status {sortBy === "status" ? (sortOrder === "asc" ? "▲" : "▼") : ""}
+                    </th>
                     <th>Channel</th>
                     {showCallAndVisitDetails && (
                       <>

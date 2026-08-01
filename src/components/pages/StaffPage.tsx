@@ -461,9 +461,8 @@ function CredentialsModal({ staff, onClose, onPasswordReset }: {
   const [copied, setCopied]                 = useState<string | null>(null);
   const [error, setError]                   = useState<string | null>(null);
 
-  const initials  = getInitials(staff.full_name);
-  const roleLabel = getRoleLabel(staff.role);
-  const roleColor = getRoleBadgeColor(staff.role);
+  const roleLabel = ROLE_LABELS[staff.role] ?? staff.role;
+  const roleColor = ROLE_COLORS[staff.role] ?? 'gray';
 
   const copy = (text: string, key: string) => {
     navigator.clipboard.writeText(text);
@@ -519,7 +518,7 @@ function CredentialsModal({ staff, onClose, onPasswordReset }: {
             fontSize: 15,
             boxShadow: '0 2px 8px rgba(240, 90, 43, 0.25)'
           }}>
-            {initials}
+            {initials(staff.full_name)}
           </div>
           <div>
             <div style={{ fontSize: 16, fontWeight: 700, lineHeight: 1.2 }}>{staff.full_name}</div>
