@@ -69,7 +69,7 @@ export async function DELETE(req: Request) {
       return NextResponse.json(
         {
           error:
-            'Yeh staff member payments ya complaints jaisi activity se linked hai, isliye permanently delete nahi ho sakta. Pehle isay Inactive kar dein.',
+            'This staff member is linked to other records that block deletion. Please deactivate the account instead.',
         },
         { status: 409 },
       )
