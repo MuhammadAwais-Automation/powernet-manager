@@ -65,6 +65,15 @@ export async function DELETE(req: Request) {
     .eq('id', staff_id)
 
   if (deleteErr) {
+    if (deleteErr.code === '23503') {
+      return NextResponse.json(
+        {
+          error:
+            'Yeh staff member payments ya complaints jaisi activity se linked hai, isliye permanently delete nahi ho sakta. Pehle isay Inactive kar dein.',
+        },
+        { status: 409 },
+      )
+    }
     return NextResponse.json({ error: deleteErr.message }, { status: 500 })
   }
 
